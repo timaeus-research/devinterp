@@ -1,6 +1,6 @@
 # DevInterp
 
-![DevInterp](assets/rm_devinterp_logo.png)
+![DevInterp](assets/devinterp_logo.png)
 
 [![Pypi](https://img.shields.io/pypi/v/devinterp)](https://pypi.org/project/devinterp/)
 
@@ -12,9 +12,9 @@ DevInterp is a Python library for conducting research on developmental interpret
 
 ## Getting Started
 
-For those new to developmental interpretability and our library, we suggest starting with our **[main tutorial](https://www.github.com/timaeus/devinterp/docs/tutorial)**. It provides an in-depth understanding of the library's functionalities and key features.
+For those new to developmental interpretability and our library, we suggest starting with our **[main tutorial](https://www.github.com/timaeus/devinterp/docs)**. It provides an in-depth understanding of the library's functionalities and key features.
 
-To see DevInterp in action, check out our [demo notebook](https://www.github.com/timaeus/devinterp/docs/demo.ipynb), which provides a hands-on approach to applying our tool to real problems.
+To see DevInterp in action, check out our [demo notebook](https://www.github.com/timaeus/devinterp/demo/tutorial.ipynb), which provides a hands-on approach to applying our tool to real problems.
 
 ## Installation
 
@@ -28,34 +28,29 @@ You can then import the library in your Python environment with `import devinter
 
 ## Local Development
 
-### Manual Setup
-
-To set up the project for local development, clone the repository from GitHub:
+### Manual Setu
+This project uses [Poetry](https://python-poetry.org/docs/#installation) for package management. Install as follows (this will also setup your virtual environment):
 
 ```bash
-git clone https://github.com/timaeus-research/devinterp.git
-cd devinterp
-pip install -r requirements.txt
+poetry config virtualenvs.in-project true
+poetry install --with dev
 ```
 
-This installs all necessary dependencies for DevInterp.
+Optionally, if you want Jupyter Lab you can run `poetry run pip install jupyterlab` (to install in the same virtual environment), and then run with `poetry run jupyter lab`.
 
+Then the library can be imported as `import devinterp`.
 ### Testing
 
-When contributing to DevInterp, please make sure to add corresponding unit tests and confirm that your changes haven't introduced any regressions by running existing tests. 
-
-```bash
-python -m unittest discover tests
-```
+- All tests via `make test`
+- Unit tests only via `make unit-test`
+- Acceptance tests only via `make acceptance-test`
 
 ### Formatting
 
-We use `black` and `isort` for code formatting. Please make sure your contributions adhere to these standards.
+This project uses `pycln`, `isort` and `black` for formatting, pull requests are checked in github actions.
 
-```bash
-black .
-isort .
-```
+- Format all files via `make format`
+- Only check the formatting via `make check-format`
 
 ## Citation
 
