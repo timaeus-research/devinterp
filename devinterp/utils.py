@@ -1,4 +1,4 @@
-from typing import Iterable, Literal, Union
+from typing import Iterable, Literal, Tuple, Union
 
 import numpy as np
 import torch
@@ -27,3 +27,11 @@ def reduce_tensor(xs: Union[np.ndarray, torch.Tensor], reduction: Reduction):
         return xs
     else:
         raise ValueError(f"Unknown reduction: {reduction}")
+    
+
+def to_tuple(x: Union[Tuple[int, ...], int]) -> Tuple[int, ...]:
+    if isinstance(x, int):
+        return (x,)
+    else:
+        return x
+

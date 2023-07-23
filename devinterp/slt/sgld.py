@@ -6,27 +6,33 @@ TODO: Also borrow pSGLD?
 """
 
 import copy
-from typing import Any, Callable, Generator, Iterable, Literal, Tuple, Union
+from typing import Any, Callable, Generator, Iterable, Literal, Optional, Tuple, Union
 
 import numpy as np
 import torch
 from torch.optim.optimizer import Optimizer, required
 from torch.utils.data import DataLoader
 
-from devinterp.utils import Reduction, ReturnTensor, convert_tensor, reduce_tensor
+from devinterp.utils import (
+    Reduction,
+    ReturnTensor,
+    convert_tensor,
+    reduce_tensor,
+    to_tuple,
+)
 
 
 class SGLD(Optimizer):
     r"""
     SGLD is from M. Welling, Y. W. Teh "Bayesian Learning via Stochastic Gradient Langevin Dynamics"
-    We use equation (4) there, which says given $n$ samples $x_1, ... , x_N$,
+    We use equation (4) there, which says given a minibatch of $n$ samples from a dataset of $N$ samples,
 
     $$
-        w' - w = \epsilon_t / 2 ( \grad \log p(w) - N \grad L'_N(w) ) + eta_t
+        w' - w = \epsilon_t / 2 ( \grad \log p(w) - (N / n) \grad L_n(w) ) + eta_t
     $$
 
-    where $\eta_t$ is Gaussian noise, sampled from $\mathcal N(0, \epsilon_t)$, and $p(w)$ is a prior. We take
-    this to be Gaussian centered at some fixed $w_0$ parameter, with covariance matrix $\lambda I_d$.
+    where $\eta_t$ is Gaussian noise, sampled from $\mathcal N(0, \epsilon_t)$, $p(w)$ is a prior, and $L_n(w)$ is the negative log likelihood of the batch.
+    We take this to be Gaussian centered at some fixed $w_0$ parameter, with covariance matrix $\lambda I_d$.
 
     $$
         p(w) \propto \exp(-1/(2\lambda)|| w - w_0 ||^2)
@@ -36,20 +42,31 @@ class SGLD(Optimizer):
     We use a tempered posterior, which means replacing $L'_N$ by $\beta L'_N$, at inverse temperature
     $\beta = 1/\log{N}$.
 
+    This should be combined with a learning rate schedule, so that as $T \to \infty$,
+
+    $$
+        \sum_{t=1}^T \epsilon_t \to \infty, \sum_{t=1}^T \epsilon_t^2 < \infty.
+    $$
+
     """
 
-    def __init__(self, params, lr=required, weight_decay=0.1, noise=0.0):
+    def __init__(
+        self, params, lr=required, weight_decay=0.1, noise: Optional[float] = None
+    ):
+        """
+        If noise is not provided, default to the lr.
+        """
         if weight_decay < 0.0:
-            raise ValueError("Invalid weight_decay value: {}".format(weight_decay))
+            raise ValueError(f"Invalid weight_decay value: {weight_decay}")
 
         if lr is not required and lr < 0.0:
-            raise ValueError("Invalid learning rate: {}".format(lr))
+            raise ValueError(f"Invalid learning rate: {lr}")
 
         defaults = dict(lr=lr, weight_decay=weight_decay, noise=noise)
 
-        super(SGLD, self).__init__(params, defaults)
+        super().__init__(params, defaults)
 
-    def step(self):
+    def step(self, closure: Optional[Callable[[], float]] = None):
         """
         Performs a single optimization step.
         """
@@ -77,13 +94,6 @@ class SGLD(Optimizer):
                     p.data.add_(-group["lr"], 0.5 * d_p)
 
         return loss
-
-
-def to_tuple(x: Union[Tuple[int, ...], int]) -> Tuple[int, ...]:
-    if isinstance(x, int):
-        return (x,)
-    else:
-        return x
 
 
 class Sampler:
@@ -188,5 +198,7 @@ class Sampler:
         TODO: Allow `return_tensors` as in transformers
         """
 
-        estimates = convert_tensor(self.estimates(observable, seed=seed), return_tensor=return_tensor)
+        estimates = convert_tensor(
+            self.estimates(observable, seed=seed), return_tensor=return_tensor
+        )
         return reduce_tensor(estimates, reduction=reduction)
