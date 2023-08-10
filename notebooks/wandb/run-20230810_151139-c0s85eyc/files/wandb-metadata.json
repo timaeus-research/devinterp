@@ -1,0 +1,41 @@
+{
+    "os": "macOS-13.4.1-x86_64-i386-64bit",
+    "python": "3.11.4",
+    "heartbeatAt": "2023-08-10T13:11:42.226731",
+    "startedAt": "2023-08-10T13:11:39.569558",
+    "docker": null,
+    "cuda": null,
+    "args": null,
+    "state": "running",
+    "program": "<python with no main file>",
+    "git": {
+        "remote": "git@github.com:timaeus-research/devinterp.git",
+        "commit": "29dca38638354039a53657b8ee697528e8b8543e"
+    },
+    "email": "jessequinten@gmail.com",
+    "root": "/Users/Jesse/Projects/devinterp",
+    "host": "MacBook-Pro.local",
+    "username": "Jesse",
+    "executable": "/Users/Jesse/Projects/devinterp/.venv/bin/python",
+    "cpu_count": 12,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 2400,
+        "min": 2400,
+        "max": 2400
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2400,
+            "min": 2400,
+            "max": 2400
+        }
+    ],
+    "disk": {
+        "total": 1858.1917190551758,
+        "used": 8.444156646728516
+    },
+    "memory": {
+        "total": 64.0
+    }
+}
