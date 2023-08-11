@@ -1,0 +1,23 @@
+{
+    "os": "Linux-5.4.0-148-generic-x86_64-with-glibc2.31",
+    "python": "3.9.16",
+    "heartbeatAt": "2023-08-11T11:08:39.390154",
+    "startedAt": "2023-08-11T11:08:38.980124",
+    "docker": null,
+    "gpu": "Quadro M4000",
+    "gpu_count": 1,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": null,
+    "state": "running",
+    "program": "<python with no main file>",
+    "git": {
+        "remote": "git@github.com:timaeus-research/devinterp.git",
+        "commit": "a7afc5d0a3b9ad4425ee84ddbd05c6a717b0cbef"
+    },
+    "email": "jessequinten@gmail.com",
+    "root": "/home/paperspace/Projects/devinterp",
+    "host": "pshy1l4hc",
+    "username": "paperspace",
+    "executable": "/usr/local/bin/python3"
+}
