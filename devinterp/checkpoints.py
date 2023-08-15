@@ -8,6 +8,7 @@ import boto3
 import torch
 from botocore.exceptions import ClientError
 
+
 class CheckpointManager:
     """
     Manages the saving and loading of model checkpoints to a specified S3 bucket or locally (or both).

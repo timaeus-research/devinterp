@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import List, Literal, Optional, Set, Tuple, Union, Iterable
+from typing import Iterable, List, Literal, Optional, Set, Tuple, Union
 
 import torch
 import yaml
