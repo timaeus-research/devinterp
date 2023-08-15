@@ -31,7 +31,7 @@ class CheckpointManager:
             else:
                 warnings.warn("AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID must be set to use S3 bucket.")
 
-        checkpoint_dir = self.get_checkpoint_dir(self.project_name)
+        checkpoint_dir = f"../{self.get_checkpoint_dir(self.project_name)}"
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
 
@@ -64,7 +64,7 @@ class CheckpointManager:
 
     @classmethod
     def get_checkpoint_dir(cls, project_name: str) -> str:
-        return f"../checkpoints/{project_name}"
+        return f"checkpoints/{project_name}"
 
     @classmethod
     def get_checkpoint_path(cls, epoch: int, batch_idx: int, project_name: str) -> str:
@@ -80,24 +80,25 @@ class CheckpointManager:
     def load_checkpoint(
         self, epoch: int, batch_idx: int,
     ) -> Dict:
-        file_name = self.get_checkpoint_path(epoch, batch_idx, self.project_name)
+        file_path = self.get_checkpoint_path(epoch, batch_idx, self.project_name)
+        rel_file_path = f"../{file_path}"
         
         if self.client:
-            object_name = os.path.basename(file_name)
+            object_name = os.path.basename(file_path)
             print(f"Downloading {object_name} from {self.bucket_name}...")
-            self.client.download_file(self.bucket_name, object_name, file_name)
+            self.client.download_file(self.bucket_name, object_name, rel_file_path)
         
-        state_dict = torch.load(file_name)
+        state_dict = torch.load(rel_file_path)
 
         if not self.save_locally and self.bucket_name and self.client:
-            os.remove(file_name)
+            os.remove(rel_file_path)
 
         return state_dict
     
-    def _upload_file(self, file_name, object_name=None):
+    def _upload_file(self, file_path, object_name=None):
         if object_name is None:
-            object_name = file_name
-        self.client.upload_file(file_name, self.bucket_name, object_name)
+            object_name = file_path
+        self.client.upload_file(file_path, self.bucket_name, object_name)
 
     def save_checkpoint(
         self,
@@ -105,14 +106,15 @@ class CheckpointManager:
         epoch: int,
         batch_idx: int,
     ):
-        file_name = self.get_checkpoint_path(epoch, batch_idx, self.project_name)
-        torch.save(state_dict, file_name)
+        file_path = self.get_checkpoint_path(epoch, batch_idx, self.project_name)
+        rel_file_path = f"../{file_path}"
+        torch.save(state_dict, rel_file_path)
 
         if self.client:
-            self._upload_file(file_name, os.path.basename(file_name))
+            self._upload_file(rel_file_path, file_path)
 
         if not self.save_locally:
-            os.remove(file_name)
+            os.remove(rel_file_path)
 
     def __iter__(self):
         for checkpoint in self.checkpoints:
