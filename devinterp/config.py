@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import List, Literal, Optional, Set, Tuple, Union
+from typing import List, Literal, Optional, Set, Tuple, Union, Iterable
 
 import torch
 import yaml
@@ -32,6 +32,18 @@ class OptimizerConfig(BaseModel):
 
         return super().model_dump(include=fields, *args, **kwargs)
 
+    def factory(self, parameters: Iterable[torch.nn.Parameter]):
+        optimizer_type = self.optimizer_type
+        optimizer_params = self.model_dump(exclude={"optimizer_type"})
+
+        if optimizer_type == "SGD":
+            return torch.optim.SGD(parameters, **optimizer_params)
+        elif optimizer_type == "Adam":
+            return torch.optim.Adam(parameters, **optimizer_params)
+        elif optimizer_type == "AdamW":
+            return torch.optim.AdamW(parameters, **optimizer_params)
+        else:
+            raise ValueError(f"Unknown optimizer type: {optimizer_type}")
 
 class SchedulerConfig(BaseModel):
     scheduler_type: Literal["StepLR", "CosineAnnealingLR", "MultiStepLR"]
@@ -60,7 +72,19 @@ class SchedulerConfig(BaseModel):
 
         return super().model_dump(include=fields, *args, **kwargs)
 
+    def factory(self, optimizer: torch.optim.Optimizer):
+        scheduler_type = self.scheduler_type
+        scheduler_params = self.model_dump(exclude={"scheduler_type"})
 
+        if scheduler_type == "StepLR":
+            return torch.optim.lr_scheduler.StepLR(optimizer, **scheduler_params)
+        elif scheduler_type == "CosineAnnealingLR":
+            return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, **scheduler_params)
+        elif scheduler_type == "MultiStepLR":
+            return torch.optim.lr_scheduler.MultiStepLR(optimizer, **scheduler_params)
+        else:
+            raise ValueError(f"Unknown scheduler type: {scheduler_type}")
+        
 class Config(BaseModel):
     # Dataset & loader
     num_training_samples: int

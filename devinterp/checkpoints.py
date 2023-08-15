@@ -2,12 +2,11 @@ import glob
 import logging
 import os
 import warnings
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, TypedDict, Union
 
 import boto3
 import torch
 from botocore.exceptions import ClientError
-
 
 class CheckpointManager:
     """
@@ -57,6 +56,8 @@ class CheckpointManager:
         else:
             warnings.warn("No checkpoints found locally.")
         return []
+    
+    # Names & ids
 
     @staticmethod
     def get_checkpoint_id(epoch: int, batch_idx: int) -> str:
@@ -77,6 +78,29 @@ class CheckpointManager:
         batch_idx = int(parts[-1].split(".")[0])
         return epoch, batch_idx
 
+    # Data
+
+    def _upload_file(self, file_path, object_name=None):
+        if object_name is None:
+            object_name = file_path
+        self.client.upload_file(file_path, self.bucket_name, object_name)
+
+    def save_checkpoint(
+        self,
+        checkpoint: Dict,
+        epoch: int,
+        batch_idx: int,
+    ):
+        file_path = self.get_checkpoint_path(epoch, batch_idx, self.project_name)
+        rel_file_path = f"../{file_path}"
+        torch.save(checkpoint, rel_file_path)
+
+        if self.client:
+            self._upload_file(rel_file_path, file_path)
+
+        if not self.save_locally:
+            os.remove(rel_file_path)
+
     def load_checkpoint(
         self, epoch: int, batch_idx: int,
     ) -> Dict:
@@ -88,34 +112,13 @@ class CheckpointManager:
             print(f"Downloading {object_name} from {self.bucket_name}...")
             self.client.download_file(self.bucket_name, object_name, rel_file_path)
         
-        state_dict = torch.load(rel_file_path)
+        checkpoint = torch.load(rel_file_path)
 
         if not self.save_locally and self.bucket_name and self.client:
             os.remove(rel_file_path)
 
-        return state_dict
+        return checkpoint
     
-    def _upload_file(self, file_path, object_name=None):
-        if object_name is None:
-            object_name = file_path
-        self.client.upload_file(file_path, self.bucket_name, object_name)
-
-    def save_checkpoint(
-        self,
-        state_dict: Dict,
-        epoch: int,
-        batch_idx: int,
-    ):
-        file_path = self.get_checkpoint_path(epoch, batch_idx, self.project_name)
-        rel_file_path = f"../{file_path}"
-        torch.save(state_dict, rel_file_path)
-
-        if self.client:
-            self._upload_file(rel_file_path, file_path)
-
-        if not self.save_locally:
-            os.remove(rel_file_path)
-
     def __iter__(self):
         for checkpoint in self.checkpoints:
             yield self.load_checkpoint(*checkpoint)
