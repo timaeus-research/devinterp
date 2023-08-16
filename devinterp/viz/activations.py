@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple, Union
 
 import torch
 from torch.nn import functional as F
@@ -85,7 +85,36 @@ class ActivationProbe:
         yield
         handle.remove()
 
-    def render(self, transform: Optional[Transform] = None, thresholds: list[int]=[512], verbose: bool = True, seed: int = 0, device: torch.device = DEVICE) -> list[torch.Tensor]:
+
+class FeatureVisualizer:
+    def __init__(self, model: torch.nn.Module, locations: Optional[list[str]]=None):
+        self.model = model
+        self.locations = locations or self.gen_locations(model)  # Defaults to all neurons in the model
+
+    @staticmethod
+    def gen_locations(model: torch.nn.Module, layer_type: Optional[Union[type, Tuple[type, ...]]] = None) -> list[str]:
+        """Generate neurons of a particular kind of layer from a PyTorch model."""
+        channel_locations = []
+
+        def recursive_search(module, prefix):
+            for name, submodule in module.named_children():
+                path = prefix + '.' + name if prefix else name
+
+                if not layer_type or isinstance(submodule, layer_type):
+
+                    # TODO: Check that the submodule has a 'weight' attribute. 
+                    # TODO: Do something about biases
+                    for channel in range(submodule.out_channels):
+                        location = f"{path}.weight.{channel}"
+                        channel_locations.append(location)
+
+                recursive_search(submodule, path)
+
+        recursive_search(model, '')
+
+        return channel_locations
+
+    def _render(self, location: str, transform: Optional[Transform] = None, thresholds: list[int]=[512], verbose: bool = True, seed: int = 0, device: torch.device = DEVICE) -> list[torch.Tensor]:
         """Renders an image that maximizes the activation of the specified neuron.
         
         Args:
@@ -99,11 +128,13 @@ class ActivationProbe:
             tuple[list[torch.Tensor], float]: A tuple containing the final images and the activation value.
         """
 
+        probe = ActivationProbe(self.model, location)
+
         # Assuming 'model' is your pre-trained ResNet model and 'location' is the string specifying the neuron's location
         self.model.to(device)
         self.model.eval()
 
-        with self.watch():
+        with probe.watch():
             # Create a random image (1x3x224x224) to start optimization, with same size as typical ResNet input
             torch.manual_seed(seed)
             input_image = torch.rand((1, 3, 32, 32), requires_grad=True, device=device)
@@ -117,12 +148,12 @@ class ActivationProbe:
             pbar = range(max(thresholds) + 1)
 
             if verbose:
-                pbar = tqdm(pbar, desc=f"Visualizing {self.location} (activation: ???)")
+                pbar = tqdm(pbar, desc=f"Visualizing {probe.location} (activation: ???)")
 
             for iteration in pbar:
                 optimizer.zero_grad()
                 self.model(input_image)  # Forward pass through the model to trigger the hook
-                activation = self.activation
+                activation = probe.activation
                 loss = -activation  # Maximizing activation
                 loss.backward()
                 optimizer.step()
@@ -131,7 +162,7 @@ class ActivationProbe:
                     input_image.data = transform(input_image.data.detach().clone())
 
                 if verbose:
-                    pbar.set_description(f"Visualizing {self.location} (activation: {activation.item():.2f})")
+                    pbar.set_description(f"Visualizing {probe.location} (activation: {activation.item():.2f})")
 
                 if iteration in thresholds:
                     image = input_image.detach().clone()
@@ -140,7 +171,7 @@ class ActivationProbe:
         
         return final_images
 
-    def render_multiple(self, num_visualizations: int, transform: Transform = None, thresholds: list[int]=[512], verbose: bool = True, seed: int = 0, device: torch.device = DEVICE, diversity_weight: float = 0.1) -> list[list[torch.Tensor]]:
+    def _render_multiple(self, location: str, num_visualizations: int, transform: Optional[Transform] = None, thresholds: list[int]=[512], verbose: bool = True, seed: int = 0, device: torch.device = DEVICE, diversity_weight: float = 0.1) -> list[list[torch.Tensor]]:
         """Renders multiple images that maximize the activation of the specified neuron, with a penalty to increase diversity.
         
         Args:
@@ -151,10 +182,12 @@ class ActivationProbe:
         Returns:
             list[list[torch.Tensor]]: A list containing lists of final images for each visualization.
         """
+        probe = ActivationProbe(self.model, location)
+
         self.model.to(device)
         self.model.eval()
         
-        with self.watch():
+        with probe.watch():
 
             # Create random images (num_visualizations x 3 x 32 x 32) to start optimization
             torch.manual_seed(seed)
@@ -167,7 +200,7 @@ class ActivationProbe:
 
             pbar = range(max(thresholds) + 1)
             if verbose:
-                pbar = tqdm(pbar, desc=f"Visualizing {self.location} (activation: ???)")
+                pbar = tqdm(pbar, desc=f"Visualizing {probe.location} (activation: ???)")
 
             for iteration in pbar:
                 optimizer.zero_grad()
@@ -175,7 +208,7 @@ class ActivationProbe:
 
                 for i in range(num_visualizations):
                     self.model(input_images[i].unsqueeze(0))  # Forward pass through the model to trigger the hook
-                    total_loss += -self.activation  # Maximizing activation
+                    total_loss += -probe.activation  # Maximizing activation
 
                     # Calculate diversity penalty for the current image
                     for j in range(num_visualizations):
@@ -190,7 +223,7 @@ class ActivationProbe:
                     input_images.data = transform(input_images.data.detach().clone())
 
                 if verbose:
-                    pbar.set_description(f"Visualizing {self.location} (activation: {-total_loss.item():.2f})")
+                    pbar.set_description(f"Visualizing {probe.location} (activation: {-total_loss.item():.2f})")
 
                 if iteration in thresholds:
                     for i in range(num_visualizations):
@@ -199,3 +232,22 @@ class ActivationProbe:
                         all_final_images[i].append(image)
 
         return all_final_images
+
+    def render_multiple(self, model: torch.nn.Module, *locations: str, thresholds: list[int]=[512], verbose: bool = True, init_seed: int = 0, device: str = "cuda", **kwargs) -> list[tuple[list[torch.Tensor], float]]:
+        results = []
+
+        for i, location in enumerate(locations):
+            images = self._render(
+                location = location,
+                thresholds = thresholds,
+                verbose = verbose,
+                seed=init_seed + i,
+                device=device
+            )
+
+            if verbose: 
+                show_images(*images, **kwargs)
+
+            results.append((images, activation))
+
+        return results
