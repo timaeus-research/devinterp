@@ -11,7 +11,7 @@ import wandb
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm.notebook import tqdm
 
-from devinterp.checkpoints import CheckpointManager
+from devinterp.storage import CheckpointManager
 from devinterp.config import Config
 from devinterp.logging import Logger
 

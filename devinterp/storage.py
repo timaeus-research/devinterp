@@ -71,10 +71,10 @@ class StorageProvider(Generic[IDType]):
         file_ids: Set[IDType] = set()
 
         if self.is_local_enabled:
-            checkpoint_files = glob.glob(self.local_root / self.id_to_key("*"))
-            file_ids |= {self.name_to_id(os.path.basename(f)) for f in checkpoint_files}
+            files = glob.glob(f"{self.local_root}/{self.id_to_key('*')}")
+            file_ids |= {self.name_to_id(os.path.basename(f)) for f in files}
 
-        if self.is_s3_enabled
+        if self.is_s3_enabled:
             response = self.client.list_objects_v2(Bucket=self.bucket_name)
             if "Contents" in response:
                 file_ids |= {self.name_to_id(item["Key"]) for item in response["Contents"] if item["Key"].startswith(self.parent_dir)}
@@ -85,7 +85,7 @@ class StorageProvider(Generic[IDType]):
         self.client.upload_file(file_path, self.bucket_name, key)
 
     def save_file(self, file_id: str, file):
-        file_path = self.id_to_name(file_id)
+        file_path = self.id_to_key(file_id)
         rel_file_path = self.local_root / file_path
         torch.save(file, rel_file_path)
 
@@ -96,8 +96,10 @@ class StorageProvider(Generic[IDType]):
             os.remove(rel_file_path)
 
     def load_file(self, file_id):
-        file_path = self.id_to_name(file_id)
+        file_path = self.id_to_key(file_id)
         rel_file_path = self.local_root / file_path
+
+        print(file_id, file_path, rel_file_path)
 
         if (self.is_local_enabled and os.path.exists(rel_file_path)):
             logger.info(f"Loading {file_path} from local save...")
@@ -131,7 +133,6 @@ class StorageProvider(Generic[IDType]):
 
         raise TypeError(f"Invalid argument `{idx}` of type `{type(idx)}`")
 
-
     def __contains__(self, file_id):
         return file_id in self.file_ids
 
@@ -141,12 +142,15 @@ class StorageProvider(Generic[IDType]):
 EpochAndBatch = Tuple[int, int]
 
 class CheckpointManager(StorageProvider[EpochAndBatch]):
+    def __init__(self, project_dir: str, bucket_name: Optional[str] = None, local_root: Optional[str] = None,  device=torch.device("cpu")):
+        super().__init__(bucket_name, local_root, f"checkpoints/{project_dir}", device=device)
+
     @staticmethod
-    def id_to_name(id: Union[EpochAndBatch, Literal["*"]]) -> str:
-        if id == "*":
+    def id_to_name(file_id: Union[EpochAndBatch, Literal["*"]]) -> str:
+        if file_id == "*":
             return "*"
         
-        epoch, batch = id
+        epoch, batch = file_id
         return f"checkpoint_epoch_{epoch}_batch_{batch}"
 
     @staticmethod
@@ -162,13 +166,16 @@ class CheckpointManager(StorageProvider[EpochAndBatch]):
 
 NeuronSeedBatch = Tuple[int, int, int]
 
-class VisualizationManager(StorageProvider):
+class VisualizationManager(StorageProvider[NeuronSeedBatch]):
+    def __init__(self, project_dir: str, bucket_name: Optional[str] = None, local_root: Optional[str] = None,  device=torch.device("cpu")):
+        super().__init__(bucket_name, local_root, f"visualizations/{project_dir}", device=device)
+
     @staticmethod
-    def id_to_name(id: NeuronSeedBatch):
-        if id == "*":
+    def id_to_name(file_id: NeuronSeedBatch):
+        if file_id == "*":
             return "*"
         
-        neuron, seed, batch = id
+        neuron, seed, batch = file_id
         return f"visualization_neuron_{neuron}_seed_{seed}_batch_{batch}"
 
     @staticmethod
