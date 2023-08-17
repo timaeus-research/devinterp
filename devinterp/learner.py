@@ -78,9 +78,9 @@ class Learner:
                 warnings.warn("Resuming from checkpoint but no run_id provided. Will not log to existing wandb run.")
             
             if not run_id:
-                wandb.init(project=config.project, entity=config.entity)
+                wandb.init(project=self.config.project, entity=self.config.entity)
             else:
-                wandb.init(project=config.project, entity=config.entity, run_id=run_id)
+                wandb.init(project=self.config.project, entity=self.config.entity, run_id=run_id)
 
         pbar = tqdm(total=self.config.num_steps, desc=f"Epoch 0 Batch 0/{self.config.num_steps} Loss: ?.??????")
         

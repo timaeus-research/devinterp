@@ -107,8 +107,11 @@ class CheckpointManager:
     ) -> Dict:
         file_path = self.get_checkpoint_path(epoch, batch_idx, self.project_name)
         rel_file_path = f"../{file_path}"
+
+        if not (epoch, batch_idx) in self.checkpoints:
+            warnings.warn(f"Checkpoint ({epoch}, {batch_idx}) not found in {self.bucket_name}.")    
         
-        if self.client:
+        if not (self.save_locally and os.path.exists(rel_file_path)) and self.client:
             object_name = os.path.basename(file_path)
             print(f"Downloading {object_name} from {self.bucket_name}...")
             self.client.download_file(self.bucket_name, object_name, rel_file_path)
