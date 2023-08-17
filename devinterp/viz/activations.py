@@ -6,6 +6,8 @@ from torch.nn import functional as F
 from torchvision import transforms
 from tqdm import tqdm
 
+from devinterp.misc.io import show_images
+
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 Transform = Callable[[torch.Tensor], torch.Tensor]
 
@@ -90,6 +92,7 @@ class FeatureVisualizer:
     def __init__(self, model: torch.nn.Module, locations: Optional[list[str]]=None):
         self.model = model
         self.locations = locations or self.gen_locations(model)  # Defaults to all neurons in the model
+        self.activations = [ActivationProbe(model, location) for location in self.locations]
 
     @staticmethod
     def gen_locations(model: torch.nn.Module, layer_type: Optional[Union[type, Tuple[type, ...]]] = None) -> list[str]:
@@ -114,7 +117,7 @@ class FeatureVisualizer:
 
         return channel_locations
 
-    def _render(self, location: str, transform: Optional[Transform] = None, thresholds: list[int]=[512], verbose: bool = True, seed: int = 0, device: torch.device = DEVICE) -> list[torch.Tensor]:
+    def render(self, probe: ActivationProbe, transform: Optional[Transform] = None, thresholds: list[int]=[512], verbose: bool = True, seed: int = 0, device: torch.device = DEVICE) -> list[torch.Tensor]:
         """Renders an image that maximizes the activation of the specified neuron.
         
         Args:
@@ -127,8 +130,6 @@ class FeatureVisualizer:
         Returns:
             tuple[list[torch.Tensor], float]: A tuple containing the final images and the activation value.
         """
-
-        probe = ActivationProbe(self.model, location)
 
         # Assuming 'model' is your pre-trained ResNet model and 'location' is the string specifying the neuron's location
         self.model.to(device)
@@ -171,74 +172,73 @@ class FeatureVisualizer:
         
         return final_images
 
-    def _render_multiple(self, location: str, num_visualizations: int, transform: Optional[Transform] = None, thresholds: list[int]=[512], verbose: bool = True, seed: int = 0, device: torch.device = DEVICE, diversity_weight: float = 0.1) -> list[list[torch.Tensor]]:
-        """Renders multiple images that maximize the activation of the specified neuron, with a penalty to increase diversity.
+    # def render(self, probe: ActivationProbe, num_visualizations: int, transform: Optional[Transform] = None, thresholds: list[int]=[512], verbose: bool = True, seed: int = 0, device: torch.device = DEVICE, diversity_weight: float = 0.1) -> list[list[torch.Tensor]]:
+    #     """Renders multiple images that maximize the activation of the specified neuron, with a penalty to increase diversity.
         
-        Args:
-            num_visualizations (int): Number of visualizations to generate.
-            ... other args same as render ...
-            diversity_weight (float, optional): Weight of the diversity penalty.
+    #     Args:
+    #         num_visualizations (int): Number of visualizations to generate.
+    #         ... other args same as render ...
+    #         diversity_weight (float, optional): Weight of the diversity penalty.
         
-        Returns:
-            list[list[torch.Tensor]]: A list containing lists of final images for each visualization.
-        """
-        probe = ActivationProbe(self.model, location)
+    #     Returns:
+    #         list[list[torch.Tensor]]: A list containing lists of final images for each visualization.
+    #     """
 
-        self.model.to(device)
-        self.model.eval()
+    #     self.model.to(device)
+    #     self.model.eval()
         
-        with probe.watch():
+    #     with probe.watch():
 
-            # Create random images (num_visualizations x 3 x 32 x 32) to start optimization
-            torch.manual_seed(seed)
-            input_images = torch.rand((num_visualizations, 3, 32, 32), requires_grad=True, device=device)
+    #         # Create random images (num_visualizations x 3 x 32 x 32) to start optimization
+    #         torch.manual_seed(seed)
+    #         input_images = torch.rand((num_visualizations, 3, 32, 32), requires_grad=True, device=device)
 
-            # Optimizer
-            optimizer = torch.optim.Adam([input_images], lr=0.01, weight_decay=1e-3)
+    #         # Optimizer
+    #         optimizer = torch.optim.Adam([input_images], lr=0.01, weight_decay=1e-3)
 
-            all_final_images = [[] for _ in range(num_visualizations)]
+    #         all_final_images = [[] for _ in range(num_visualizations)]
 
-            pbar = range(max(thresholds) + 1)
-            if verbose:
-                pbar = tqdm(pbar, desc=f"Visualizing {probe.location} (activation: ???)")
+    #         pbar = range(max(thresholds) + 1)
+    #         if verbose:
+    #             pbar = tqdm(pbar, desc=f"Visualizing {probe.location} (activation: ???)")
 
-            for iteration in pbar:
-                optimizer.zero_grad()
-                total_loss = torch.tensor(0.0, device=device)
+    #         for iteration in pbar:
+    #             optimizer.zero_grad()
+    #             total_loss = torch.tensor(0.0, device=device)
 
-                for i in range(num_visualizations):
-                    self.model(input_images[i].unsqueeze(0))  # Forward pass through the model to trigger the hook
-                    total_loss += -probe.activation  # Maximizing activation
+    #             for i in range(num_visualizations):
+    #                 self.model(input_images[i].unsqueeze(0))  # Forward pass through the model to trigger the hook
+    #                 total_loss += -probe.activation  # Maximizing activation
 
-                    # Calculate diversity penalty for the current image
-                    for j in range(num_visualizations):
-                        if i != j:
-                            diversity_loss = F.cosine_similarity(input_images[i].view(1, -1), input_images[j].view(1, -1))
-                            total_loss += diversity_weight * diversity_loss
+    #                 # Calculate diversity penalty for the current image
+    #                 for j in range(num_visualizations):
+    #                     if i != j:
+    #                         diversity_loss = F.cosine_similarity(input_images[i].view(1, -1), input_images[j].view(1, -1))
+    #                         total_loss += diversity_weight * diversity_loss
 
-                total_loss.backward()
-                optimizer.step()
+    #             total_loss.backward()
+    #             optimizer.step()
 
-                if transform:
-                    input_images.data = transform(input_images.data.detach().clone())
+    #             if transform:
+    #                 input_images.data = transform(input_images.data.detach().clone())
 
-                if verbose:
-                    pbar.set_description(f"Visualizing {probe.location} (activation: {-total_loss.item():.2f})")
+    #             if verbose:
+    #                 pbar.set_description(f"Visualizing {probe.location} (activation: {-total_loss.item():.2f})")
 
-                if iteration in thresholds:
-                    for i in range(num_visualizations):
-                        image = input_images[i].detach().clone()
-                        image = torch.reshape(image, (3, 32, 32))
-                        all_final_images[i].append(image)
+    #             if iteration in thresholds:
+    #                 for i in range(num_visualizations):
+    #                     image = input_images[i].detach().clone()
+    #                     image = torch.reshape(image, (3, 32, 32))
+    #                     all_final_images[i].append(image)
 
-        return all_final_images
+    #     return all_final_images
 
-    def render_multiple(self, model: torch.nn.Module, *locations: str, thresholds: list[int]=[512], verbose: bool = True, init_seed: int = 0, device: str = "cuda", **kwargs) -> list[tuple[list[torch.Tensor], float]]:
+    def render_all(self, thresholds: list[int]=[512], verbose: bool = True, init_seed: int = 0, device: str = "cuda", **kwargs) -> list[tuple[list[torch.Tensor], float]]:
         results = []
 
-        for i, location in enumerate(locations):
-            images = self._render(
-                location = location,
+        for i, probe in enumerate(self.activations):
+            images = self.render(
+                probe,
                 thresholds = thresholds,
                 verbose = verbose,
                 seed=init_seed + i,
@@ -248,6 +248,17 @@ class FeatureVisualizer:
             if verbose: 
                 show_images(*images, **kwargs)
 
-            results.append((images, activation))
+            results.append((images, probe.activation))
 
         return results
+    
+    def __len__(self) -> int:
+        return len(self.activations)
+
+    def __getitem__(self, idx: Union[int, str]) -> ActivationProbe:
+        if isinstance(idx, int):
+            return self.activations[idx]
+        elif isinstance(idx, str):
+            return next(filter(lambda probe: probe.location == idx, self.activations))
+        else:
+            raise TypeError(f"Invalid type for index: {type(idx)}")

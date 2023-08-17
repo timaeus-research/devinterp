@@ -139,7 +139,7 @@ class Config(BaseModel):
         else:
             logger.info("Logging to wandb disabled")
 
-        logger.info(yaml.dump(self.dict()))
+        logger.info(yaml.dump(self.model_dump(exclude=("logging_steps", "checkpoint_steps"))))
 
     def _process_steps(
         self, num_steps: Tuple[Optional[int], Optional[int]]

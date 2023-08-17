@@ -2,148 +2,182 @@ import glob
 import logging
 import os
 import warnings
-from typing import Dict, List, Optional, Tuple, TypedDict, Union
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, TypedDict, Union, Generic, TypeVar, Literal, Set
 
 import boto3
 import torch
 from botocore.exceptions import ClientError
 
+logger = logging.getLogger(__name__)
 
-class CheckpointManager:
+IDType = TypeVar("IDType")
+
+class StorageProvider(Generic[IDType]):
     """
-    Manages the saving and loading of model checkpoints to a specified S3 bucket or locally (or both).
+    Wrapper for either local or cloud (S3) storage (or both).
 
-    :param project_name: The name of the project for organizing checkpoints
     :param bucket_name: The name of the S3 bucket to store checkpoints (Optional)
+    :param local_root: If provided, then the base directory in which to save files locally. If omitted, files will not be saved locally. (Optional)
     :param save_locally: If True, saves checkpoints locally without deleting them (Optional)
     """
-    def __init__(self, project_name: str, bucket_name=None, save_locally=False):
-        self.project_name = project_name
+    file_ids: List[IDType]
+
+    def __init__(self, bucket_name: Optional[str] = None, local_root: Optional[str] = None, parent_dir: str = "data",  device=torch.device("cpu")):
         self.bucket_name = bucket_name
-        self.save_locally = save_locally
+        self.is_local_enabled = local_root is not None
+        self.local_root = Path(local_root or "tmp")
+        self.parent_dir = parent_dir
+        self.device = device
+
+        self.file_ids = [] # Any non-int hashable type.
         self.client = None
-        self.checkpoints = []
 
-        if bucket_name:
-            if os.getenv("AWS_SECRET_ACCESS_KEY") and os.getenv("AWS_ACCESS_KEY_ID"):
-                self.client = boto3.client("s3")
-                self.checkpoints = self.get_checkpoints()
-            else:
-                warnings.warn("AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID must be set to use S3 bucket.")
+        # Cloud 
 
-        checkpoint_dir = f"../{self.get_checkpoint_dir(self.project_name)}"
-        if not os.path.exists(checkpoint_dir):
-            os.makedirs(checkpoint_dir)
+        if bucket_name and (os.getenv("AWS_SECRET_ACCESS_KEY") and os.getenv("AWS_ACCESS_KEY_ID")):
+            self.client = boto3.client("s3")
+            self.file_ids = self.get_file_ids()
+        else:
+            warnings.warn("AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID must be set to use S3 bucket.")
 
-        if not bucket_name and not save_locally:
-            warnings.warn("Neither S3 bucket name provided nor save_locally is True. Checkpoints will not be persisted.")
+        # Local 
+        
+        local_path = os.path.join(self.local_root, parent_dir)
+        if self.is_local_enabled and not os.path.exists(local_path):
+            os.makedirs(local_path)
+        
+        if not self.bucket_name and not self.local_root:
+            warnings.warn("Neither S3 bucket name provided nor local_root is defined. Files will not be persisted.")
 
-    def get_checkpoints(self) -> List[Tuple[int, int]]:
+    @property
+    def is_s3_enabled(self):
+        return self.client is not None
+    
+    def id_to_name(self, file_id: Union[IDType, Literal["*"]]) -> str:
+        """Should contain no `/` and should handle the wildcard."""
+        raise NotImplementedError
+    
+    def id_to_key(self, file_id: Union[IDType, Literal["*"]]) -> str:
+        return f"{self.parent_dir}/{self.id_to_name(file_id)}.pt"
+    
+    def name_to_id(self, name: str) -> IDType:
+        raise NotImplementedError
+
+    def get_file_ids(self) -> List[IDType]:
         """
         Returns a list of tuples (epoch, batch_idx) of all checkpoints in the bucket or local directory.
         """
-        if self.bucket_name and self.client:
+        file_ids: Set[IDType] = set()
+
+        if self.is_local_enabled:
+            checkpoint_files = glob.glob(self.local_root / self.id_to_key("*"))
+            file_ids |= {self.name_to_id(os.path.basename(f)) for f in checkpoint_files}
+
+        if self.is_s3_enabled
             response = self.client.list_objects_v2(Bucket=self.bucket_name)
             if "Contents" in response:
-                return sorted(
-                    [self.decode_checkpoint_id(item["Key"]) for item in response["Contents"]]
-                )
-            warnings.warn("No files found in the bucket.")
-        elif self.save_locally:
-            checkpoint_files = glob.glob(f"{self.get_checkpoint_dir(self.project_name)}/*.pt")
-            return sorted(
-                [self.decode_checkpoint_id(os.path.basename(f)) for f in checkpoint_files]
-            )
+                file_ids |= {self.name_to_id(item["Key"]) for item in response["Contents"] if item["Key"].startswith(self.parent_dir)}
+            
+        return sorted(list(file_ids))
+
+    def upload_file(self, file_path: str, key: str):
+        self.client.upload_file(file_path, self.bucket_name, key)
+
+    def save_file(self, file_id: str, file):
+        file_path = self.id_to_name(file_id)
+        rel_file_path = self.local_root / file_path
+        torch.save(file, rel_file_path)
+
+        if self.client:
+            self.upload_file(rel_file_path, file_path)
+
+        if not self.is_local_enabled:
+            os.remove(rel_file_path)
+
+    def load_file(self, file_id):
+        file_path = self.id_to_name(file_id)
+        rel_file_path = self.local_root / file_path
+
+        if (self.is_local_enabled and os.path.exists(rel_file_path)):
+            logger.info(f"Loading {file_path} from local save...")
+        elif self.client:
+            logger.info(f"Downloading {file_path} from bucket `{self.bucket_name}`...")
+            self.client.download_file(self.bucket_name, file_path, rel_file_path)
         else:
-            warnings.warn("No checkpoints found locally.")
-        return []
-    
-    # Names & ids
+            raise OSError(f"File with id `{file_id}` not found either locally or in bucket.")
+
+        checkpoint = torch.load(rel_file_path, map_location=self.device)
+
+        if not self.is_local_enabled and self.bucket_name and self.client:
+            os.remove(rel_file_path)
+
+        return checkpoint
+
+    def __iter__(self):
+        for file_id in self.file_ids:
+            yield self.load_file(file_id)
+
+    def __len__(self):
+        return len(self.file_ids)
+
+    def __getitem__(self, idx):
+        if isinstance(idx, int):
+            return self.load_file(self.file_ids[idx])
+        
+        elif idx not in self.file_ids:
+            warnings.warn(f"File with id `{idx}` not found in {self.bucket_name}.")
+            return self.load_file(idx)
+
+        raise TypeError(f"Invalid argument `{idx}` of type `{type(idx)}`")
+
+
+    def __contains__(self, file_id):
+        return file_id in self.file_ids
+
+    def __repr__(self):
+        return f"StorageProvider({self.bucket_name}, {self.local_root})"
+
+EpochAndBatch = Tuple[int, int]
+
+class CheckpointManager(StorageProvider[EpochAndBatch]):
+    @staticmethod
+    def id_to_name(id: Union[EpochAndBatch, Literal["*"]]) -> str:
+        if id == "*":
+            return "*"
+        
+        epoch, batch = id
+        return f"checkpoint_epoch_{epoch}_batch_{batch}"
 
     @staticmethod
-    def get_checkpoint_id(epoch: int, batch_idx: int) -> str:
-        return f"checkpoint_epoch_{epoch}_batch_{batch_idx}"
-
-    @classmethod
-    def get_checkpoint_dir(cls, project_name: str) -> str:
-        return f"checkpoints/{project_name}"
-
-    @classmethod
-    def get_checkpoint_path(cls, epoch: int, batch_idx: int, project_name: str) -> str:
-        return f"{cls.get_checkpoint_dir(project_name)}/{cls.get_checkpoint_id(epoch, batch_idx)}.pt"
-
-    @staticmethod
-    def decode_checkpoint_id(checkpoint_id: str) -> Tuple[int, int]:
-        parts = checkpoint_id.split("_")
+    def name_to_id(name: str) -> EpochAndBatch:
+        parts = name.split("_")
         epoch = int(parts[-3])
         batch_idx = int(parts[-1].split(".")[0])
         return epoch, batch_idx
 
-    # Data
+    def __repr__(self):
+        return f"CheckpointManager({self.parent_dir}, {self.bucket_name})"
 
-    def _upload_file(self, file_path, object_name=None):
-        if object_name is None:
-            object_name = file_path
-        self.client.upload_file(file_path, self.bucket_name, object_name)
 
-    def save_checkpoint(
-        self,
-        checkpoint: Dict,
-        epoch: int,
-        batch_idx: int,
-    ):
-        file_path = self.get_checkpoint_path(epoch, batch_idx, self.project_name)
-        rel_file_path = f"../{file_path}"
-        torch.save(checkpoint, rel_file_path)
+NeuronSeedBatch = Tuple[int, int, int]
 
-        if self.client:
-            self._upload_file(rel_file_path, file_path)
-
-        if not self.save_locally:
-            os.remove(rel_file_path)
-
-    def load_checkpoint(
-        self, epoch: int, batch_idx: int,
-    ) -> Dict:
-        file_path = self.get_checkpoint_path(epoch, batch_idx, self.project_name)
-        rel_file_path = f"../{file_path}"
-
-        if not (epoch, batch_idx) in self.checkpoints:
-            warnings.warn(f"Checkpoint ({epoch}, {batch_idx}) not found in {self.bucket_name}.")    
+class VisualizationManager(StorageProvider):
+    @staticmethod
+    def id_to_name(id: NeuronSeedBatch):
+        if id == "*":
+            return "*"
         
-        if not (self.save_locally and os.path.exists(rel_file_path)) and self.client:
-            object_name = os.path.basename(file_path)
-            print(f"Downloading {object_name} from {self.bucket_name}...")
-            self.client.download_file(self.bucket_name, object_name, rel_file_path)
-        
-        checkpoint = torch.load(rel_file_path)
+        neuron, seed, batch = id
+        return f"visualization_neuron_{neuron}_seed_{seed}_batch_{batch}"
 
-        if not self.save_locally and self.bucket_name and self.client:
-            os.remove(rel_file_path)
-
-        return checkpoint
-    
-    def __iter__(self):
-        for checkpoint in self.checkpoints:
-            yield self.load_checkpoint(*checkpoint)
-
-    def __len__(self):
-        return len(self.checkpoints)
-
-    def __getitem__(self, idx: Union[int, tuple]):
-        if isinstance(idx, int):
-            return self.load_checkpoint(*self.checkpoints[idx])
-
-        elif isinstance(idx, tuple):
-            if idx not in self.checkpoints:
-                warnings.warn(f"Checkpoint {idx} not found in {self.bucket_name}.")
-
-            return self.load_checkpoint(*idx)
-
-        raise TypeError(f"Invalid argument type: {type(idx)}")
-
-    def __contains__(self, checkpoint: Tuple[int, int]):
-        return checkpoint in self.checkpoints
+    @staticmethod
+    def name_to_id(name: str) -> NeuronSeedBatch:
+        parts = name.split("_")
+        neuron = int(parts[-5])
+        seed = int(parts[-3])
+        batch_idx = int(parts[-1].split(".")[0])
+        return neuron, seed, batch_idx
 
     def __repr__(self):
-        return f"CheckpointManager({self.project_name}, {self.bucket_name})"
+        return f"VisualizationManager({self.parent_dir}, {self.bucket_name})"
