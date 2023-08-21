@@ -7,6 +7,7 @@ from torchvision import transforms
 from tqdm import tqdm
 
 from devinterp.misc.io import show_images
+from devinterp.storage import VisualizationManager
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 Transform = Callable[[torch.Tensor], torch.Tensor]
@@ -89,11 +90,23 @@ class ActivationProbe:
 
 
 class FeatureVisualizer:
-    def __init__(self, model: torch.nn.Module, locations: Optional[list[str]]=None):
+    def __init__(self, model: torch.nn.Module, locations: Optional[list[str]]=None, storage: Optional[VisualizationManager] = None):
         self.model = model
         self.locations = locations or self.gen_locations(model)  # Defaults to all neurons in the model
         self.activations = [ActivationProbe(model, location) for location in self.locations]
+        self.storage = storage
 
+    def save_visualization(self, location: str, seed: int, step: int, data):
+        if self.storage:
+            file_id = (location, seed, step)
+            self.storage.save_file(file_id, data)
+
+    def load_visualization(self, location: str, seed: int, step: int):
+        if self.storage:
+            file_id = (location, seed, step)
+            return self.storage.load_file(file_id)
+        return None
+    
     @staticmethod
     def gen_locations(model: torch.nn.Module, layer_type: Optional[Union[type, Tuple[type, ...]]] = None) -> list[str]:
         """Generate neurons of a particular kind of layer from a PyTorch model."""

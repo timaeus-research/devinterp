@@ -42,3 +42,5 @@ def show_images(*images: torch.Tensor, nrow=None, **kwargs):
     plt.imshow(grid_image_np)
     plt.axis('off') # to remove the axis
     plt.show()
+
+    return grid_image_np

@@ -2,8 +2,10 @@ import glob
 import logging
 import os
 import warnings
+from abc import ABC
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, TypedDict, Union, Generic, TypeVar, Literal, Set
+from typing import (Dict, Generic, List, Literal, Optional, Set, Tuple,
+                    TypedDict, TypeVar, Union)
 
 import boto3
 import torch
@@ -13,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 IDType = TypeVar("IDType")
 
-class StorageProvider(Generic[IDType]):
+class StorageProvider(Generic[IDType], ABC):
     """
     Wrapper for either local or cloud (S3) storage (or both).
 
@@ -84,7 +86,7 @@ class StorageProvider(Generic[IDType]):
     def upload_file(self, file_path: str, key: str):
         self.client.upload_file(file_path, self.bucket_name, key)
 
-    def save_file(self, file_id: str, file):
+    def save_file(self, file_id: IDType, file):
         file_path = self.id_to_key(file_id)
         rel_file_path = self.local_root / file_path
         torch.save(file, rel_file_path)
@@ -95,7 +97,7 @@ class StorageProvider(Generic[IDType]):
         if not self.is_local_enabled:
             os.remove(rel_file_path)
 
-    def load_file(self, file_id):
+    def load_file(self, file_id: IDType):
         file_path = self.id_to_key(file_id)
         rel_file_path = self.local_root / file_path
 
@@ -139,10 +141,11 @@ class StorageProvider(Generic[IDType]):
     def __repr__(self):
         return f"StorageProvider({self.bucket_name}, {self.local_root})"
 
+
 EpochAndBatch = Tuple[int, int]
 
 class CheckpointManager(StorageProvider[EpochAndBatch]):
-    def __init__(self, project_dir: str, bucket_name: Optional[str] = None, local_root: Optional[str] = None,  device=torch.device("cpu")):
+    def __init__(self, project_dir: str, bucket_name: Optional[str] = None, local_root: Optional[str] = None, device=torch.device("cpu")):
         super().__init__(bucket_name, local_root, f"checkpoints/{project_dir}", device=device)
 
     @staticmethod
@@ -164,27 +167,28 @@ class CheckpointManager(StorageProvider[EpochAndBatch]):
         return f"CheckpointManager({self.parent_dir}, {self.bucket_name})"
 
 
-NeuronSeedBatch = Tuple[int, int, int]
+NeuronSeedStep = Tuple[str, int, int]
 
-class VisualizationManager(StorageProvider[NeuronSeedBatch]):
-    def __init__(self, project_dir: str, bucket_name: Optional[str] = None, local_root: Optional[str] = None,  device=torch.device("cpu")):
+
+class VisualizationManager(StorageProvider[NeuronSeedStep]):
+    def __init__(self, project_dir: str, bucket_name: Optional[str] = None, local_root: Optional[str] = None, device=torch.device("cpu")):
         super().__init__(bucket_name, local_root, f"visualizations/{project_dir}", device=device)
 
     @staticmethod
-    def id_to_name(file_id: NeuronSeedBatch):
+    def id_to_name(file_id: NeuronSeedStep):
         if file_id == "*":
             return "*"
         
-        neuron, seed, batch = file_id
-        return f"visualization_neuron_{neuron}_seed_{seed}_batch_{batch}"
+        neuron, seed, step = file_id
+        return f"{neuron}_seed_{seed}_step_{step}"
 
     @staticmethod
-    def name_to_id(name: str) -> NeuronSeedBatch:
+    def name_to_id(name: str) -> NeuronSeedStep:
         parts = name.split("_")
-        neuron = int(parts[-5])
+        neuron  = parts[-5].split("/")[-1]
         seed = int(parts[-3])
-        batch_idx = int(parts[-1].split(".")[0])
-        return neuron, seed, batch_idx
+        step = int(parts[-1].split(".")[0])
+        return neuron, seed, step
 
     def __repr__(self):
         return f"VisualizationManager({self.parent_dir}, {self.bucket_name})"
