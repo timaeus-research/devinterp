@@ -9,6 +9,7 @@ Reduction = Literal["mean", "sum"]
 Metric = Callable[[torch.nn.Module, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]  # model, data, target, output -> value
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 def dataloader_map(model: torch.nn.Module, loader: torch.utils.data.DataLoader, metrics: Dict[str, Metric], device: torch.device = DEVICE):
     metric_values = {metric_name: torch.zeros(len(loader.dataset), device=device) for metric_name in metrics.keys()}
 
@@ -42,6 +43,6 @@ def dataloader_reduce(model: torch.nn.Module, loader: torch.utils.data.DataLoade
 
     return metric_values
 
-def dataloaders_reduce(model: torch.nn.Module, loaders: Dict[str, torch.utils.DataLoader], metrics: Dict[str, Metric], reduction: Reduction = "mean", device: torch.device = DEVICE):
+def dataloaders_reduce(model: torch.nn.Module, loaders: Dict[str, torch.utils.data.DataLoader], metrics: Dict[str, Metric], reduction: Reduction = "mean", device: torch.device = DEVICE):
     return flatten_dict({loader_name: dataloader_reduce(model, loader, metrics, reduction, device=device) for loader_name, loader in loaders.items()})
 
