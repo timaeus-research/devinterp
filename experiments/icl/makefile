@@ -4,6 +4,9 @@ run: train.py model.py baselines.py tasks.py
 cts:
 	ls *.py | entr make
 
+deps: requirements.txt
+	pip install -r requirements.txt
+
 test:
 	pytest
 
