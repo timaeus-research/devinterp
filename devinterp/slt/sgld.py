@@ -1,204 +1,82 @@
-"""
-
-Based on code from [Javier Antoran](https://github.com/JavierAntoran/Bayesian-Neural-Networks/blob/master/src/Stochastic_Gradient_Langevin_Dynamics/optimizers.py)
-
-TODO: Also borrow pSGLD?
-"""
-
-import copy
-from typing import Any, Callable, Generator, Iterable, Literal, Optional, Tuple, Union
-
-import numpy as np
 import torch
-from torch.optim.optimizer import Optimizer, required
-from torch.utils.data import DataLoader
-
-from devinterp.utils import (
-    Reduction,
-    ReturnTensor,
-    convert_tensor,
-    reduce_tensor,
-    to_tuple,
-)
 
 
-class SGLD(Optimizer):
+class SGLD(torch.optim.Optimizer):
     r"""
-    SGLD is from M. Welling, Y. W. Teh "Bayesian Learning via Stochastic Gradient Langevin Dynamics"
-    We use equation (4) there, which says given a minibatch of $n$ samples from a dataset of $N$ samples,
+    Implements Stochastic Gradient Langevin Dynamics (SGLD) optimizer.
+    
+    This optimizer blends Stochastic Gradient Descent (SGD) with Langevin Dynamics,
+    introducing Gaussian noise to the gradient updates. It can also include an
+    elasticity term that , acting like
+    a special form of weight decay.
+
+    It follows Lau et al.'s (2023) implementation, which is a modification of 
+    Welling and Teh (2011) that omits the learning rate schedule and introduces 
+    an elasticity term that pulls the weights towards their initial values.
+
+    The equation for the update is as follows:
 
     $$
-        w' - w = \epsilon_t / 2 ( \grad \log p(w) - (N / n) \grad L_n(w) ) + eta_t
+    \begin{gathered}
+    \Delta w_t=\frac{\epsilon}{2}\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right)+\gamma\left(w^_0-w_t\right) - \lambda w_t\right) \\
+    +N(0, \epsilon\sigma^2)
+    \end{gathered}
     $$
 
-    where $\eta_t$ is Gaussian noise, sampled from $\mathcal N(0, \epsilon_t)$, $p(w)$ is a prior, and $L_n(w)$ is the negative log likelihood of the batch.
-    We take this to be Gaussian centered at some fixed $w_0$ parameter, with covariance matrix $\lambda I_d$.
+    where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate, 
+    $(\beta n)$ is the inverse temperature (we're in the tempered Bayes paradigm), 
+    $n$ is the number of training samples, $m$ is the batch size, $\gamma$ is 
+    the elasticity strength, $\lambda$ is the weight decay strength, and $\sigma$ is the 
+    noise term.
 
-    $$
-        p(w) \propto \exp(-1/(2\lambda)|| w - w_0 ||^2)
-        \grad \log p(w) = \grad( -1/(2\lambda)|| w - w_0 ||^2 ) = -\lambda^{-1}( w - w_0 ).
-    $$
+    :param params: Iterable of parameters to optimize or dicts defining parameter groups
+    :param lr: Learning rate (required)
+    :param noise_level: Amount of Gaussian noise introduced into gradient updates (default: 1). This is multiplied by the learning rate.
+    :param weight_decay: L2 regularization term, applied as weight decay (default: 0)
+    :param elasticity: Strength of the force pulling weights back to their initial values (default: 0)
+    :param temperature: Temperature. (default: 1)
 
-    We use a tempered posterior, which means replacing $L'_N$ by $\beta L'_N$, at inverse temperature
-    $\beta = 1/\log{N}$.
+    Example:
+        >>> optimizer = SGLD(model.parameters(), lr=0.1, temperature=torch.log(n)/n)
+        >>> optimizer.zero_grad()
+        >>> loss_fn(model(input), target).backward()
+        >>> optimizer.step()
 
-    This should be combined with a learning rate schedule, so that as $T \to \infty$,
-
-    $$
-        \sum_{t=1}^T \epsilon_t \to \infty, \sum_{t=1}^T \epsilon_t^2 < \infty.
-    $$
-
+    Note:
+        - We've absorbed $n$, the number of training samples, into the temperature. 
+        - The `elasticity` term is unique to this implementation and serves to guide the
+        weights towards their original values. This is useful for estimating quantities over the local 
+        posterior.
     """
 
-    def __init__(
-        self, params, lr=required, weight_decay=0.1, noise: Optional[float] = None
-    ):
-        """
-        If noise is not provided, default to the lr.
-        """
-        if weight_decay < 0.0:
-            raise ValueError(f"Invalid weight_decay value: {weight_decay}")
+    def __init__(self, params, lr=1e-3, noise_level=1., weight_decay=0., elasticity=0., temperature=1.):
+        defaults = dict(lr=lr, noise_level=noise_level, weight_decay=weight_decay, elasticity=elasticity, temperature=1.)
+        super(SGLD, self).__init__(params, defaults)
 
-        if lr is not required and lr < 0.0:
-            raise ValueError(f"Invalid learning rate: {lr}")
-
-        defaults = dict(lr=lr, weight_decay=weight_decay, noise=noise)
-
-        super().__init__(params, defaults)
-
-    def step(self, closure: Optional[Callable[[], float]] = None):
-        """
-        Performs a single optimization step.
-        """
-        loss = None
-
+        # Save the initial parameters if the elasticity term is set
         for group in self.param_groups:
-            weight_decay = group["weight_decay"]
+            if group['elasticity'] != 0:
+                for p in group['params']:
+                    param_state = self.state[p]
+                    param_state['initial_param'] = torch.clone(p.data).detach()
 
-            for p in group["params"]:
+    def step(self, closure=None):
+        for group in self.param_groups:
+            for p in group['params']:
                 if p.grad is None:
                     continue
 
-                d_p = p.grad.data
+                dw = p.grad.data / group['temperature']
 
-                if weight_decay != 0:
-                    d_p.add_(weight_decay, p.data)
+                if group['weight_decay'] != 0:
+                    dw.add_(p.data, alpha=group['weight_decay'])
 
-                if group["noise"]:
-                    langevin_noise = p.data.new(p.data.size()).normal_(
-                        mean=0, std=group["noise"]
-                    ) / np.sqrt(group["lr"])
+                if group['elasticity'] != 0:
+                    initial_param = self.state[p]['initial_param']
+                    dw.add_((p.data - initial_param), alpha=group['elasticity'])
 
-                    p.data.add_(-group["lr"], 0.5 * d_p + langevin_noise)
-                else:
-                    p.data.add_(-group["lr"], 0.5 * d_p)
+                p.data.add_(dw, alpha = -0.5 * group['lr'])
 
-        return loss
-
-
-class Sampler:
-    """
-    Sample several learning machines using an optimizer.
-    """
-
-    def __init__(
-        self,
-        model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        dataloader: DataLoader,
-        loss: Callable[[torch.nn.Module, torch.Tensor], torch.Tensor],
-        num_steps: int,
-        num_inits: int,
-        sample_from: Union[int, Tuple[int, ...]] = -1,
-    ):
-        """
-
-        Args:
-            model: The model (class) to sample from.
-            optimizer: The optimizer to use for sampling.
-            dataloader: The dataloader to use for sampling.
-            num_steps: The number of steps to run the optimizer per initialization.
-            num_inits: The number of initializations to sample from.
-            sample_from: The index or indices of the parameters to sample from. If -1, sample from the last step of the trajectory.
-
-        """
-        self.model = model
-        self.optimizer = optimizer
-        self.dataloader = dataloader
-        self.loss = loss
-        self.num_steps = num_steps
-        self.num_inits = num_inits
-
-        self.sample_from = tuple(
-            (x if x > 0 else num_steps + x) for x in to_tuple(sample_from)
-        )
-
-        # TODO: With very large models, trying to keep >1 copy of the model in memory may be too much
-        self.init_model_state = copy.deepcopy(
-            model.state_dict()
-        )  # the deepcopy may not be necessary
-
-    def reset_(self):
-        """
-        Reset the model to its initial state.
-        """
-        self.model.load_state_dict(self.init_model_state)
-
-    def samples(self, seed=0) -> Generator[torch.nn.Module, None, None]:
-        """
-        Sample from the optimizer.
-
-        Args:
-            seed: The seed to use for sampling.
-
-        """
-
-        # TODO: Make this outer loop parallelizable
-        for init in range(self.num_inits):
-            self.reset_()
-
-            # TODO: What if the dataloader is already shuffled?
-            torch.random.manual_seed(seed + 0.1 * init)
-
-            for step, batch in zip(range(self.num_steps), self.dataloader):
-                self.optimizer.zero_grad()
-                loss = self.loss(self.model, batch)
-                loss.backward()
-                self.optimizer.step()
-
-                if step in self.sample_from:
-                    yield self.model
-
-    def estimates(self, observable: Callable[[torch.nn.Module], Any], seed=0):
-        """
-        Sample snapshots of an observable from the optimizer.
-
-        Args:
-            observable: The observable to sample from.
-        """
-
-        for sample in self.samples(seed=seed):
-            yield observable(sample)
-
-    def estimate(
-        self,
-        observable: Callable[[torch.nn.Module], Any],
-        reduction: Reduction = "mean",
-        seed=0,
-        return_tensor: ReturnTensor = "pt",
-    ):
-        """
-        Estimate some observable over samples drawn from the optimizer.
-
-        Args:
-            observable: The observable to sample from.
-            reduction: How to reduce the estimates.
-            seed: The seed to use for sampling.
-
-        TODO: Allow `return_tensors` as in transformers
-        """
-
-        estimates = convert_tensor(
-            self.estimates(observable, seed=seed), return_tensor=return_tensor
-        )
-        return reduce_tensor(estimates, reduction=reduction)
+                # Add Gaussian noise
+                noise = torch.normal(mean=0., std=group['noise_level'], size=dw.size(), device=dw.device)
+                p.data.add_(noise, alpha=group['lr'] ** 0.5)
