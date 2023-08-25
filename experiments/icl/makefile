@@ -1,8 +1,5 @@
-run: train.py model.py baselines.py tasks.py
+run:
 	python3 train.py
-
-cts:
-	ls *.py | entr make
 
 deps: requirements.txt
 	pip install -r requirements.txt

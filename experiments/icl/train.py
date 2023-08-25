@@ -60,49 +60,70 @@ MODEL = InContextRegressionTransformer(
 # # TRAINING SETTINGS
 
 BATCH_SIZE         = 256
-NUM_TRAINING_STEPS = 512
-NUM_TRAINING_STEPS = 65_536
-# NUM_TRAINING_STEPS = 524_288 # for the paper (500k)
+# NUM_TRAINING_STEPS = 512
+# NUM_TRAINING_STEPS = 65_536
+NUM_TRAINING_STEPS = 524_288 # for the paper (500k)
 LEARNING_RATE      = 1e-3
 
 
-def LOSS(ys_true, ys_pred):
-    return torch.mean((ys_true - ys_pred).square())
+def LOSS(ys_true, ys_pred, axis=None):
+    return (ys_true - ys_pred).square().mean(axis=axis)
 
 
 # # EVALUATION
 
-EVALUATION_BATCH_SIZE = 65536 # too much? try it
+EVALUATION_BATCH_SIZE = 2048
 
 
 @torch.no_grad()
 def EVAL(step):
-    # generate data
+    report = ""
+    def log(s):
+        nonlocal report
+        report += f"{s}\n"
+
+    log(f"evaluation at step {step}:")
+
+    log(f" generating new batch of {EVALUATION_BATCH_SIZE} from T_pretrain...")
     xs, ys = DATA.get_batch(
         num_examples=MAX_NUM_EXAMPLES,
-        batch_size=BATCH_SIZE,
+        batch_size=EVALUATION_BATCH_SIZE,
     )
-    ys_model = MODEL(xs, ys)
-    ys_dmmse = dmmse_predictor(
-        xs,
-        ys,
-        prior=DATA.task_distribution,
-        noise_variance=DATA.noise_variance,
-    )
-    ys_ridge = ridge_predictor(
-        xs,
-        ys,
-        noise_variance=DATA.noise_variance,
-    )
-    return "\n".join([
-        f"evaluation at step {step}:",
-        f"  training loss: L2(model, truth) = {LOSS(ys, ys_model):.3f}",
-        f"  baseline 1:    L2(dmmse, truth) = {LOSS(ys, ys_dmmse):.3f}",
-        f"  baseline 2:    L2(ridge, truth) = {LOSS(ys, ys_ridge):.3f}",
-        f"  algo. delta:   L2(model, dmmse) = {LOSS(ys_dmmse,ys_model):.3f}",
-        f"  algo. delta:   L2(model, ridge) = {LOSS(ys_ridge,ys_model):.3f}",
-        # NOTE: in th e paper they divide the last two by D---why?
-    ])
+    
+    log(" computing model and baseline predictions...")
+    preds = {
+        'model': MODEL(xs, ys),
+        'dmmse': dmmse_predictor(
+            xs,
+            ys,
+            prior=DATA.task_distribution,
+            noise_variance=DATA.noise_variance,
+        ),
+        'ridge': ridge_predictor(
+            xs,
+            ys,
+            noise_variance=DATA.noise_variance,
+        ),
+    }
+
+    log(" average MSE loss for model and baselines:")
+    # compute model and baseline outputs
+    for m, ys_ in preds.items():
+        log(f"  {m} mse loss = {LOSS(ys, ys_):.2f}")
+
+    log(" MSE loss curves per-prediction, i.e., over the context:")
+    for m, ys_ in preds.items():
+        losses = LOSS(ys, ys_, axis=(0,2))
+        string = ' '.join(f'{l:.2f}' for l in losses)
+        log(f"  {m} mse loss curve = [ {string} ]")
+
+    log(" average squared distance between model and baseline predictions:")
+    log(f"  delta dMMSE = {LOSS(preds['dmmse'], preds['model']):.2f}")
+    log(f"  delta ridge = {LOSS(preds['ridge'], preds['model']):.2f}")
+    
+    # TODO: also evaluate on gaussian task prior?
+
+    return report
 
 
 
@@ -127,8 +148,8 @@ if __name__ == "__main__":
         loss.backward()
         optimizer.step()
         # periodic diagnostic evaluation
-        if step%(NUM_TRAINING_STEPS//256)==0 or step==NUM_TRAINING_STEPS-1:
+        if NUM_TRAINING_STEPS <= 256 \
+        or step % (NUM_TRAINING_STEPS // 256) == 0 \
+        or step == NUM_TRAINING_STEPS - 1:
             tqdm.tqdm.write(EVAL(step))
-
-
 
