@@ -1,5 +1,5 @@
 run:
-	python3 train.py
+	python3 main.py
 
 deps: requirements.txt
 	pip install -r requirements.txt
