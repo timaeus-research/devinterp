@@ -51,7 +51,7 @@ class DTransformer(nn.Module):
             bias=False,
             device=device,
         )
-        self.blocks = [
+        self.blocks = nn.ModuleList([
             MultiHeadedCausalSelfAttentionTransformerBlock(
                 embed_size=embed_size,
                 mlp_size=mlp_size,
@@ -60,7 +60,7 @@ class DTransformer(nn.Module):
                 device=device,
             )
             for _ in range(num_layers)
-        ]
+        ])
         # unembedding
         self.unembedding = nn.Sequential(
             nn.LayerNorm(
