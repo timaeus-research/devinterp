@@ -13,6 +13,7 @@ import torch
 import tqdm
 #
 from baselines import dmmse_predictor, ridge_predictor
+from dotenv import load_dotenv
 from model import InContextRegressionTransformer
 from tasks import (DiscreteTaskDistribution, GaussianTaskDistribution,
                    RegressionSequenceDistribution)
@@ -22,7 +23,8 @@ from devinterp.config import Config
 from devinterp.logging import Logger
 from devinterp.storage import CheckpointManager
 
-logging.basicConfig(level=logging.INFO)
+load_dotenv()
+
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = "1"
 
 class ICLConfig(Config):
@@ -86,6 +88,8 @@ def evals(model, data, num_examples, batch_size, ):
 
 
 def train(config: ICLConfig, seed=0, is_debug=False):
+    logging.basicConfig(level=logging.INFO if not is_debug else logging.DEBUG)
+
     set_seed(seed)
 
     data = RegressionSequenceDistribution(
@@ -108,11 +112,15 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     )
     model.to(config.device)
     model.train()
+
     optimizer = config.optimizer_config.factory(model.parameters())
     scheduler = config.scheduler_config.factory(optimizer) if config.scheduler_config else None
 
-    checkpointer = CheckpointManager(config.project, "devinterp", ".") if config.checkpoint_steps and config.project else None
-    logger = Logger(config.project, config.entity, config.logging_steps, to_stdout=is_debug)
+    # TODO: hash the model details to create a unique identifier for the model and use this as project name below
+    checkpointer = CheckpointManager("icl", "devinterp") # , "experiments/icl")
+    logger = Logger(config.project, config.entity, config.logging_steps)
+
+    print(checkpointer, config.checkpoint_steps)
 
     def state_dict():
         return {
@@ -141,8 +149,10 @@ def train(config: ICLConfig, seed=0, is_debug=False):
             wandb.log({"batch/loss": loss.item()}, step=step)
 
         # Log to wandb & save checkpoints according to log_steps
-        if step in config.checkpoint_steps and checkpointer:
-            checkpointer.save_checkpoint((0, step), state_dict())
+        if step in config.checkpoint_steps:
+            print("saving checkpoint")
+            logger.info(f"Saving checkpoint at step {step}")
+            checkpointer.save_file((0, step), state_dict())
 
         if step in config.logging_steps:
             logger.log(evals(model, data, config.max_examples, config.eval_batch_size), step=step)
@@ -152,30 +162,37 @@ def train(config: ICLConfig, seed=0, is_debug=False):
         wandb.finish()
 
 
-if __name__ == "__main__":
-    wandb.init(project="icl", entity="devinterp")
+def get_config(project=None, entity=None):
+    use_wandb = project is not None and entity is not None
+
+    if use_wandb:
+        wandb.init(project=project, entity=entity)
+
     config_dict = {
         "num_steps": 524_288, # for the paper (500k)
         "num_training_samples": 524_288 * 256,
         "batch_size": 256,
-        "logging_steps": (1000, 1000), 
+        "logging_steps": None, # (1000, 1000), 
         "checkpoint_steps": (100, 100),
         "optimizer_config": {
             "optimizer_type": "Adam",
             "betas": (0.9, 0.999),
             "weight_decay": 0.0,
             "lr": 1e-3,
-        }
+        },
+        "project": project,
+        "entity": entity,
     }
 
-    config_dict.update(wandb.config)
+    if use_wandb:
+        config_dict.update(wandb.config)
 
-    config = ICLConfig(
-        **config_dict,
-        project="icl",
-        entity="devinterp",
-    )
-    train(config, seed=0, is_debug=True)
+    return ICLConfig(**config_dict)
+
+if __name__ == "__main__":
+    # config = get_config(project="devinterp", entity="devinterp")
+    config = get_config()
+    train(config, seed=0, is_debug=False)
 
 
     

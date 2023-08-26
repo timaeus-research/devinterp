@@ -1,5 +1,6 @@
 
 import csv
+import logging
 import warnings
 
 import pandas as pd
@@ -28,7 +29,7 @@ class Logger:
         get_dataframe(): Returns the DataFrame containing the logs if use_df is True, otherwise raises an error.
     """
 
-    def __init__(self, project=None, entity=None, logging_steps=[], metrics=[], out_file=None, use_df=False, to_stdout=False):
+    def __init__(self, project=None, entity=None, logging_steps=[], metrics=[], out_file=None, use_df=False):
         self.project = project
         self.entity = entity
         self.logging_steps = sorted(list(logging_steps))
@@ -37,7 +38,7 @@ class Logger:
         self.use_df = use_df
         self.current_step_idx = 0
         self.buffer = {}
-        self.to_stdout = to_stdout
+        self._logger = logging.getLogger(project)
 
         if self.use_df:
             self.df = pd.DataFrame(index=logging_steps, columns=["step"] + self.metrics)
@@ -74,7 +75,20 @@ class Logger:
                 writer = csv.writer(file)
                 writer.writerow([self.buffer[metric] if metric in self.buffer else None for metric in ["step"] + self.metrics])
 
-        if self.to_stdout:
-            print(yaml.dump(self.buffer))
+        self.debug(yaml.dump(self.buffer))
             
         self.current_step_idx += 1
+
+    def debug(self, msg):
+        self._logger.debug(msg)
+
+    def info(self, msg):
+        self._logger.info(msg)
+
+    def warning(self, msg):
+        self._logger.warning(msg)
+
+    def error(self, msg):
+        self._logger.error(msg)
+
+    
