@@ -54,6 +54,9 @@ def set_seed(seed: int):
 
 def loss_fn(ys_true, ys_pred, axis=None):
     return (ys_true - ys_pred).square().mean(axis=axis) ** 0.5
+
+def accuracy_fn(ys_true, ys_pred, axis=None, atol=1e-3):
+    return ((ys_true - ys_pred).abs() < atol).mean(axis=axis, dtype=torch.float64) 
     
 @torch.no_grad()
 def evals(model, data, num_examples, batch_size, ):
@@ -76,13 +79,18 @@ def evals(model, data, num_examples, batch_size, ):
             noise_variance=data.noise_variance,
         ),
     }
-    metrics = {f"{alg}/{metric}": 0.0 for alg in preds.keys() for metric in ["per_token", "avg", "final"]}
+    metrics = {f"{alg}/{type_}/{metric}": 0.0 for alg in preds.keys() for metric in ["per_token", "avg", "final"] for type_ in ["mse", "acc"]}
 
     for m, ys_ in preds.items():
         per_token_losses = loss_fn(ys, ys_, axis=(0,2))
-        metrics[f"{m}/per_token"] = per_token_losses.tolist()
-        metrics[f"{m}/avg"] = per_token_losses.mean().item()
-        metrics[f"{m}/final"] = per_token_losses[-1].item()
+        metrics[f"{m}/mse/per_token"] = per_token_losses.tolist()
+        metrics[f"{m}/mse/avg"] = per_token_losses.mean().item()
+        metrics[f"{m}/mse/final"] = per_token_losses[-1].item()
+
+        per_token_accuracies = accuracy_fn(ys, ys_, axis=(0,2))
+        metrics[f"{m}/acc/per_token"] = per_token_accuracies.tolist()
+        metrics[f"{m}/acc/avg"] = per_token_accuracies.mean().item()
+        metrics[f"{m}/acc/final"] = per_token_accuracies[-1].item()
 
     return metrics
 
