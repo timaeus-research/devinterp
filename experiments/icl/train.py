@@ -125,7 +125,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     scheduler = config.scheduler_config.factory(optimizer) if config.scheduler_config else None
 
     # TODO: hash the model details to create a unique identifier for the model and use this as project name below
-    checkpointer = CheckpointManager("icl", "devinterp") # , "experiments/icl")
+    checkpointer = CheckpointManager(f"icl-ntasks-{config.num_tasks}", "devinterp") # , "experiments/icl")
     logger = Logger(config.project, config.entity, config.logging_steps)
 
     print(checkpointer, config.checkpoint_steps)
