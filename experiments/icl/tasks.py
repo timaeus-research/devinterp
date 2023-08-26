@@ -23,13 +23,13 @@ class RegressionSequenceDistribution:
     * `noise_variance : float >= 0`
         variance for gaussian error added to regression outputs.
     """
-    def __init__(self, task_distribution, noise_variance=0.25, device='cpu'):
+    def __init__(self, task_distribution: 'TaskDistribution', noise_variance=0.25, device='cpu'):
         self.task_distribution = task_distribution
         self.noise_variance = noise_variance
         self.std = noise_variance**0.5
 
 
-    def get_batch(self, num_examples, batch_size):
+    def get_batch(self, num_examples: int, batch_size: int):
         """
         Generate a batch of synthetic data (token sequences) for in-context
         regression.
@@ -77,6 +77,24 @@ class RegressionSequenceDistribution:
         ys = xs @ ws.view(B, D, 1) + errors # B K D @ B D . + B K 1 -> B K 1
 
         return xs, ys
+    
+    def loop_batches(self, num_examples: int, batch_size: int):
+        """
+        Iterate over batches of synthetic data (token sequences) for
+        in-context regression.
+
+        Yields:
+
+        * `xs : tensor(batch_size, num_examples, task_size, device=device)`
+            batch of sequences of input vectors.
+        * `ys : tensor(batch_size, num_examples, 1, device=device)`
+            batch of corresponding sequences of input vectors.
+        """
+        while True:
+            yield self.get_batch(
+                num_examples=num_examples,
+                batch_size=batch_size,
+            )
 
 
 class TaskDistribution:
@@ -105,7 +123,7 @@ class TaskDistribution:
         self.task_size = task_size
         self.device = device
 
-    def sample_tasks(self, n):
+    def sample_tasks(self, n: int):
         """
         produce a sample of `n` tasks from the concrete task distribution
 
@@ -149,7 +167,7 @@ class DiscreteTaskDistribution(TaskDistribution):
     * `device='cpu' : str(device name)`
         which device to initialise tasks on
     """
-    def __init__(self, task_size, num_tasks, device='cpu'):
+    def __init__(self, task_size: int, num_tasks: int, device='cpu'):
         super().__init__(task_size=task_size, device=device)
         self.num_tasks = num_tasks
         self.tasks = torch.normal(
@@ -160,7 +178,7 @@ class DiscreteTaskDistribution(TaskDistribution):
         )
 
 
-    def sample_tasks(self, n):
+    def sample_tasks(self, n: int):
         """
         Produce a uniformly random sample (with replacement) of `n` of
         the task distribution's tasks that were generated at construction
@@ -207,7 +225,7 @@ class GaussianTaskDistribution(TaskDistribution):
     """
 
 
-    def sample_tasks(self, n):
+    def sample_tasks(self, n: int):
         """
         produce a sample of `n` tasks drawn i.i.d. from a standard gaussian
         distribution in `self.task_size` dimensions
@@ -258,7 +276,7 @@ class SingletonTaskDistribution(TaskDistribution):
         super().__init__(task_size=task_size, device=device)
 
 
-    def sample_tasks(self, n, device='cpu'):
+    def sample_tasks(self, n: int, device='cpu'):
         """
         Produce a batch of the singleton task repeated `n` times in a 2d
         tensor.
