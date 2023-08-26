@@ -3,6 +3,8 @@ import csv
 import warnings
 
 import pandas as pd
+import yaml
+
 import wandb
 
 
@@ -16,7 +18,7 @@ class Logger:
     Parameters:
         project (str, optional): Name of the wandb project. If both project and entity are provided, will log to wandb.
         entity (str, optional): Name of the wandb entity. If both project and entity are provided, will log to wandb.
-        logging_steps (list[int], optional): List of steps at which logging will occur. Must be provided in ascending order.
+        logging_steps (list[int], required): List of steps at which logging will occur. Must be provided in ascending order.
         metrics (list[str], optional): List of metric names that will be logged.
         out_file (str, optional): Path to the CSV file where logs will be saved. If provided, logs will be written to this file.
         use_df (bool, optional): If True, logs will be saved to a Pandas DataFrame within the Logger object.
@@ -26,7 +28,7 @@ class Logger:
         get_dataframe(): Returns the DataFrame containing the logs if use_df is True, otherwise raises an error.
     """
 
-    def __init__(self, project=None, entity=None, logging_steps=[], metrics=[], out_file=None, use_df=False):
+    def __init__(self, project=None, entity=None, logging_steps=[], metrics=[], out_file=None, use_df=False, to_stdout=False):
         self.project = project
         self.entity = entity
         self.logging_steps = sorted(list(logging_steps))
@@ -35,6 +37,7 @@ class Logger:
         self.use_df = use_df
         self.current_step_idx = 0
         self.buffer = {}
+        self.to_stdout = to_stdout
 
         if self.use_df:
             self.df = pd.DataFrame(index=logging_steps, columns=["step"] + self.metrics)
@@ -71,5 +74,7 @@ class Logger:
                 writer = csv.writer(file)
                 writer.writerow([self.buffer[metric] if metric in self.buffer else None for metric in ["step"] + self.metrics])
 
+        if self.to_stdout:
+            print(yaml.dump(self.buffer))
+            
         self.current_step_idx += 1
-

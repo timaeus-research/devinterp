@@ -1,0 +1,24 @@
+name: icl-config-sweep
+method: grid
+program: experiments/icl/train.py
+project: "icl"
+entity: "devinterp"
+parameters:
+  task_size:
+    values: [4, 8, 16, 32] # List the task sizes you want to sweep over
+  max_examples:
+    value: 16
+  num_tasks:
+    value: 64
+  noise_variance:
+    value: 0.25
+  eval_batch_size:
+    value: 2048
+  embed_size:
+    value: 64
+  mlp_size:
+    value: 64
+  num_heads:
+    value: 2
+  num_layers:
+    value: 2

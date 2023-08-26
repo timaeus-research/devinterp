@@ -2,154 +2,182 @@
 training the transformer on synthetic in-context regression task
 """
 
-# for using torch.linalg.solve on MPS
+import logging
 import os
-os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = "1"
-# (must be done before importing torch)
+import random
+import warnings
+from typing import Optional
 
-import tqdm
+import numpy as np
 import torch
-torch.manual_seed(42)
-from model import InContextRegressionTransformer
-from tasks import RegressionSequenceDistribution
-from tasks import DiscreteTaskDistribution, GaussianTaskDistribution
+import tqdm
+#
 from baselines import dmmse_predictor, ridge_predictor
+from model import InContextRegressionTransformer
+from tasks import (DiscreteTaskDistribution, GaussianTaskDistribution,
+                   RegressionSequenceDistribution)
 
+import wandb
+from devinterp.config import Config
+from devinterp.logging import Logger
+from devinterp.storage import CheckpointManager
 
-# # COMPUTE SETTINGS
+logging.basicConfig(level=logging.INFO)
+os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = "1"
 
-# DEVICE = 'cpu'
-DEVICE = 'mps'
+class ICLConfig(Config):
+    # Dataset & loader
+    task_size: int = 8
+    max_examples: int = 16
+    num_tasks: int = 64
+    noise_variance: float = 0.25
+    eval_batch_size: int = 2048
+    
+    # Model
+    embed_size: int = 64 # 128 in the paper
+    mlp_size: int = 64 # 128 in the paper
+    num_heads: int = 2 # 2 in the paper
+    num_layers: int = 2 # 8 in the paper
+    
 
-# # DATA SETTINGS
+def set_seed(seed: int):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    random.seed(seed)
 
-INPUT_DIMENSION     =  8
-MAX_NUM_EXAMPLES    = 16
-NUM_DISTINCT_TASKS  = 64
-NOISE_VARIANCE      = .25
+    try:
+        torch.cuda.manual_seed_all(seed) 
+    except AttributeError:
+        warnings.warn("CUDA not available")
 
-DATA = RegressionSequenceDistribution(
-    task_distribution=DiscreteTaskDistribution(
-        num_tasks=NUM_DISTINCT_TASKS,
-        task_size=INPUT_DIMENSION,
-        device=DEVICE,
-    ),
-    noise_variance=NOISE_VARIANCE,
-)
-
-
-# # MODEL SETTINGS
-
-MODEL = InContextRegressionTransformer(
-    task_size=INPUT_DIMENSION,
-    max_examples=MAX_NUM_EXAMPLES,
-    # beginner specs
-    embed_size=64,
-    mlp_size=64,
-    num_heads=2,
-    num_layers=2,
-    # # specs from the paper
-    # embed_size=128,
-    # mlp_size=128,
-    # num_heads=2,
-    # num_layers=8,
-    device=DEVICE,
-)
-
-
-# # TRAINING SETTINGS
-
-BATCH_SIZE         = 256
-# NUM_TRAINING_STEPS = 512
-# NUM_TRAINING_STEPS = 65_536
-NUM_TRAINING_STEPS = 524_288 # for the paper (500k)
-LEARNING_RATE      = 1e-3
-
-
-def LOSS(ys_true, ys_pred, axis=None):
-    return (ys_true - ys_pred).square().mean(axis=axis)
-
-
-# # EVALUATION
-
-EVALUATION_BATCH_SIZE = 2048
-
-
+def loss_fn(ys_true, ys_pred, axis=None):
+    return (ys_true - ys_pred).square().mean(axis=axis) ** 0.5
+    
 @torch.no_grad()
-def EVAL(step):
-    report = ""
-    def log(s):
-        nonlocal report
-        report += f"{s}\n"
-
-    log(f"evaluation at step {step}:")
-
-    log(f" generating new batch of {EVALUATION_BATCH_SIZE} from T_pretrain...")
-    xs, ys = DATA.get_batch(
-        num_examples=MAX_NUM_EXAMPLES,
-        batch_size=EVALUATION_BATCH_SIZE,
+def evals(model, data, num_examples, batch_size, ):
+    xs, ys = data.get_batch(
+        num_examples=num_examples,
+        batch_size=batch_size,
     )
     
-    log(" computing model and baseline predictions...")
     preds = {
-        'model': MODEL(xs, ys),
+        'model': model(xs, ys),
         'dmmse': dmmse_predictor(
             xs,
             ys,
-            prior=DATA.task_distribution,
-            noise_variance=DATA.noise_variance,
+            prior=data.task_distribution,
+            noise_variance=data.noise_variance,
         ),
         'ridge': ridge_predictor(
             xs,
             ys,
-            noise_variance=DATA.noise_variance,
+            noise_variance=data.noise_variance,
         ),
     }
+    metrics = {f"{alg}/{metric}": 0.0 for alg in preds.keys() for metric in ["per_token", "avg", "final"]}
 
-    log(" average MSE loss for model and baselines:")
-    # compute model and baseline outputs
     for m, ys_ in preds.items():
-        log(f"  {m} mse loss = {LOSS(ys, ys_):.2f}")
+        per_token_losses = loss_fn(ys, ys_, axis=(0,2))
+        metrics[f"{m}/per_token"] = per_token_losses.tolist()
+        metrics[f"{m}/avg"] = per_token_losses.mean().item()
+        metrics[f"{m}/final"] = per_token_losses[-1].item()
 
-    log(" MSE loss curves per-prediction, i.e., over the context:")
-    for m, ys_ in preds.items():
-        losses = LOSS(ys, ys_, axis=(0,2))
-        string = ' '.join(f'{l:.2f}' for l in losses)
-        log(f"  {m} mse loss curve = [ {string} ]")
-
-    log(" average squared distance between model and baseline predictions:")
-    log(f"  delta dMMSE = {LOSS(preds['dmmse'], preds['model']):.2f}")
-    log(f"  delta ridge = {LOSS(preds['ridge'], preds['model']):.2f}")
-    
-    # TODO: also evaluate on gaussian task prior?
-
-    return report
+    return metrics
 
 
+def train(config: ICLConfig, seed=0, is_debug=False):
+    set_seed(seed)
 
-# # TRAINING LOOP
+    data = RegressionSequenceDistribution(
+        task_distribution=DiscreteTaskDistribution(
+            num_tasks=config.num_tasks,
+            task_size=config.task_size,
+            device=config.device,
+        ),
+        noise_variance=config.noise_variance,
+    )
 
-if __name__ == "__main__":
+    model = InContextRegressionTransformer(
+        task_size=config.task_size,
+        max_examples=config.max_examples,
+        embed_size=config.embed_size,
+        mlp_size=config.mlp_size,
+        num_heads=config.num_heads,
+        num_layers=config.num_layers,
+        device=config.device,
+    )
+    model.to(config.device)
+    model.train()
+    optimizer = config.optimizer_config.factory(model.parameters())
+    scheduler = config.scheduler_config.factory(optimizer) if config.scheduler_config else None
 
-    # define optimizer
-    optimizer = torch.optim.Adam(MODEL.parameters(), lr=LEARNING_RATE)
+    checkpointer = CheckpointManager(config.project, "devinterp", ".") if config.checkpoint_steps and config.project else None
+    logger = Logger(config.project, config.entity, config.logging_steps, to_stdout=is_debug)
 
-    # training loop
-    for step in tqdm.trange(NUM_TRAINING_STEPS):
+    def state_dict():
+        return {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict() if scheduler else None,
+        }
+
+    for step in tqdm.trange(config.num_steps, desc=f"Epoch 0 Batch 0/{config.num_steps} Loss: ?.??????"):
+        set_seed(seed + step)  # For reproducibility if we resume training
+
         # data generation and forward pass
-        xs, ys = DATA.get_batch(
-            num_examples=MAX_NUM_EXAMPLES,
-            batch_size=BATCH_SIZE,
+        xs, ys = data.get_batch(
+            num_examples=config.max_examples,
+            batch_size=config.batch_size,
         )
-        ys_pred = MODEL(xs, ys)
-        loss = LOSS(ys_true=ys, ys_pred=ys_pred)
+        ys_pred = model(xs, ys)
+        loss = loss_fn(ys_true=ys, ys_pred=ys_pred)
         # backward pass and gradient step
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        # periodic diagnostic evaluation
-        if NUM_TRAINING_STEPS <= 256 \
-        or step % (NUM_TRAINING_STEPS // 256) == 0 \
-        or step == NUM_TRAINING_STEPS - 1:
-            tqdm.tqdm.write(EVAL(step))
+
+        if config.is_wandb_enabled:
+            # TODO: Figure out how to make this work with Logger
+            wandb.log({"batch/loss": loss.item()}, step=step)
+
+        # Log to wandb & save checkpoints according to log_steps
+        if step in config.checkpoint_steps and checkpointer:
+            checkpointer.save_checkpoint((0, step), state_dict())
+
+        if step in config.logging_steps:
+            logger.log(evals(model, data, config.max_examples, config.eval_batch_size), step=step)
+            model.train()
+
+    if config.is_wandb_enabled:
+        wandb.finish()
+
+
+if __name__ == "__main__":
+    wandb.init(project="icl", entity="devinterp")
+    config_dict = {
+        "num_steps": 524_288, # for the paper (500k)
+        "num_training_samples": 524_288 * 256,
+        "batch_size": 256,
+        "logging_steps": (1000, 1000), 
+        "checkpoint_steps": (100, 100),
+        "optimizer_config": {
+            "optimizer_type": "Adam",
+            "betas": (0.9, 0.999),
+            "weight_decay": 0.0,
+            "lr": 1e-3,
+        }
+    }
+
+    config_dict.update(wandb.config)
+
+    config = ICLConfig(
+        **config_dict,
+        project="icl",
+        entity="devinterp",
+    )
+    train(config, seed=0, is_debug=True)
+
+
+    
+    
 

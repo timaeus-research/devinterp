@@ -1,6 +1,7 @@
 import logging
 import warnings
-from typing import Iterable, List, Literal, Optional, Set, Tuple, Union
+from typing import (Callable, Iterable, List, Literal, Optional, Set, Tuple,
+                    Union)
 
 import torch
 import yaml
@@ -46,13 +47,14 @@ class OptimizerConfig(BaseModel):
             raise ValueError(f"Unknown optimizer type: {optimizer_type}")
 
 class SchedulerConfig(BaseModel):
-    scheduler_type: Literal["StepLR", "CosineAnnealingLR", "MultiStepLR"]
+    scheduler_type: Literal["StepLR", "CosineAnnealingLR", "MultiStepLR", "LambdaLR"] 
     step_size: Optional[int] = None
     gamma: Optional[float] = None
     T_max: Optional[int] = None
     eta_min: Optional[float] = None
     last_epoch: Optional[int] = -1
     milestones: Optional[List[int]] = None
+    lr_lambda: Optional[Callable[[int], float]] = None
 
     class Config:
         validate_assignment = True
@@ -82,6 +84,8 @@ class SchedulerConfig(BaseModel):
             return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, **scheduler_params)
         elif scheduler_type == "MultiStepLR":
             return torch.optim.lr_scheduler.MultiStepLR(optimizer, **scheduler_params)
+        elif scheduler_type == "LambdaLR" and self.lr_lambda is not None:
+            return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=self.lr_lambda)
         else:
             raise ValueError(f"Unknown scheduler type: {scheduler_type}")
         
@@ -91,10 +95,10 @@ class Config(BaseModel):
     batch_size: int = 128
 
     # Training loop
-    num_epochs: Optional[int] = None
-    num_steps: Optional[int] = None
-    logging_steps: Optional[Set[int]] = None
-    checkpoint_steps: Optional[Set[int]] = None
+    # num_epochs: int = None
+    num_steps: int = None
+    logging_steps: Set[int] = None
+    checkpoint_steps: Set[int] = None
 
     # Optimizer
     optimizer_config: OptimizerConfig = Field(default_factory=OptimizerConfig)
@@ -111,39 +115,36 @@ class Config(BaseModel):
     # class Config:
     #     frozen = True
 
-    def __init__(self, logging_steps=None, checkpoint_steps=None, **data):
-        super().__init__(**data)
-        assert (
-            self.num_epochs is not None or self.num_steps is not None
-        ), "Must specify either num_epochs or num_steps"
+    @property
+    def num_steps_per_epoch(self):
+        return self.num_training_samples // self.batch_size
 
-        if self.num_steps is None:
-            self.num_steps = self.num_epochs * self.num_steps_per_epoch
+    # @validator("num_steps", pre=True, always=True)
+    # def validate_num_steps(cls, value, values):
+    #     print("steps", value, values)
+    #     if value is None:
+    #         return values['num_epochs'] * values['num_training_samples'] // values['batch_size']
+    
+    # @validator("num_epochs", pre=True, always=True)
+    # def validate_num_epochs(cls, value, values):
+    #     print("epochs", value, values)
+    #     if value is None:
+    #         return (values['num_steps'] * values['batch_size'] // values['num_training_samples']) + 1
+    
+    @validator("optimizer_config", pre=True)
+    def validate_optimizer_config(cls, value):
+        if isinstance(value, dict):
+            return OptimizerConfig(**value)
+        return value
+    
+    @validator("scheduler_config", pre=True)
+    def validate_scheduler_config(cls, value):
+        if isinstance(value, dict):
+            return SchedulerConfig(**value)
+        return value
 
-        if self.num_epochs is None:
-            self.num_epochs = (self.num_steps // self.num_steps_per_epoch) + 1
-
-        if isinstance(logging_steps, tuple) and len(logging_steps) == 2:
-            self.logging_steps = self._process_steps(logging_steps)
-        else:
-            self.logging_steps = set(logging_steps)
-
-        if isinstance(checkpoint_steps, tuple) and len(checkpoint_steps) == 2:
-            self.checkpoint_steps = self._process_steps(checkpoint_steps)
-        else:
-            self.checkpoint_steps = set(checkpoint_steps)
-
-        if self.is_wandb_enabled:
-            wandb_msg = f"Logging to wandb enabled (project: {self.project}, entity: {self.entity})"
-            logger.info(wandb_msg)
-        else:
-            logger.info("Logging to wandb disabled")
-
-        logger.info(yaml.dump(self.model_dump(exclude=("logging_steps", "checkpoint_steps"))))
-
-    def _process_steps(
-        self, num_steps: Tuple[Optional[int], Optional[int]]
-    ) -> Set[int]:
+    @validator("logging_steps", "checkpoint_steps", pre=True, always=True)
+    def validate_steps(cls, value, values):
         """
         Processes steps for logging & taking checkpoints, allowing customization of intervals.
 
@@ -160,21 +161,33 @@ class Config(BaseModel):
 
         """
 
-        if num_steps is None:
-            return set()
-
-        if isinstance(num_steps, tuple):
+        if isinstance(value, tuple) and len(value) == 2:
             result = set()
 
-            if num_steps[0] is not None:
-                result |= int_linspace(0, self.num_steps, num_steps[0], return_type="set")  # type: ignore
+            if value[0] is not None:
+                result |= int_linspace(0, values["num_steps"], value[0], return_type="set")  # type: ignore
 
-            if num_steps[1] is not None:
-                result |= int_logspace(1, self.num_steps, num_steps[1], return_type="set")  # type: ignore
+            if value[1] is not None:
+                result |= int_logspace(1, values["num_steps"], value[1], return_type="set")  # type: ignore
 
             return result
+        elif value is None:
+            return set()
+        return set(value)
 
-        raise ValueError(f"Invalid num_steps: {num_steps}")
+    @validator("device", pre=True)
+    def validate_device(cls, value):
+        return str(torch.device(value))
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if self.is_wandb_enabled:
+            wandb_msg = f"Logging to wandb enabled (project: {self.project}, entity: {self.entity})"
+            logger.info(wandb_msg)
+        else:
+            logger.info("Logging to wandb disabled")
+
+        logger.info(yaml.dump(self.model_dump(exclude=("logging_steps", "checkpoint_steps"))))
 
     @property
     def is_wandb_enabled(self):
@@ -184,15 +197,7 @@ class Config(BaseModel):
             )
 
         return self.project is not None
-
-    @property
-    def num_steps_per_epoch(self):
-        return self.num_training_samples // self.batch_size
-
-    @validator("device", pre=True)
-    def validate_device(cls, value):
-        return torch.device(value)
-
+    
     def model_dump(self, *args, **kwargs):
         config_dict = super().model_dump(*args, **kwargs)
         config_dict["optimizer_config"] = self.optimizer_config.model_dump()
