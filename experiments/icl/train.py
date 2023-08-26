@@ -180,7 +180,7 @@ def get_config(project=None, entity=None):
         "num_steps": 524_288, # for the paper (500k)
         "num_training_samples": 524_288 * 256,
         "batch_size": 256,
-        "logging_steps": None, # (1000, 1000), 
+        "logging_steps": (500, 500), 
         "checkpoint_steps": (100, 100),
         "optimizer_config": {
             "optimizer_type": "Adam",
@@ -198,8 +198,8 @@ def get_config(project=None, entity=None):
     return ICLConfig(**config_dict)
 
 if __name__ == "__main__":
-    # config = get_config(project="devinterp", entity="devinterp")
-    config = get_config()
+    config = get_config(project="devinterp", entity="devinterp")
+    # config = get_config()
     train(config, seed=0, is_debug=False)
 
 

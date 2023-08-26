@@ -46,7 +46,7 @@ class StorageProvider(Generic[IDType], ABC):
         # Local 
         
         local_path = os.path.join(self.local_root, parent_dir)
-        if self.is_local_enabled and not os.path.exists(local_path):
+        if not os.path.exists(local_path):
             os.makedirs(local_path)
         
         if not self.bucket_name and not self.local_root:
