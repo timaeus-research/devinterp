@@ -65,31 +65,23 @@ def losses_fn(ys, yhats):
         "last": losses[-1].item(),
     }
 
-def compute_dict_deltas(d1, d2):
-    return {k: torch.abs(v - d2[k]) for k, v in d1.items()}
-    
-def prepend_keys(d, prefix, delimiter="/"):
-    return {f"{prefix}{delimiter}{k}": v for k, v in d.items()}
+def flatten_dict(nested_dict, delimiter="/", prefix=None):
+    flat_dict = {}
+    for k, v in nested_dict.items():
+        p = k if prefix is None else f"{prefix}{delimiter}{k}"
+        if isinstance(v, dict):
+            flat_dict.update(flatten_dict(v, delimiter, p))
+        else:
+            flat_dict[p] = v
+    return flat_dict
 
-@torch.no_grad()
-def predictor_loss_evals(xs, ys, data, predictor):
-    yhats = predictor(
-        xs,
-        ys,
-        prior=data.task_distribution,
-        noise_variance=data.noise_variance,
-    )
-    return losses_fn(ys, yhats)
-
-dmmse_loss_evals = functools.partial(predictor_loss_evals, predictor=dmmse_predictor)
-ridge_loss_evals = functools.partial(predictor_loss_evals, predictor=ridge_predictor)
-# model_loss_evals = functools.partial(predictor_loss_evals, predictor=model)
 
 def train(config: ICLConfig, seed=0, is_debug=False):
     logging.basicConfig(level=logging.INFO if not is_debug else logging.DEBUG)
 
     set_seed(seed)
 
+    # initialise data sources
     pretrain_data = RegressionSequenceDistribution(
         task_distribution=DiscreteTaskDistribution(
             num_tasks=config.num_tasks,
@@ -108,6 +100,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
         noise_variance=config.noise_variance,
     )
 
+    # initialise model
     model = InContextRegressionTransformer(
         task_size=config.task_size,
         max_examples=config.max_examples,
@@ -120,6 +113,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     model.to(config.device)
     model.train()
 
+    # initialise training stuff
     optimizer = config.optimizer_config.factory(model.parameters())
     scheduler = config.scheduler_config.factory(optimizer) if config.scheduler_config else None
 
@@ -127,44 +121,45 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     checkpointer = CheckpointManager(f"icl-ntasks-{config.num_tasks}", "devinterp") # , "experiments/icl")
     logger = Logger(config.project, config.entity, config.logging_steps)
 
-    pretrain_xs, pretrain_ys = pretrain_data.get_batch(
-        num_examples=config.max_examples,
-        batch_size=8192,
-    )
-
-    true_xs, true_ys = true_data.get_batch(
-        num_examples=config.max_examples,
-        batch_size=8192,
-    )
-
-    ref_metrics = {
-        "pretrain": {
-            "dmmse": dmmse_loss_evals(pretrain_xs, pretrain_ys, pretrain_data),
-            "ridge": ridge_loss_evals(pretrain_xs, pretrain_xs, pretrain_data),
-        },
-        "true": {
-            "dmmse": dmmse_loss_evals(true_xs, true_ys, pretrain_data),  # Note: using pretrain_data here is intentional
-            "ridge": ridge_loss_evals(true_xs, true_ys, pretrain_data),
-        },
+    # initialise evaluation stuff
+    # fixed evaluation data batches
+    evaluation_batches = {
+        'pretrain': pretrain_data.get_batch(
+            num_examples=config.max_examples,
+            batch_size=config.eval_batch_size,
+        ),
+        'true': true_data.get_batch(
+            num_examples=config.max_examples,
+            batch_size=config.eval_batch_size,
+        ),
     }
-
+    # baseline predictions (for deltas) and losses (for reference)
+    baseline_predictions = {}
+    baseline_losses = {}
+    for data_key, (xs, ys) in evaluation_batches.items():
+        baseline_predictions[data_key] = {
+            'dmmse': dmmse_predictor(xs, ys, pretrain_data.task_distribution, pretrain_data.noise_variance),
+            'ridge': ridge_predictor(xs, ys, true_data.noise_variance),
+        }
+        baseline_losses[data_key] = {
+            baseline_key + '_mse_losses': losses_fn(ys, ys_)
+            for baseline_key, ys_ in baseline_predictions[data_key].items()
+        }
+    # to evaluate a model on the batches against these baselines
     @torch.no_grad()
     def evals():
-        def _evals(data, key: str, _ref_metrics):
-            xs, ys = data.get_batch(
-                num_examples=config.max_examples,
-                batch_size=config.eval_batch_size,
-            )
+        metrics = {}
+        for data_key, (xs, ys) in evaluation_batches.items():
             yhats = model(xs, ys)
-            losses = losses_fn(ys, yhats)
-            delta_dmmse = prepend_keys(compute_dict_deltas(losses, _ref_metrics), "delta_dmmse")
-            delta_ridge = prepend_keys(compute_dict_deltas(losses, _ref_metrics), "delta_ridge") 
-            losses = prepend_keys(losses, "mse")       
-            metrics = losses | delta_dmmse | delta_ridge
-
-            return prepend_keys(metrics, key)
-
-        return _evals(pretrain_data, "pretrain", ref_metrics["pretrain"]) | _evals(true_data, "true", ref_metrics["true"])
+            metrics[data_key] = {
+                'model_mse_losses': losses_fn(ys, yhats),
+                **{
+                    'delta_model_vs_' + key: losses_fn(ys_, yhats)
+                    for key, ys_ in baseline_predictions[data_key].items()
+                },
+                **baseline_losses[data_key], # for comparing to model_mse_losses
+            }
+        return flatten_dict(metrics, delimiter="/") # {a: {b: c}} -> {a/b: c}
 
 
     def state_dict():
@@ -224,7 +219,7 @@ def get_config(project=None, entity=None):
         "num_training_samples": num_steps * batch_size,
         "batch_size": batch_size,
         "logging_steps": (500, 500), 
-        "checkpoint_steps": None, # was: (100, 100),
+        "checkpoint_steps": (100, 100),
         "optimizer_config": {
             "optimizer_type": "Adam",
             "betas": (0.9, 0.999),
