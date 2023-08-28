@@ -152,6 +152,9 @@ def train(config: ICLConfig, seed=0, is_debug=False):
         loss.backward()
         optimizer.step()
 
+        if scheduler:
+            scheduler.step()
+
         if config.is_wandb_enabled:
             # TODO: Figure out how to make this work with Logger
             wandb.log({"batch/loss": loss.item()}, step=step)
@@ -176,17 +179,30 @@ def get_config(project=None, entity=None):
     if use_wandb:
         wandb.init(project=project, entity=entity)
 
+    num_steps = 524_288 # for the paper (500k)
+    batch_size = 256
+    max_learning_rate = 1e-3
     config_dict = {
-        "num_steps": 524_288, # for the paper (500k)
-        "num_training_samples": 524_288 * 256,
-        "batch_size": 256,
+        "num_steps": num_steps, 
+        "num_training_samples": num_steps * batch_size,
+        "batch_size": batch_size,
         "logging_steps": (500, 500), 
-        "checkpoint_steps": (100, 100),
+        "checkpoint_steps": None, # was: (100, 100),
         "optimizer_config": {
             "optimizer_type": "Adam",
             "betas": (0.9, 0.999),
             "weight_decay": 0.0,
-            "lr": 1e-3,
+            "lr": max_learning_rate,    # unused (overwritten by scheduler)
+        },
+        "scheduler_config": {
+            "scheduler_type": "OneCycleLR",
+            "max_lr": max_learning_rate,
+            "total_steps": num_steps,
+            "anneal_strategy": 'linear',
+            "div_factor": (num_steps/2 - 1),        # start 1 step past 0
+            "final_div_factor": (num_steps/2 - 1),  # end 1 step before 0
+            "pct_start": 0.5,           # 50% warmup
+            "cycle_momentum": False,    # Adam doesn't support momentum
         },
         "project": project,
         "entity": entity,
@@ -201,8 +217,4 @@ if __name__ == "__main__":
     config = get_config(project="devinterp", entity="devinterp")
     # config = get_config()
     train(config, seed=0, is_debug=False)
-
-
-    
-    
 
