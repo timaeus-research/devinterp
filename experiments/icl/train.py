@@ -85,32 +85,21 @@ ddmse_loss_evals = functools.partial(predictor_loss_evals, predictor=dmmse_predi
 ridge_loss_evals = functools.partial(predictor_loss_evals, predictor=ridge_predictor)
 # model_loss_evals = functools.partial(predictor_loss_evals, predictor=model)
 
-
-@torch.no_grad()
-def evals(model, pretrain_data, true_data, num_examples, batch_size, ddmse_loss_metrics, ridge_loss_metrics):
-    def _evals(data, key: str):
-        xs, ys = data.get_batch(
-            num_examples=num_examples,
-            batch_size=batch_size,
-        )
-        yhats = model(xs, ys)
-        losses = losses_fn(ys, yhats)
-        delta_dmmse = prepend_keys(compute_dict_deltas(losses, ddmse_loss_metrics), "delta_dmmse")
-        delta_ridge = prepend_keys(compute_dict_deltas(losses, ridge_loss_metrics), "delta_ridge") 
-        losses = prepend_keys(losses, "mse")       
-        metrics = losses | delta_dmmse | delta_ridge
-
-        return prepend_keys(metrics, key)
-
-    return _evals(pretrain_data, "pretrain") | _evals(true_data, "true")
-
-
 def train(config: ICLConfig, seed=0, is_debug=False):
     logging.basicConfig(level=logging.INFO if not is_debug else logging.DEBUG)
 
     set_seed(seed)
 
     pretrain_data = RegressionSequenceDistribution(
+        task_distribution=DiscreteTaskDistribution(
+            num_tasks=config.num_tasks,
+            task_size=config.task_size,
+            device=config.device,
+        ),
+        noise_variance=config.noise_variance,
+    )
+
+    true_data = RegressionSequenceDistribution(
         task_distribution=DiscreteTaskDistribution(
             num_tasks=config.num_tasks,
             task_size=config.task_size,
@@ -138,14 +127,45 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     checkpointer = CheckpointManager(f"icl-ntasks-{config.num_tasks}", "devinterp") # , "experiments/icl")
     logger = Logger(config.project, config.entity, config.logging_steps)
 
-
-    xs, ys = pretrain_data.get_batch(
+    pretrain_xs, pretrain_ys = pretrain_data.get_batch(
         num_examples=config.max_examples,
         batch_size=8192,
     )
 
-    ddmse_loss_metrics = ddmse_loss_evals(xs, ys, pretrain_data)
-    ridge_loss_metrics = ridge_loss_evals(xs, ys, pretrain_data)
+    true_xs, true_ys = true_data.get_batch(
+        num_examples=config.max_examples,
+        batch_size=8192,
+    )
+
+    ref_metrics = {
+        "pretrain": {
+            "dmmse": ddmse_loss_evals(pretrain_xs, pretrain_ys, pretrain_data),
+            "ridge": ridge_loss_evals(pretrain_xs, pretrain_xs, pretrain_data),
+        },
+        "true": {
+            "dmmse": ddmse_loss_evals(true_xs, true_ys, pretrain_data),  # Note: using pretrain_data here is intentional
+            "ridge": ridge_loss_evals(true_xs, true_ys, pretrain_data),
+        },
+    }
+
+    @torch.no_grad()
+    def evals():
+        def _evals(data, key: str, _ref_metrics):
+            xs, ys = data.get_batch(
+                num_examples=config.max_examples,
+                batch_size=config.eval_batch_size,
+            )
+            yhats = model(xs, ys)
+            losses = losses_fn(ys, yhats)
+            delta_dmmse = prepend_keys(compute_dict_deltas(losses, _ref_metrics), "delta_dmmse")
+            delta_ridge = prepend_keys(compute_dict_deltas(losses, _ref_metrics), "delta_ridge") 
+            losses = prepend_keys(losses, "mse")       
+            metrics = losses | delta_dmmse | delta_ridge
+
+            return prepend_keys(metrics, key)
+
+        return _evals(pretrain_data, "pretrain", ref_metrics["pretrain"]) | _evals(true_data, "true", ref_metrics["true"])
+
 
     def state_dict():
         return {
@@ -180,7 +200,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
             checkpointer.save_file((0, step), state_dict())
 
         if step in config.logging_steps:
-            logger.log(evals(model, pretrain_data, pretrain_data, config.max_examples, config.eval_batch_size, ddmse_loss_metrics, ridge_loss_metrics), step=step)
+            logger.log(evals(), step=step)
             model.train()
 
     if config.is_wandb_enabled:
@@ -197,8 +217,8 @@ def get_config(project=None, entity=None):
         "num_steps": 524_288, # for the paper (500k)
         "num_training_samples": 524_288 * 256,
         "batch_size": 256,
-        "logging_steps": None, # (1000, 1000), 
-        "checkpoint_steps": (100, 100),
+        "logging_steps": None, # (1000, 1000), # Set to None if you want no logging
+        "checkpoint_steps": (100, 100),  # Set to None if you want no checkpoints
         "optimizer_config": {
             "optimizer_type": "Adam",
             "betas": (0.9, 0.999),
@@ -215,8 +235,8 @@ def get_config(project=None, entity=None):
     return ICLConfig(**config_dict)
 
 if __name__ == "__main__":
-    # config = get_config(project="devinterp", entity="devinterp")
-    config = get_config()
+    # config = get_config(project="devinterp", entity="devinterp") # With wandb
+    config = get_config() # Without wandb
     train(config, seed=0, is_debug=False)
 
 
