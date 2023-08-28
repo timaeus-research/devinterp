@@ -145,6 +145,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
             baseline_key + '_mse_losses': losses_fn(ys, ys_)
             for baseline_key, ys_ in baseline_predictions[data_key].items()
         }
+
     # to evaluate a model on the batches against these baselines
     @torch.no_grad()
     def evals():
@@ -170,7 +171,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
         }
 
     for step in tqdm.trange(config.num_steps, desc=f"Epoch 0 Batch 0/{config.num_steps} Loss: ?.??????"):
-        set_seed(seed + step * 0.1)  # For reproducibility if we resume training
+        set_seed(seed + step)  # For reproducibility if we resume training
 
         # data generation and forward pass
         xs, ys = pretrain_data.get_batch(
