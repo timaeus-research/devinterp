@@ -6,6 +6,7 @@ import torch
 import yaml
 from pydantic import BaseModel, Field, model_validator, validator
 
+from devinterp.slt.sgld import SGLD
 from devinterp.utils import int_linspace, int_logspace
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,6 @@ class OptimizerConfig(BaseModel):
     temperature: Optional[Union[Literal['adaptive'], float]] = None
     num_samples: Optional[int] = None  # If -1, then this needs to be filled in later. 
     class Config:
-        validate_assignment = True
         frozen = True
 
     def model_dump(self, *args, **kwargs):
@@ -49,6 +49,8 @@ class OptimizerConfig(BaseModel):
         elif self.optimizer_type in {"Adam", "AdamW"}:
             assert self.betas is not None, "betas must be specified for Adam/AdamW"  
 
+        return self
+
     def factory(self, parameters: Iterable[torch.nn.Parameter]):
         optimizer_type = self.optimizer_type
         optimizer_params = self.model_dump(exclude={"optimizer_type"})
@@ -59,6 +61,8 @@ class OptimizerConfig(BaseModel):
             return torch.optim.Adam(parameters, **optimizer_params)
         elif optimizer_type == "AdamW":
             return torch.optim.AdamW(parameters, **optimizer_params)
+        elif optimizer_type == "SGLD":
+            return SGLD(parameters, **optimizer_params)
         else:
             raise ValueError(f"Unknown optimizer type: {optimizer_type}")
 
@@ -209,14 +213,3 @@ class Config(BaseModel):
     @validator("device", pre=True)
     def validate_device(cls, value):
         return torch.device(value)
-
-    def model_dump(self, *args, **kwargs):
-        config_dict = super().model_dump(*args, **kwargs)
-        config_dict["optimizer_config"] = self.optimizer_config.model_dump()
-
-        if self.scheduler_config is not None:
-            config_dict["scheduler_config"] = self.scheduler_config.model_dump()
-        else:
-            config_dict["scheduler_config"] = None
-
-        return config_dict
