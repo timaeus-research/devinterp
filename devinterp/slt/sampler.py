@@ -2,7 +2,6 @@ import itertools
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional
 
-import numpy as np
 import torch
 import yaml
 from pydantic import BaseModel, Field, validator
@@ -11,11 +10,23 @@ from torch.nn import functional as F
 
 from devinterp.config import OptimizerConfig
 from devinterp.slt.ensemble import Ensemble
-from devinterp.slt.metrics import Metric
+from devinterp.slt.observables import Metric, estimate_free_energy, estimate_rlct
 from devinterp.slt.sgld import SGLD
 
 
 class SamplerConfig(BaseModel):
+    """
+    Configuration class for Sampler. Specifies optimizer, number of chains, sampling settings, etc.
+
+    Attributes (example):
+        optimizer_config (OptimizerConfig): Configuration for the optimizer.
+        num_chains (int): Number of independent chains for sampling.
+        num_draws_per_chain (int): Number of draws per chain.
+        num_burnin_steps (int): Number of burnin steps.
+        verbose (bool): Whether to print verbose output.
+        batch_size (int): Batch size for dataloader.
+    """
+
     optimizer_config: OptimizerConfig  # This isn't working for some unknown reason
     num_chains: int = 5
     num_draws_per_chain: int = 10
@@ -30,6 +41,18 @@ class SamplerConfig(BaseModel):
 
 
 class Sampler:
+    """
+    Class for sampling from a given model using a specified optimizer and dataset.
+
+    Attributes:
+        config (SamplerConfig): Configuration for sampling.
+        model (nn.Module): The original model.
+        ensemble (Ensemble): Container for independent model instances.
+        optimizer (Optimizer): The optimizer to use for sampling.
+        data (Dataset): Dataset for sampling.
+        loader (DataLoader): DataLoader for the dataset.
+    """
+
     def __init__(
         self, model: nn.Module, data: torch.utils.data.Dataset, config: SamplerConfig
     ):
@@ -44,24 +67,27 @@ class Sampler:
 
         print(yaml.dump(config.model_dump()))
 
-    @property
-    def num_samples(self):
-        return len(self.data)
-
     def sample(
         self,
-        metrics: Optional[Dict[str, Metric]] = None,
+        kwargs: Optional[Dict[str, Metric]] = None,
         summary_fn: Callable = lambda **kwargs: kwargs,
     ):
+        """
+        Performs the sampling process, returning metric summaries as specified.
+
+        Parameters:
+            metrics (Optional[Dict[str, Metric]]): Metrics to compute during sampling.
+            summary_fn (Callable): Function to summarize metrics after sampling.
+        """
         self.ensemble.train()
         self.ensemble.zero_grad()
 
-        metrics = metrics or {}
-        if "losses" not in metrics:
-            metrics["losses"] = lambda xs, ys, yhats, losses, loss, model: loss
+        kwargs = kwargs or {}
+        if "losses" not in kwargs:
+            kwargs["losses"] = lambda xs, ys, yhats, losses, loss, model: loss
 
         loss_init = 0
-        draws = {m: [[] for _ in range(self.ensemble.num_chains)] for m in metrics}
+        draws = {m: [[] for _ in range(self.ensemble.num_chains)] for m in kwargs}
         num_steps = (
             self.config.num_draws_per_chain * self.config.num_steps_bw_draws
             + self.config.num_burnin_steps
@@ -78,7 +104,7 @@ class Sampler:
                     i >= self.config.num_burnin_steps
                     and i % self.config.num_steps_bw_draws == 0
                 ):
-                    for m, fn in metrics.items():
+                    for m, fn in kwargs.items():
                         draws[m][j].append(fn(xs, ys, yhats, losses, loss, model))
 
                 if i == 0 and j == 0:
@@ -89,53 +115,4 @@ class Sampler:
 
         draws = {m: torch.Tensor(v) for m, v in draws.items()}
 
-        return summary_fn(loss_init=loss_init, num_samples=self.num_samples, **draws)
-
-
-def estimate_free_energy(losses, num_samples: int, **_):
-    """
-    Estimate the free energy, $E[nL_n]$.
-    """
-    loss_avg = losses.mean()
-    free_energy_estimate = loss_avg * num_samples
-
-    return free_energy_estimate.item()
-
-
-def estimate_rlct(loss_init, losses, num_samples: int, **_):
-    r"""
-    Estimate $\hat\lambda$, using the WBIC.
-    """
-    loss_avg = losses.mean()
-    rlct_estimate = (loss_avg - loss_init) * num_samples / np.log(num_samples)
-
-    return rlct_estimate.item()
-
-
-# def estimate_sing_fluc(loss_sum, loss_sq_sum, num_epochs: int):
-#     r"""
-#     Estimate the singular fluctuation, $\hat\nu$.
-
-#     TODO: I don't understand what the right value/name for num_epochs is. In Edmund's original code,
-#     he iterates over the entire dataloader (and increments num_epochs) each time he draws the loss_sum and loss_sq_sum.
-#     I don't think this is necessary. I think we can get around it with a batch based approach.
-#     """
-#    return ((loss_sq_sum - loss_sum * loss_sum / num_epochs) / (num_epochs - 1)).sum()
-
-
-def compose_summary_fns(**summary_fns):
-    def fn(**metrics):
-        output = {}
-        for name, fn in summary_fns.items():
-            output[name] = fn(**metrics)
-
-        return output
-
-    return fn
-
-
-slt_summary_fn = compose_summary_fns(
-    free_energy=estimate_free_energy,
-    rlct=estimate_rlct,
-    # sing_fluc=estimate_sing_fluc
-)
+        return summary_fn(loss_init=loss_init, num_samples=len(self.data), **draws)
