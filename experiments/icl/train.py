@@ -2,6 +2,7 @@
 training the transformer on synthetic in-context regression task
 """
 
+import functools
 import logging
 import os
 import random
@@ -11,6 +12,7 @@ from typing import Optional
 import numpy as np
 import torch
 import tqdm
+import wandb
 #
 from baselines import dmmse_predictor, ridge_predictor
 from dotenv import load_dotenv
@@ -18,7 +20,6 @@ from model import InContextRegressionTransformer
 from tasks import (DiscreteTaskDistribution, GaussianTaskDistribution,
                    RegressionSequenceDistribution)
 
-import wandb
 from devinterp.config import Config
 from devinterp.logging import Logger
 from devinterp.storage import CheckpointManager
@@ -53,46 +54,55 @@ def set_seed(seed: int):
         warnings.warn("CUDA not available")
 
 def loss_fn(ys_true, ys_pred, axis=None):
-    return (ys_true - ys_pred).square().mean(axis=axis) ** 0.5
+    return (ys_true - ys_pred).square().mean(axis=axis) 
 
-def accuracy_fn(ys_true, ys_pred, axis=None, atol=1e-3):
-    return ((ys_true - ys_pred).abs() < atol).mean(axis=axis, dtype=torch.float64) 
-    
-@torch.no_grad()
-def evals(model, data, num_examples, batch_size, ):
-    xs, ys = data.get_batch(
-        num_examples=num_examples,
-        batch_size=batch_size,
-    )
-    
-    preds = {
-        'model': model(xs, ys),
-        'dmmse': dmmse_predictor(
-            xs,
-            ys,
-            prior=data.task_distribution,
-            noise_variance=data.noise_variance,
-        ),
-        'ridge': ridge_predictor(
-            xs,
-            ys,
-            noise_variance=data.noise_variance,
-        ),
+def losses_fn(ys, yhats):
+    losses = loss_fn(ys, yhats, axis=(0,2))
+
+    return {
+        "per_token": losses.tolist(),
+        "avg": losses.mean().item(),
+        "last": losses[-1].item(),
     }
-    metrics = {f"{alg}/{type_}/{metric}": 0.0 for alg in preds.keys() for metric in ["per_token", "avg", "final"] for type_ in ["mse", "acc"]}
 
-    for m, ys_ in preds.items():
-        per_token_losses = loss_fn(ys, ys_, axis=(0,2))
-        metrics[f"{m}/mse/per_token"] = per_token_losses.tolist()
-        metrics[f"{m}/mse/avg"] = per_token_losses.mean().item()
-        metrics[f"{m}/mse/final"] = per_token_losses[-1].item()
+def compute_dict_deltas(d1, d2):
+    return {k: torch.abs(v - d2[k]) for k, v in d1.items()}
+    
+def prepend_keys(d, prefix, delimiter="/"):
+    return {f"{prefix}{delimiter}{k}": v for k, v in d.items()}
 
-        per_token_accuracies = accuracy_fn(ys, ys_, axis=(0,2))
-        metrics[f"{m}/acc/per_token"] = per_token_accuracies.tolist()
-        metrics[f"{m}/acc/avg"] = per_token_accuracies.mean().item()
-        metrics[f"{m}/acc/final"] = per_token_accuracies[-1].item()
+@torch.no_grad()
+def predictor_loss_evals(xs, ys, data, predictor):
+    yhats = predictor(
+        xs,
+        ys,
+        prior=data.task_distribution,
+        noise_variance=data.noise_variance,
+    )
+    return losses_fn(ys, yhats)
 
-    return metrics
+ddmse_loss_evals = functools.partial(predictor_loss_evals, predictor=dmmse_predictor)
+ridge_loss_evals = functools.partial(predictor_loss_evals, predictor=ridge_predictor)
+# model_loss_evals = functools.partial(predictor_loss_evals, predictor=model)
+
+
+@torch.no_grad()
+def evals(model, pretrain_data, true_data, num_examples, batch_size, ddmse_loss_metrics, ridge_loss_metrics):
+    def _evals(data, key: str):
+        xs, ys = data.get_batch(
+            num_examples=num_examples,
+            batch_size=batch_size,
+        )
+        yhats = model(xs, ys)
+        losses = losses_fn(ys, yhats)
+        delta_dmmse = prepend_keys(compute_dict_deltas(losses, ddmse_loss_metrics), "delta_dmmse")
+        delta_ridge = prepend_keys(compute_dict_deltas(losses, ridge_loss_metrics), "delta_ridge") 
+        losses = prepend_keys(losses, "mse")       
+        metrics = losses | delta_dmmse | delta_ridge
+
+        return prepend_keys(metrics, key)
+
+    return _evals(pretrain_data, "pretrain") | _evals(true_data, "true")
 
 
 def train(config: ICLConfig, seed=0, is_debug=False):
@@ -100,7 +110,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
 
     set_seed(seed)
 
-    data = RegressionSequenceDistribution(
+    pretrain_data = RegressionSequenceDistribution(
         task_distribution=DiscreteTaskDistribution(
             num_tasks=config.num_tasks,
             task_size=config.task_size,
@@ -128,7 +138,14 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     checkpointer = CheckpointManager(f"icl-ntasks-{config.num_tasks}", "devinterp") # , "experiments/icl")
     logger = Logger(config.project, config.entity, config.logging_steps)
 
-    print(checkpointer, config.checkpoint_steps)
+
+    xs, ys = pretrain_data.get_batch(
+        num_examples=config.max_examples,
+        batch_size=8192,
+    )
+
+    ddmse_loss_metrics = ddmse_loss_evals(xs, ys, pretrain_data)
+    ridge_loss_metrics = ridge_loss_evals(xs, ys, pretrain_data)
 
     def state_dict():
         return {
@@ -138,10 +155,10 @@ def train(config: ICLConfig, seed=0, is_debug=False):
         }
 
     for step in tqdm.trange(config.num_steps, desc=f"Epoch 0 Batch 0/{config.num_steps} Loss: ?.??????"):
-        set_seed(seed + step)  # For reproducibility if we resume training
+        set_seed(seed + step * 0.1)  # For reproducibility if we resume training
 
         # data generation and forward pass
-        xs, ys = data.get_batch(
+        xs, ys = pretrain_data.get_batch(
             num_examples=config.max_examples,
             batch_size=config.batch_size,
         )
@@ -163,7 +180,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
             checkpointer.save_file((0, step), state_dict())
 
         if step in config.logging_steps:
-            logger.log(evals(model, data, config.max_examples, config.eval_batch_size), step=step)
+            logger.log(evals(model, pretrain_data, pretrain_data, config.max_examples, config.eval_batch_size, ddmse_loss_metrics, ridge_loss_metrics), step=step)
             model.train()
 
     if config.is_wandb_enabled:
