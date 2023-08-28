@@ -28,7 +28,7 @@ You can then import the library in your Python environment with `import devinter
 
 ## Local Development
 
-### Manual Setu
+### Manual Setup
 This project uses [Poetry](https://python-poetry.org/docs/#installation) for package management. Install as follows (this will also setup your virtual environment):
 
 ```bash
