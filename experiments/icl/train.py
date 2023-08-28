@@ -214,7 +214,7 @@ def get_config(project=None, entity=None):
     return ICLConfig(**config_dict)
 
 if __name__ == "__main__":
-    config = get_config(project="devinterp", entity="devinterp")
+    config = get_config(project="icl", entity="devinterp")
     # config = get_config()
     train(config, seed=0, is_debug=False)
 
