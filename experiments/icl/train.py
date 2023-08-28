@@ -81,7 +81,7 @@ def predictor_loss_evals(xs, ys, data, predictor):
     )
     return losses_fn(ys, yhats)
 
-ddmse_loss_evals = functools.partial(predictor_loss_evals, predictor=dmmse_predictor)
+dmmse_loss_evals = functools.partial(predictor_loss_evals, predictor=dmmse_predictor)
 ridge_loss_evals = functools.partial(predictor_loss_evals, predictor=ridge_predictor)
 # model_loss_evals = functools.partial(predictor_loss_evals, predictor=model)
 
@@ -139,11 +139,11 @@ def train(config: ICLConfig, seed=0, is_debug=False):
 
     ref_metrics = {
         "pretrain": {
-            "dmmse": ddmse_loss_evals(pretrain_xs, pretrain_ys, pretrain_data),
+            "dmmse": dmmse_loss_evals(pretrain_xs, pretrain_ys, pretrain_data),
             "ridge": ridge_loss_evals(pretrain_xs, pretrain_xs, pretrain_data),
         },
         "true": {
-            "dmmse": ddmse_loss_evals(true_xs, true_ys, pretrain_data),  # Note: using pretrain_data here is intentional
+            "dmmse": dmmse_loss_evals(true_xs, true_ys, pretrain_data),  # Note: using pretrain_data here is intentional
             "ridge": ridge_loss_evals(true_xs, true_ys, pretrain_data),
         },
     }
