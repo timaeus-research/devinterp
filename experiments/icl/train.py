@@ -7,12 +7,11 @@ import logging
 import os
 import random
 import warnings
-from typing import Optional
+from typing import Dict, List, Optional, TypedDict
 
 import numpy as np
 import torch
 import tqdm
-import wandb
 #
 from baselines import dmmse_predictor, ridge_predictor
 from dotenv import load_dotenv
@@ -20,9 +19,11 @@ from model import InContextRegressionTransformer
 from tasks import (DiscreteTaskDistribution, GaussianTaskDistribution,
                    RegressionSequenceDistribution)
 
+import wandb
 from devinterp.config import Config
 from devinterp.logging import Logger
 from devinterp.storage import CheckpointManager
+from devinterp.utils import flatten_dict
 
 load_dotenv()
 
@@ -53,10 +54,17 @@ def set_seed(seed: int):
     except AttributeError:
         warnings.warn("CUDA not available")
 
+
 def loss_fn(ys_true, ys_pred, axis=None):
     return (ys_true - ys_pred).square().mean(axis=axis) 
 
-def losses_fn(ys, yhats):
+
+class LossSummary(TypedDict):
+    per_token: List[float]
+    avg: float
+    last: float
+
+def losses_fn(ys, yhats) -> LossSummary:
     losses = loss_fn(ys, yhats, axis=(0,2))
 
     return {
@@ -65,40 +73,23 @@ def losses_fn(ys, yhats):
         "last": losses[-1].item(),
     }
 
-def flatten_dict(nested_dict, delimiter="/", prefix=None):
-    flat_dict = {}
-    for k, v in nested_dict.items():
-        p = k if prefix is None else f"{prefix}{delimiter}{k}"
-        if isinstance(v, dict):
-            flat_dict.update(flatten_dict(v, delimiter, p))
-        else:
-            flat_dict[p] = v
-    return flat_dict
+class StateDict(TypedDict):
+    model: Dict
+    optimizer: Dict
+    scheduler: Optional[Dict]
+
+
+def state_dict(model, optimizer, scheduler) -> StateDict:
+    return {
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "scheduler": scheduler.state_dict() if scheduler else None,
+    }
 
 
 def train(config: ICLConfig, seed=0, is_debug=False):
     logging.basicConfig(level=logging.INFO if not is_debug else logging.DEBUG)
-
     set_seed(seed)
-
-    # initialise data sources
-    pretrain_data = RegressionSequenceDistribution(
-        task_distribution=DiscreteTaskDistribution(
-            num_tasks=config.num_tasks,
-            task_size=config.task_size,
-            device=config.device,
-        ),
-        noise_variance=config.noise_variance,
-    )
-
-    true_data = RegressionSequenceDistribution(
-        task_distribution=DiscreteTaskDistribution(
-            num_tasks=config.num_tasks,
-            task_size=config.task_size,
-            device=config.device,
-        ),
-        noise_variance=config.noise_variance,
-    )
 
     # initialise model
     model = InContextRegressionTransformer(
@@ -121,60 +112,74 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     checkpointer = CheckpointManager(f"icl-ntasks-{config.num_tasks}", "devinterp") # , "experiments/icl")
     logger = Logger(config.project, config.entity, config.logging_steps)
 
+    # initialise data sources
+    pretrain_dist = RegressionSequenceDistribution(
+        task_distribution=DiscreteTaskDistribution(
+            num_tasks=config.num_tasks,
+            task_size=config.task_size,
+            device=config.device,
+        ),
+        noise_variance=config.noise_variance,
+    )
+
+    true_dist = RegressionSequenceDistribution(
+        task_distribution=DiscreteTaskDistribution(
+            num_tasks=config.num_tasks,
+            task_size=config.task_size,
+            device=config.device,
+        ),
+        noise_variance=config.noise_variance,
+    )
+
     # initialise evaluation stuff
     # fixed evaluation data batches
-    evaluation_batches = {
-        'pretrain': pretrain_data.get_batch(
-            num_examples=config.max_examples,
-            batch_size=config.eval_batch_size,
-        ),
-        'true': true_data.get_batch(
-            num_examples=config.max_examples,
-            batch_size=config.eval_batch_size,
-        ),
-    }
-    # baseline predictions (for deltas) and losses (for reference)
-    baseline_predictions = {}
-    baseline_losses = {}
-    for data_key, (xs, ys) in evaluation_batches.items():
-        baseline_predictions[data_key] = {
-            'dmmse': dmmse_predictor(xs, ys, pretrain_data.task_distribution, pretrain_data.noise_variance),
-            'ridge': ridge_predictor(xs, ys, true_data.noise_variance),
-        }
-        baseline_losses[data_key] = {
-            baseline_key + '_mse_losses': losses_fn(ys, ys_)
-            for baseline_key, ys_ in baseline_predictions[data_key].items()
-        }
+    pretrain_data = pretrain_dist.get_batch(
+        num_examples=config.max_examples,
+        batch_size=config.eval_batch_size,
+    )
+    pretrain_dmmse_preds = dmmse_predictor(*pretrain_data, pretrain_dist.task_distribution, pretrain_dist.noise_variance)
+    pretrain_ridge_preds = ridge_predictor(*pretrain_data, pretrain_dist.noise_variance)
+
+    # For the following, we use the true distribution to generate the data, but the pretrain distribution to "train" the predictor
+    true_data = true_dist.get_batch(
+        num_examples=config.max_examples,
+        batch_size=config.eval_batch_size,
+    )
+    true_dmmse_preds = dmmse_predictor(*true_data, pretrain_dist.task_distribution, pretrain_dist.noise_variance)
+    true_ridge_preds = ridge_predictor(*true_data, pretrain_dist.noise_variance)
 
     # to evaluate a model on the batches against these baselines
     @torch.no_grad()
     def evals():
-        metrics = {}
-        for data_key, (xs, ys) in evaluation_batches.items():
-            yhats = model(xs, ys)
-            metrics[data_key] = {
-                'model_mse_losses': losses_fn(ys, yhats),
-                **{
-                    'delta_model_vs_' + key: losses_fn(ys_, yhats)
-                    for key, ys_ in baseline_predictions[data_key].items()
-                },
-                **baseline_losses[data_key], # for comparing to model_mse_losses
-            }
-        return flatten_dict(metrics, delimiter="/") # {a: {b: c}} -> {a/b: c}
+        pretrain_model_preds = model(*pretrain_data)
+        pretrain_model_losses = losses_fn(pretrain_data[1], pretrain_model_preds)
+        pretrain_delta_model_vs_dmmse = loss_fn(pretrain_model_preds, pretrain_dmmse_preds)
+        pretrain_delta_model_vs_ridge = loss_fn(pretrain_model_preds, pretrain_ridge_preds)
+        
+        true_model_preds = model(*true_data)
+        true_model_losses = losses_fn(true_data[1], true_model_preds)
+        true_delta_model_vs_dmmse = loss_fn(true_model_preds, true_dmmse_preds)
+        true_delta_model_vs_ridge = loss_fn(true_model_preds, true_ridge_preds)
 
-
-    def state_dict():
         return {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "scheduler": scheduler.state_dict() if scheduler else None,
+            "pretrain/per_token": pretrain_model_losses["per_token"],
+            "pretrain/mse": pretrain_model_losses["avg"],
+            "pretrain/last_token": pretrain_model_losses["last"],
+            "pretrain/delta_dmmse": pretrain_delta_model_vs_dmmse,
+            "pretrain/delta_ridge": pretrain_delta_model_vs_ridge,
+            "true/per_token": true_model_losses["per_token"],
+            "true/mse": true_model_losses["avg"],
+            "true/last_token": true_model_losses["last"],
+            "true/delta_dmmse": true_delta_model_vs_dmmse,
+            "true/delta_ridge": true_delta_model_vs_ridge,
         }
+
 
     for step in tqdm.trange(config.num_steps, desc=f"Epoch 0 Batch 0/{config.num_steps} Loss: ?.??????"):
         set_seed(seed + step)  # For reproducibility if we resume training
 
         # data generation and forward pass
-        xs, ys = pretrain_data.get_batch(
+        xs, ys = pretrain_dist.get_batch(
             num_examples=config.max_examples,
             batch_size=config.batch_size,
         )
@@ -196,7 +201,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
         if step in config.checkpoint_steps:
             print("saving checkpoint")
             logger.info(f"Saving checkpoint at step {step}")
-            checkpointer.save_file((0, step), state_dict())
+            checkpointer.save_file((0, step), state_dict(model, optimizer, scheduler))
 
         if step in config.logging_steps:
             logger.log(evals(), step=step)

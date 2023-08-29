@@ -115,3 +115,17 @@ def flatten_dict(metrics, prefix="", delimiter="/"):
         else:
             flattened[f"{prefix}{key}"] = value
     return flattened
+
+
+def flatten_dict(nested_dict, delimiter="/", prefix=None):
+    """
+    Recursively flattens a nested dictionary of metrics into a single-level dictionary.
+    """
+    flat_dict = {}
+    for k, v in nested_dict.items():
+        p = k if prefix is None else f"{prefix}{delimiter}{k}"
+        if isinstance(v, dict):
+            flat_dict.update(flatten_dict(v, delimiter, p))
+        else:
+            flat_dict[p] = v
+    return flat_dict
