@@ -38,10 +38,10 @@ class ICLConfig(Config):
     eval_batch_size: int = 2048
     
     # Model
-    embed_size: int = 64 # 128 in the paper
-    mlp_size: int = 64 # 128 in the paper
-    num_heads: int = 2 # 2 in the paper
-    num_layers: int = 2 # 8 in the paper
+    embed_size: int = 128
+    mlp_size: int = 128
+    num_heads: int = 2 
+    num_layers: int = 8
     
 
 def set_seed(seed: int):
@@ -123,8 +123,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     )
 
     true_dist = RegressionSequenceDistribution(
-        task_distribution=DiscreteTaskDistribution(
-            num_tasks=config.num_tasks,
+        task_distribution=GaussianTaskDistribution(
             task_size=config.task_size,
             device=config.device,
         ),
@@ -138,7 +137,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
         batch_size=config.eval_batch_size,
     )
     pretrain_dmmse_preds = dmmse_predictor(*pretrain_data, pretrain_dist.task_distribution, pretrain_dist.noise_variance)
-    pretrain_ridge_preds = ridge_predictor(*pretrain_data, pretrain_dist.noise_variance)
+    pretrain_ridge_preds = ridge_predictor(*pretrain_data, config.noise_variance)
 
     # For the following, we use the true distribution to generate the data, but the pretrain distribution to "train" the predictor
     true_data = true_dist.get_batch(
@@ -146,7 +145,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
         batch_size=config.eval_batch_size,
     )
     true_dmmse_preds = dmmse_predictor(*true_data, pretrain_dist.task_distribution, pretrain_dist.noise_variance)
-    true_ridge_preds = ridge_predictor(*true_data, pretrain_dist.noise_variance)
+    true_ridge_preds = ridge_predictor(*true_data, config.noise_variance)
 
     # to evaluate a model on the batches against these baselines
     @torch.no_grad()
