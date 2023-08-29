@@ -2,11 +2,12 @@
 training the transformer on synthetic in-context regression task
 """
 
+import functools
 import logging
 import os
 import random
 import warnings
-from typing import Optional
+from typing import Dict, List, Optional, TypedDict
 
 import numpy as np
 import torch
@@ -22,6 +23,7 @@ import wandb
 from devinterp.config import Config
 from devinterp.logging import Logger
 from devinterp.storage import CheckpointManager
+from devinterp.utils import flatten_dict
 
 load_dotenv()
 
@@ -52,63 +54,44 @@ def set_seed(seed: int):
     except AttributeError:
         warnings.warn("CUDA not available")
 
+
 def loss_fn(ys_true, ys_pred, axis=None):
-    return (ys_true - ys_pred).square().mean(axis=axis) ** 0.5
+    return (ys_true - ys_pred).square().mean(axis=axis) 
 
-def accuracy_fn(ys_true, ys_pred, axis=None, atol=1e-3):
-    return ((ys_true - ys_pred).abs() < atol).mean(axis=axis, dtype=torch.float64) 
-    
-@torch.no_grad()
-def evals(model, data, num_examples, batch_size, ):
-    xs, ys = data.get_batch(
-        num_examples=num_examples,
-        batch_size=batch_size,
-    )
-    
-    preds = {
-        'model': model(xs, ys),
-        'dmmse': dmmse_predictor(
-            xs,
-            ys,
-            prior=data.task_distribution,
-            noise_variance=data.noise_variance,
-        ),
-        'ridge': ridge_predictor(
-            xs,
-            ys,
-            noise_variance=data.noise_variance,
-        ),
+
+class LossSummary(TypedDict):
+    per_token: List[float]
+    avg: float
+    last: float
+
+def losses_fn(ys, yhats) -> LossSummary:
+    losses = loss_fn(ys, yhats, axis=(0,2))
+
+    return {
+        "per_token": losses.tolist(),
+        "avg": losses.mean().item(),
+        "last": losses[-1].item(),
     }
-    metrics = {f"{alg}/{type_}/{metric}": 0.0 for alg in preds.keys() for metric in ["per_token", "avg", "final"] for type_ in ["mse", "acc"]}
 
-    for m, ys_ in preds.items():
-        per_token_losses = loss_fn(ys, ys_, axis=(0,2))
-        metrics[f"{m}/mse/per_token"] = per_token_losses.tolist()
-        metrics[f"{m}/mse/avg"] = per_token_losses.mean().item()
-        metrics[f"{m}/mse/final"] = per_token_losses[-1].item()
+class StateDict(TypedDict):
+    model: Dict
+    optimizer: Dict
+    scheduler: Optional[Dict]
 
-        per_token_accuracies = accuracy_fn(ys, ys_, axis=(0,2))
-        metrics[f"{m}/acc/per_token"] = per_token_accuracies.tolist()
-        metrics[f"{m}/acc/avg"] = per_token_accuracies.mean().item()
-        metrics[f"{m}/acc/final"] = per_token_accuracies[-1].item()
 
-    return metrics
+def state_dict(model, optimizer, scheduler) -> StateDict:
+    return {
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "scheduler": scheduler.state_dict() if scheduler else None,
+    }
 
 
 def train(config: ICLConfig, seed=0, is_debug=False):
     logging.basicConfig(level=logging.INFO if not is_debug else logging.DEBUG)
-
     set_seed(seed)
 
-    data = RegressionSequenceDistribution(
-        task_distribution=DiscreteTaskDistribution(
-            num_tasks=config.num_tasks,
-            task_size=config.task_size,
-            device=config.device,
-        ),
-        noise_variance=config.noise_variance,
-    )
-
+    # initialise model
     model = InContextRegressionTransformer(
         task_size=config.task_size,
         max_examples=config.max_examples,
@@ -121,6 +104,7 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     model.to(config.device)
     model.train()
 
+    # initialise training stuff
     optimizer = config.optimizer_config.factory(model.parameters())
     scheduler = config.scheduler_config.factory(optimizer) if config.scheduler_config else None
 
@@ -128,20 +112,74 @@ def train(config: ICLConfig, seed=0, is_debug=False):
     checkpointer = CheckpointManager(f"icl-ntasks-{config.num_tasks}", "devinterp") # , "experiments/icl")
     logger = Logger(config.project, config.entity, config.logging_steps)
 
-    print(checkpointer, config.checkpoint_steps)
+    # initialise data sources
+    pretrain_dist = RegressionSequenceDistribution(
+        task_distribution=DiscreteTaskDistribution(
+            num_tasks=config.num_tasks,
+            task_size=config.task_size,
+            device=config.device,
+        ),
+        noise_variance=config.noise_variance,
+    )
 
-    def state_dict():
+    true_dist = RegressionSequenceDistribution(
+        task_distribution=DiscreteTaskDistribution(
+            num_tasks=config.num_tasks,
+            task_size=config.task_size,
+            device=config.device,
+        ),
+        noise_variance=config.noise_variance,
+    )
+
+    # initialise evaluation stuff
+    # fixed evaluation data batches
+    pretrain_data = pretrain_dist.get_batch(
+        num_examples=config.max_examples,
+        batch_size=config.eval_batch_size,
+    )
+    pretrain_dmmse_preds = dmmse_predictor(*pretrain_data, pretrain_dist.task_distribution, pretrain_dist.noise_variance)
+    pretrain_ridge_preds = ridge_predictor(*pretrain_data, pretrain_dist.noise_variance)
+
+    # For the following, we use the true distribution to generate the data, but the pretrain distribution to "train" the predictor
+    true_data = true_dist.get_batch(
+        num_examples=config.max_examples,
+        batch_size=config.eval_batch_size,
+    )
+    true_dmmse_preds = dmmse_predictor(*true_data, pretrain_dist.task_distribution, pretrain_dist.noise_variance)
+    true_ridge_preds = ridge_predictor(*true_data, pretrain_dist.noise_variance)
+
+    # to evaluate a model on the batches against these baselines
+    @torch.no_grad()
+    def evals():
+        pretrain_model_preds = model(*pretrain_data)
+        pretrain_model_losses = losses_fn(pretrain_data[1], pretrain_model_preds)
+        pretrain_delta_model_vs_dmmse = loss_fn(pretrain_model_preds, pretrain_dmmse_preds)
+        pretrain_delta_model_vs_ridge = loss_fn(pretrain_model_preds, pretrain_ridge_preds)
+        
+        true_model_preds = model(*true_data)
+        true_model_losses = losses_fn(true_data[1], true_model_preds)
+        true_delta_model_vs_dmmse = loss_fn(true_model_preds, true_dmmse_preds)
+        true_delta_model_vs_ridge = loss_fn(true_model_preds, true_ridge_preds)
+
         return {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "scheduler": scheduler.state_dict() if scheduler else None,
+            "pretrain/per_token": pretrain_model_losses["per_token"],
+            "pretrain/mse": pretrain_model_losses["avg"],
+            "pretrain/last_token": pretrain_model_losses["last"],
+            "pretrain/delta_dmmse": pretrain_delta_model_vs_dmmse,
+            "pretrain/delta_ridge": pretrain_delta_model_vs_ridge,
+            "true/per_token": true_model_losses["per_token"],
+            "true/mse": true_model_losses["avg"],
+            "true/last_token": true_model_losses["last"],
+            "true/delta_dmmse": true_delta_model_vs_dmmse,
+            "true/delta_ridge": true_delta_model_vs_ridge,
         }
+
 
     for step in tqdm.trange(config.num_steps, desc=f"Epoch 0 Batch 0/{config.num_steps} Loss: ?.??????"):
         set_seed(seed + step)  # For reproducibility if we resume training
 
         # data generation and forward pass
-        xs, ys = data.get_batch(
+        xs, ys = pretrain_dist.get_batch(
             num_examples=config.max_examples,
             batch_size=config.batch_size,
         )
@@ -163,10 +201,10 @@ def train(config: ICLConfig, seed=0, is_debug=False):
         if step in config.checkpoint_steps:
             print("saving checkpoint")
             logger.info(f"Saving checkpoint at step {step}")
-            checkpointer.save_file((0, step), state_dict())
+            checkpointer.save_file((0, step), state_dict(model, optimizer, scheduler))
 
         if step in config.logging_steps:
-            logger.log(evals(model, data, config.max_examples, config.eval_batch_size), step=step)
+            logger.log(evals(), step=step)
             model.train()
 
     if config.is_wandb_enabled:
@@ -187,7 +225,7 @@ def get_config(project=None, entity=None):
         "num_training_samples": num_steps * batch_size,
         "batch_size": batch_size,
         "logging_steps": (500, 500), 
-        "checkpoint_steps": None, # was: (100, 100),
+        "checkpoint_steps": (100, 100),
         "optimizer_config": {
             "optimizer_type": "Adam",
             "betas": (0.9, 0.999),
