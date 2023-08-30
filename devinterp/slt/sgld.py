@@ -1,3 +1,6 @@
+from typing import Literal, Union
+
+import numpy as np
 import torch
 
 
@@ -26,8 +29,8 @@ class SGLD(torch.optim.Optimizer):
     where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate, 
     $(\beta n)$ is the inverse temperature (we're in the tempered Bayes paradigm), 
     $n$ is the number of training samples, $m$ is the batch size, $\gamma$ is 
-    the elasticity strength, $\lambda$ is the weight decay strength, and $\sigma$ is the 
-    noise term.
+    the elasticity strength, $\lambda$ is the weight decay strength, $n$ is the 
+    number of samples, and $\sigma$ is the noise term.
 
     :param params: Iterable of parameters to optimize or dicts defining parameter groups
     :param lr: Learning rate (required)
@@ -35,6 +38,7 @@ class SGLD(torch.optim.Optimizer):
     :param weight_decay: L2 regularization term, applied as weight decay (default: 0)
     :param elasticity: Strength of the force pulling weights back to their initial values (default: 0)
     :param temperature: Temperature. (default: 1)
+    :param num_samples: Number of samples to average over (default: 1)
 
     Example:
         >>> optimizer = SGLD(model.parameters(), lr=0.1, temperature=torch.log(n)/n)
@@ -43,14 +47,13 @@ class SGLD(torch.optim.Optimizer):
         >>> optimizer.step()
 
     Note:
-        - We've absorbed $n$, the number of training samples, into the temperature. 
         - The `elasticity` term is unique to this implementation and serves to guide the
         weights towards their original values. This is useful for estimating quantities over the local 
         posterior.
     """
 
-    def __init__(self, params, lr=1e-3, noise_level=1., weight_decay=0., elasticity=0., temperature=1.):
-        defaults = dict(lr=lr, noise_level=noise_level, weight_decay=weight_decay, elasticity=elasticity, temperature=1.)
+    def __init__(self, params, lr=1e-3, noise_level=1., weight_decay=0., elasticity=0., temperature: Union[Literal['adaptive'], float]=1., num_samples=1):
+        defaults = dict(lr=lr, noise_level=noise_level, weight_decay=weight_decay, elasticity=elasticity, temperature=temperature, num_samples=num_samples)
         super(SGLD, self).__init__(params, defaults)
 
         # Save the initial parameters if the elasticity term is set
@@ -59,6 +62,8 @@ class SGLD(torch.optim.Optimizer):
                 for p in group['params']:
                     param_state = self.state[p]
                     param_state['initial_param'] = torch.clone(p.data).detach()
+            if group['temperature'] == "adaptive":  # TODO: Better name
+                group['temperature'] = np.log(group["num_samples"])
 
     def step(self, closure=None):
         for group in self.param_groups:
@@ -66,7 +71,7 @@ class SGLD(torch.optim.Optimizer):
                 if p.grad is None:
                     continue
 
-                dw = p.grad.data / group['temperature']
+                dw = p.grad.data * group["num_samples"] / group['temperature']
 
                 if group['weight_decay'] != 0:
                     dw.add_(p.data, alpha=group['weight_decay'])
