@@ -1,8 +1,0 @@
-torch
-tqdm
-pytest
-torch_testing
-wandb
-pydantic
-dotenv
-boto3
