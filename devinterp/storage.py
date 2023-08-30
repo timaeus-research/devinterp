@@ -165,30 +165,3 @@ class CheckpointManager(StorageProvider[EpochAndBatch]):
 
     def __repr__(self):
         return f"CheckpointManager({self.parent_dir}, {self.bucket_name})"
-
-
-NeuronSeedStep = Tuple[str, int, int]
-
-
-class VisualizationManager(StorageProvider[NeuronSeedStep]):
-    def __init__(self, project_dir: str, bucket_name: Optional[str] = None, local_root: Optional[str] = None, device=torch.device("cpu")):
-        super().__init__(bucket_name, local_root, f"visualizations/{project_dir}", device=device)
-
-    @staticmethod
-    def id_to_name(file_id: NeuronSeedStep):
-        if file_id == "*":
-            return "*"
-        
-        neuron, seed, step = file_id
-        return f"{neuron}_seed_{seed}_step_{step}"
-
-    @staticmethod
-    def name_to_id(name: str) -> NeuronSeedStep:
-        parts = name.split("_")
-        neuron  = parts[-5].split("/")[-1]
-        seed = int(parts[-3])
-        step = int(parts[-1].split(".")[0])
-        return neuron, seed, step
-
-    def __repr__(self):
-        return f"VisualizationManager({self.parent_dir}, {self.bucket_name})"
