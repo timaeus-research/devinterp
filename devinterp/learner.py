@@ -11,9 +11,9 @@ import wandb
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm.notebook import tqdm
 
-from devinterp.storage import CheckpointManager
 from devinterp.config import Config
 from devinterp.logging import Logger
+from devinterp.storage import CheckpointManager
 
 wandb.finish()
 
@@ -23,24 +23,27 @@ class LearnerStateDict(TypedDict):
     scheduler: Optional[Dict]
 
 class Learner:
+
+
     def __init__(self, model: torch.nn.Module, train_set: torch.utils.data.Dataset, test_set: torch.utils.data.DataLoader, config: Config, metrics: Optional[List[Callable[['Learner'], Dict]]]=None):
+        """
+        Initializes the Learner object.
+
+        Args:
+            model (torch.nn.Module): The PyTorch model to be trained.
+            train_set (torch.utils.data.Dataset): The training dataset.
+            test_set (torch.utils.data.DataLoader): The test DataLoader.
+            config (Config): Configuration object containing hyperparameters.
+            metrics (Optional[List[Callable]]): List of metric functions to evaluate the model.
+
+        """
+
         self.config = config
         self.model = model
         self.train_set = train_set
         self.test_set = test_set
         self.optimizer = config.optimizer_config.factory(model.parameters())
-
-        def lr_lambda(step: int):
-            if step < 400:
-                return 0.1
-            elif step < 32_000:
-                return 1.
-            elif step < 48_000:
-                return 0.1
-            else:
-                return 0.01
-
-        self.scheduler = LambdaLR(self.optimizer, lr_lambda=lr_lambda) # config.scheduler_config.factory(self.optimizer)
+        self.scheduler = config.scheduler_config.factory(self.optimizer) # config.scheduler_config.factory(self.optimizer)
         self.generator = torch.Generator(device="cpu")
         self.sampler = torch.utils.data.RandomSampler(train_set, generator=self.generator)
         self.train_loader = torch.utils.data.DataLoader(train_set, batch_size=config.batch_size, sampler=self.sampler)
@@ -50,9 +53,22 @@ class Learner:
         self.checkpoints = CheckpointManager(f"{model.__class__.__name__}18/{self.train_loader.dataset.__class__.__name__}", 'devinterp')  # TODO: read 18 automatically
         
     def measure(self):
+        """
+        Applies metrics to the current state of the model and returns results.
+
+        Returns:
+            Dict: Metrics calculated from the current model state.
+        """
         return functools.reduce(lambda x, y: x | y, [metric(self) for metric in self.metrics], {})
 
     def resume(self, batch_idx: Optional[int] = None):
+        """
+        Resumes training from a saved checkpoint.
+
+        Args:
+            batch_idx (Optional[int]): Batch index to resume training from.
+        
+        """
         if batch_idx is None:
             epoch, batch_idx = self.checkpoints[-1]
         else:
@@ -61,14 +77,20 @@ class Learner:
             if batch != batch_idx:
                 warnings.warn(f"Could not find checkpoint with batch_idx {batch_idx}. Resuming from closest batch ({batch}) instead.")
 
-        self.load(epoch, batch_idx)
+        self.load_checkpoint(epoch, batch_idx)
 
-    def train(self, resume=False, run_id: Optional[str] = None):
+    def train(self, resume=0, run_id: Optional[str] = None):
+        """
+        Trains the model.
+
+        Args:
+            resume (int): Batch index to resume training from. If 0, will not resume.
+            run_id (Optional[str]): Wandb run ID to resume from. If None, will create a new run.
+
+        """
+        
         if resume:
-            self.resume(resume, run_id)
-
-            if self.scheduler:
-                self.scheduler.last_epoch = self.config.num_steps_per_epoch * epoch + batch_idx
+            self.resume(resume)
 
         self.model.to(self.config.device)
         self.model.train()
@@ -121,6 +143,12 @@ class Learner:
             wandb.finish()
 
     def state_dict(self) -> LearnerStateDict:
+        """
+        Returns the current state of the Learner in a LearnerStateDict format.
+
+        Returns:
+            LearnerStateDict: Dictionary containing model, optimizer, and scheduler states.
+        """
         return {
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
@@ -128,6 +156,12 @@ class Learner:
         }
 
     def load_state_dict(self, checkpoint: LearnerStateDict):
+        """
+        Loads a LearnerStateDict into the Learner.
+
+        Args:
+            checkpoint (LearnerStateDict): Dictionary containing model, optimizer, and scheduler states.
+        """
         self.model.load_state_dict(checkpoint["model"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
 
@@ -135,14 +169,34 @@ class Learner:
             self.scheduler.load_state_dict(checkpoint["scheduler"])
     
     def save_checkpoint(self, epoch: int, batch_idx: int):
+        """
+        Saves a checkpoint of the current Learner state.
+
+        Args:
+            epoch (int): Epoch to save checkpoint at.
+            batch_idx (int): Batch index to save checkpoint at.        
+        """
         checkpoint = self.state_dict()
-        self.checkpoints.save_checkpoint(checkpoint, epoch, batch_idx)
+        self.checkpoints.save_file((epoch, batch_idx), checkpoint)
 
     def load_checkpoint(self, epoch: int, batch_idx: int):
-        checkpoint = self.checkpoints.load_checkpoint(epoch, batch_idx)
+        """
+        Loads a checkpoint of the Learner state.
+
+        Args:
+            epoch (int): Epoch to load checkpoint from.
+            batch_idx (int): Batch index to load checkpoint from.
+        """        
+        checkpoint = self.checkpoints.load_file((epoch, batch_idx))
         self.load_state_dict(checkpoint)
 
     def set_seed(self, seed: int):
+        """
+        Sets the seed for the Learner.
+
+        Args:
+            seed (int): Seed to set.
+        """
         np.random.seed(seed)
         torch.manual_seed(seed)
         random.seed(seed)

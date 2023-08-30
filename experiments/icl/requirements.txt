@@ -1,4 +1,0 @@
-torch
-tqdm
-pytest
-torch_testing

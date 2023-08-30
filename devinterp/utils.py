@@ -83,8 +83,7 @@ def int_linspace(start, stop, num, return_type="list"):
             f"return_type must be either 'list' or 'set', got {return_type}"
         )
 
-
-def flatten_dict(metrics, prefix="", delimiter="/"):
+def flatten_dict(dict_, prefix="", delimiter="/"):
     """
     Recursively flattens a nested dictionary of metrics into a single-level dictionary.
 
@@ -114,7 +113,7 @@ def flatten_dict(metrics, prefix="", delimiter="/"):
             }
     """
     flattened = {}
-    for key, value in metrics.items():
+    for key, value in dict_.items():
         if isinstance(value, dict):
             flattened.update(
                 flatten_dict(
