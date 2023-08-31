@@ -163,7 +163,7 @@ class Criterion(Protocol):
 
 def get_criterion(
     criterion: CriterionLiteral,
-) -> Criterion
+) -> Criterion:
     """
     Returns the criterion corresponding to the given string.
     """
