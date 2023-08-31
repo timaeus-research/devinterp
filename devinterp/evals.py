@@ -124,6 +124,6 @@ class ComposeEvaluators(Evaluator):
         """
         return functools.reduce(
             lambda x, y: x | y,
-            [eval_(model, optimizer, scheduler) for eval_ in self.evals],
+            (eval_(model, optimizer, scheduler) for eval_ in self.evals),
             {},
         )

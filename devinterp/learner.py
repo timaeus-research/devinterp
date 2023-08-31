@@ -233,7 +233,7 @@ class Learner:
             torch.cuda.manual_seed_all(seed)
 
 
-logger = logging.getLogger(__name__)
+logger_ = logging.getLogger(__name__)
 
 
 class LearnerConfig(BaseModel):
@@ -266,11 +266,11 @@ class LearnerConfig(BaseModel):
 
         if self.is_wandb_enabled:
             wandb_msg = f"Logging to wandb enabled (project: {self.logger_config.project}, entity: {self.logger_config.entity})"
-            logger.info(wandb_msg)
+            logger_.info(wandb_msg)
         else:
-            logger.info("Logging to wandb disabled")
+            logger_.info("Logging to wandb disabled")
 
-        logger.info(
+        logger_.info(
             yaml.dump(self.model_dump(exclude=("logging_steps", "checkpoint_steps")))
         )
 
@@ -315,7 +315,7 @@ class LearnerConfig(BaseModel):
         self,
         model: torch.nn.Module,
         dataset: torch.utils.data.Dataset,
-        evals: Optional[List[Evaluator]] = None,
+        evaluator: Optional[Evaluator] = None,
     ):
         """Produces a Learner object from the configuration."""
         optimizer = self.optimizer_config.factory(model.parameters())
@@ -338,6 +338,6 @@ class LearnerConfig(BaseModel):
             config=self,
             logger=logger,
             checkpointer=checkpointer,
-            evals=evals,
+            evaluator=evaluator,
             criterion=getattr(F, self.criterion),
         )
