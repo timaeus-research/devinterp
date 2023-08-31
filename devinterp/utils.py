@@ -1,5 +1,6 @@
 import warnings
-from typing import Callable, Iterable, Literal, Tuple, Union, Protocol, Optional
+from typing import (Callable, Iterable, Literal, Optional, Protocol, Tuple,
+                    Union)
 
 import numpy as np
 import torch
@@ -163,7 +164,7 @@ class Criterion(Protocol):
 
 def get_criterion(
     criterion: CriterionLiteral,
-) -> Criterion
+) -> Criterion:
     """
     Returns the criterion corresponding to the given string.
     """

@@ -2,7 +2,6 @@ from typing import Callable, Dict, Literal
 
 import torch
 
-from devinterp.learner import LearnerConfig
 from devinterp.utils import flatten_dict
 
 Reduction = Literal["mean", "sum"]
