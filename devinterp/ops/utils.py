@@ -1,8 +1,8 @@
-from typing import Dict, List, Literal, Set, Tuple, TypeAlias, Union
+from typing import Dict, List, Literal, Set, Tuple, Union
 
 from devinterp.utils import int_linspace, int_logspace
 
-StepsConfig: TypeAlias = Dict[
+StepsConfig = Dict[
     Literal["log_space", "linear_space"], Tuple[int, int, int]
 ]
 

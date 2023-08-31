@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Literal, Optional, Protocol
+from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, Union
 
 import torch
 from pydantic import BaseModel
@@ -22,7 +22,7 @@ class LRScheduler(Protocol):
         is_verbose: bool,
         group: Dict[str, Any],
         lr: float,
-        epoch: int | None = ...,
+        epoch: Union[int, None] = ...,
     ) -> None:
         ...
 

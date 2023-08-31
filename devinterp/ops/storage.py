@@ -17,7 +17,6 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    TypeAlias,
     TypedDict,
     TypeVar,
     Union,

@@ -118,7 +118,7 @@ def dataloaders_reduce(
     )
 
 
-class CustomDataloader(torch.utils.data.DataLoader):
+class CustomDataLoader(torch.utils.data.DataLoader):
     def __init__(self, data: torch.utils.data.Dataset, *args, **kwargs):
         self.generator = torch.Generator(device="cpu")
         sampler = torch.utils.data.RandomSampler(data, generator=self.generator)
