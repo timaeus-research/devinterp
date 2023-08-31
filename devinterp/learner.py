@@ -1,8 +1,9 @@
 import functools
 import logging
+import math
 import random
 import warnings
-from typing import Callable, Container, Dict, List, Optional, Set, Tuple, TypedDict
+from typing import Any, Callable, Container, Dict, List, Optional, Set, Tuple, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -28,146 +29,6 @@ class LearnerStateDict(TypedDict):
     model: Dict
     optimizer: Dict
     scheduler: Optional[Dict]
-
-
-class LearnerConfig(BaseModel):
-    # Dataset & loader
-    num_training_samples: int
-    batch_size: int = 128
-
-    # Training loop
-    # num_epochs: int = None
-    num_steps: int = 100_000
-    logging_config: Optional[MetricLoggingConfig] = None
-    checkpointer_config: Optional[CheckpointerConfig] = None
-
-    # Optimizer
-    optimizer_config: OptimizerConfig = Field(default_factory=OptimizerConfig)
-    scheduler_config: Optional[SchedulerConfig] = None
-
-    # Misc
-    device: str = Field(
-        default_factory=lambda: "cuda" if torch.cuda.is_available() else "cpu"
-    )
-
-    # TODO: Make this frozen
-    class Config:
-        frozen = True
-
-    def __init__(self, **data):
-        super().__init__(**data)
-
-        if self.is_wandb_enabled:
-            wandb_msg = f"Logging to wandb enabled (project: {self.project}, entity: {self.entity})"
-            logger.info(wandb_msg)
-        else:
-            logger.info("Logging to wandb disabled")
-
-        logger.info(
-            yaml.dump(self.model_dump(exclude=("logging_steps", "checkpoint_steps")))
-        )
-
-    # Properties
-
-    @property
-    def num_steps_per_epoch(self):
-        """Number of steps per epoch."""
-        return self.num_training_samples // self.batch_size
-
-    @property
-    def is_wandb_enabled(self):
-        """Whether wandb is enabled."""
-        if self.entity is not None and self.project is None:
-            warnings.warn(
-                "Wandb entity is specified but project is not. Disabling wandb."
-            )
-
-        return self.project is not None
-
-    # Validators
-
-    @validator("logging_steps", "checkpoint_steps", pre=True, always=True)
-    @classmethod
-    def validate_steps(cls, value, values):
-        """
-        Processes steps for logging & taking checkpoints, allowing customization of intervals.
-
-        Args:
-            num_steps: A tuple (x, y) with optional integer values:
-            - x: Specifies the number of steps to take on a linear interval.
-            - y: Specifies the number of steps to take on a log interval.
-
-        Returns:
-            A set of step numbers at which logging or checkpointing should occur.
-
-        Raises:
-            ValueError: If the num_steps input is not valid.
-
-        """
-
-        if isinstance(value, tuple) and len(value) == 2:
-            result = set()
-
-            if value[0] is not None:
-                result |= int_linspace(0, values["num_steps"], value[0], return_type="set")  # type: ignore
-
-            if value[1] is not None:
-                result |= int_logspace(1, values["num_steps"], value[1], return_type="set")  # type: ignore
-
-            return result
-        elif value is None:
-            return set()
-        return set(value)
-
-    @validator("device", pre=True)
-    @classmethod
-    def validate_device(cls, value):
-        """Validates `device` field."""
-        return str(torch.device(value))
-
-    def model_dump(self, *args, **kwargs):
-        """Dumps the model configuration to a dictionary."""
-        config_dict = super().model_dump(*args, **kwargs)
-        config_dict["optimizer_config"] = self.optimizer_config.model_dump()
-
-        if self.scheduler_config is not None:
-            config_dict["scheduler_config"] = self.scheduler_config.model_dump()
-        else:
-            config_dict["scheduler_config"] = None
-
-        return config_dict
-
-    def factory(
-        self,
-        model: torch.nn.Module,
-        train_set: torch.utils.data.Dataset,
-        test_set: torch.utils.data.DataLoader,
-        metrics: Optional[List[Callable[["Learner"], Dict]]] = None,
-    ):
-        """Produces a Learner object from the configuration."""
-        optimizer = self.optimizer_config.factory(model.parameters())
-
-        if self.scheduler_config is not None:
-            scheduler = self.scheduler_config.factory(optimizer)
-        else:
-            scheduler = None
-
-        logger = self.logging_config.factory() if self.logging_config else None
-        checkpointer = (
-            self.checkpointer_config.factory() if self.checkpointer_config else None
-        )
-
-        return Learner(
-            model=model,
-            train_set=train_set,
-            test_set=test_set,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            config=self,
-            logger=logger,
-            checkpointer=checkpointer,
-            metrics=metrics,
-        )
 
 
 class Learner:
@@ -209,7 +70,7 @@ class Learner:
         self.logger = logger
         self.checkpointer = checkpointer
 
-    def measure(self):
+    def measure(self) -> Dict[str, Any]:
         """
         Applies metrics to the current state of the model and returns results.
 
@@ -228,6 +89,9 @@ class Learner:
             batch_idx (Optional[int]): Batch index to resume training from.
 
         """
+        if self.checkpointer is None:
+            raise ValueError("Cannot resume training without a checkpointer.")
+
         if batch_idx is None:
             epoch, batch_idx = self.checkpointer[-1]
         else:
@@ -380,3 +244,143 @@ class Learner:
 
         if "cuda" in str(self.config.device):
             torch.cuda.manual_seed_all(seed)
+
+
+class LearnerConfig(BaseModel):
+    # Dataset & loader
+    num_training_samples: int
+    batch_size: int = 128
+
+    # Training loop
+    # num_epochs: int = None
+    num_steps: int = 100_000
+    logging_config: Optional[MetricLoggingConfig] = None
+    checkpointer_config: Optional[CheckpointerConfig] = None
+
+    # Optimizer
+    optimizer_config: OptimizerConfig = Field(default_factory=OptimizerConfig)
+    scheduler_config: Optional[SchedulerConfig] = None
+
+    # Misc
+    device: str = Field(
+        default_factory=lambda: "cuda" if torch.cuda.is_available() else "cpu"
+    )
+
+    # TODO: Make this frozen
+    class Config:
+        frozen = True
+
+    def __init__(self, **data):
+        super().__init__(**data)
+
+        if self.is_wandb_enabled:
+            wandb_msg = f"Logging to wandb enabled (project: {self.project}, entity: {self.entity})"
+            logger.info(wandb_msg)
+        else:
+            logger.info("Logging to wandb disabled")
+
+        logger.info(
+            yaml.dump(self.model_dump(exclude=("logging_steps", "checkpoint_steps")))
+        )
+
+    # Properties
+
+    @property
+    def num_steps_per_epoch(self):
+        """Number of steps per epoch."""
+        return self.num_training_samples // self.batch_size
+
+    @property
+    def num_epochs(self):
+        """Number of epochs."""
+        return math.ceil(self.num_steps / self.num_steps_per_epoch)
+
+    @property
+    def is_wandb_enabled(self):
+        """Whether wandb is enabled."""
+        return self.logging_config and self.logging_config.is_wandb_enabled
+
+    # Validators
+
+    @validator("logging_steps", "checkpoint_steps", pre=True, always=True)
+    @classmethod
+    def validate_steps(cls, value, values):
+        """
+        Processes steps for logging & taking checkpoints, allowing customization of intervals.
+
+        Args:
+            num_steps: A tuple (x, y) with optional integer values:
+            - x: Specifies the number of steps to take on a linear interval.
+            - y: Specifies the number of steps to take on a log interval.
+
+        Returns:
+            A set of step numbers at which logging or checkpointing should occur.
+
+        Raises:
+            ValueError: If the num_steps input is not valid.
+
+        """
+
+        if isinstance(value, tuple) and len(value) == 2:
+            result = set()
+
+            if value[0] is not None:
+                result |= int_linspace(0, values["num_steps"], value[0], return_type="set")  # type: ignore
+
+            if value[1] is not None:
+                result |= int_logspace(1, values["num_steps"], value[1], return_type="set")  # type: ignore
+
+            return result
+        elif value is None:
+            return set()
+        return set(value)
+
+    @validator("device", pre=True)
+    @classmethod
+    def validate_device(cls, value):
+        """Validates `device` field."""
+        return str(torch.device(value))
+
+    def model_dump(self, *args, **kwargs):
+        """Dumps the model configuration to a dictionary."""
+        config_dict = super().model_dump(*args, **kwargs)
+        config_dict["optimizer_config"] = self.optimizer_config.model_dump()
+
+        if self.scheduler_config is not None:
+            config_dict["scheduler_config"] = self.scheduler_config.model_dump()
+        else:
+            config_dict["scheduler_config"] = None
+
+        return config_dict
+
+    def factory(
+        self,
+        model: torch.nn.Module,
+        train_set: torch.utils.data.Dataset,
+        test_set: torch.utils.data.DataLoader,
+        metrics: Optional[List[Callable[["Learner"], Dict]]] = None,
+    ):
+        """Produces a Learner object from the configuration."""
+        optimizer = self.optimizer_config.factory(model.parameters())
+
+        if self.scheduler_config is not None:
+            scheduler = self.scheduler_config.factory(optimizer)
+        else:
+            scheduler = None
+
+        logger = self.logging_config.factory() if self.logging_config else None
+        checkpointer = (
+            self.checkpointer_config.factory() if self.checkpointer_config else None
+        )
+
+        return Learner(
+            model=model,
+            train_set=train_set,
+            test_set=test_set,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            config=self,
+            logger=logger,
+            checkpointer=checkpointer,
+            metrics=metrics,
+        )

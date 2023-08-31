@@ -216,6 +216,15 @@ class MetricLoggingConfig(BaseModel):
     class Config:
         frozen = True
 
+    @property
+    def is_wandb_enabled(self):
+        if self.entity is not None and self.project is None:
+            warnings.warn(
+                "Wandb entity is specified but project is not. Disabling wandb."
+            )
+
+        return self.project is not None
+
     def factory(self):
         """Creates a MetricLogger based on the configuration."""
         loggers = []
