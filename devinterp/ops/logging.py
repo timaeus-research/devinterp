@@ -204,6 +204,37 @@ class CompositeLogger(MetricLogger):
                 logger.warning(msg)
 
 
+class MetricLoggingConfig(BaseModel):
+    project: Optional[str] = None
+    entity: Optional[str] = None
+    logging_steps: Optional[List[int]] = None
+    metrics: Optional[List[str]] = None
+    out_file: Optional[str] = None
+    use_df: Optional[bool] = False
+    stdout: Optional[bool] = False
+
+    class Config:
+        frozen = True
+
+    def factory(self):
+        """Creates a MetricLogger based on the configuration."""
+        loggers = []
+
+        if self.project and self.entity:
+            loggers.append(WandbLogger(self.project, self.entity))
+
+        if self.logging_steps:
+            if self.use_df and self.metrics:
+                loggers.append(DataFrameLogger(self.logging_steps, self.metrics))
+            elif self.out_file:
+                loggers.append(CsvLogger(self.out_file, self.metrics))
+
+        if self.stdout:
+            loggers.append(StdLogger(self.project or "MetricLogger"))
+
+        return CompositeLogger(loggers)
+
+
 def Logger(
     project=None,
     entity=None,
@@ -212,18 +243,13 @@ def Logger(
     out_file=None,
     use_df=False,
 ):
-    """For backwards-compatibility. Use CompositeLogger instead."""
+    """For backwards-compatibility. Use CompositeLogger or MetricLoggingConfig.factory instead."""
     warnings.warn("Logger is deprecated. Use CompositeLogger instead.")
-
-    loggers = []
-
-    if project and entity:
-        loggers.append(WandbLogger(project, entity))
-
-    if logging_steps:
-        if use_df:
-            loggers.append(DataFrameLogger(logging_steps, metrics))
-        else:
-            loggers.append(CsvLogger(out_file, metrics))
-
-    return CompositeLogger(loggers)
+    return MetricLoggingConfig(
+        project=project,
+        entity=entity,
+        logging_steps=logging_steps,
+        metrics=metrics,
+        out_file=out_file,
+        use_df=use_df,
+    ).factory()

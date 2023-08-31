@@ -9,10 +9,10 @@ from pydantic import BaseModel, Field, validator
 from torch import nn
 from torch.nn import functional as F
 
-from devinterp.config import OptimizerConfig
+from devinterp.optim.optimizers import OptimizerConfig
 from devinterp.slt.ensemble import Ensemble
 from devinterp.slt.observables import Metric, estimate_free_energy, estimate_rlct
-from devinterp.slt.sgld import SGLD
+from devinterp.optim.sgld import SGLD
 from devinterp.utils import get_criterion
 
 logger = Logger(__name__)

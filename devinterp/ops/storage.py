@@ -26,6 +26,7 @@ from typing import (
 import boto3
 import torch
 from botocore.exceptions import ClientError
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -339,6 +340,37 @@ def StorageProvider(
 EpochAndBatch = Tuple[int, int]
 
 
+class CheckpointerConfig(BaseModel):
+    checkpoint_steps: Set[int] = Field(default_factory=set)
+    project_dir: str = "checkpoints"
+    bucket_name: Optional[str] = None
+    local_root: Optional[str] = None
+    device: str = "cpu"
+
+    class Config:
+        frozen = True
+
+    def factory(self):
+        def id_to_key(file_id: Union[EpochAndBatch, Literal["*"]]) -> str:
+            epoch, batch = file_id
+            return f"checkpoint_epoch_{epoch}_batch_{batch}"
+
+        def key_to_id(name: str) -> EpochAndBatch:
+            parts = name.split("_")
+            epoch = int(parts[-3])
+            batch_idx = int(parts[-1].split(".")[0])
+            return epoch, batch_idx
+
+        return create_storage_provider(
+            bucket_name=self.bucket_name,
+            local_root=self.local_root,
+            root_dir=f"checkpoints/{self.project_dir}",
+            device=self.device,
+            id_to_key=id_to_key,
+            key_to_id=key_to_id,
+        )
+
+
 def CheckpointManager(
     project_dir: str,
     bucket_name: Optional[str] = None,
@@ -351,21 +383,9 @@ def CheckpointManager(
         "CheckpointManager is deprecated. Use create_storage_provider instead."
     )
 
-    def id_to_key(file_id: Union[EpochAndBatch, Literal["*"]]) -> str:
-        epoch, batch = file_id
-        return f"checkpoint_epoch_{epoch}_batch_{batch}"
-
-    def key_to_id(name: str) -> EpochAndBatch:
-        parts = name.split("_")
-        epoch = int(parts[-3])
-        batch_idx = int(parts[-1].split(".")[0])
-        return epoch, batch_idx
-
-    return create_storage_provider(
+    return CheckpointerConfig(
+        project_dir=project_dir,
         bucket_name=bucket_name,
         local_root=local_root,
-        root_dir=f"checkpoints/{project_dir}",
         device=device,
-        id_to_key=id_to_key,
-        key_to_id=key_to_id,
-    )
+    ).factory()

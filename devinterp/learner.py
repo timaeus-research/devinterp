@@ -1,21 +1,27 @@
 import functools
+import logging
 import random
 import warnings
-from typing import Callable, Container, Dict, List, Optional, Tuple, TypedDict
+from typing import Callable, Container, Dict, List, Optional, Set, Tuple, TypedDict
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
+import yaml
+from pydantic import BaseModel, Field, validator
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm.notebook import tqdm
 
 import wandb
-from devinterp.config import Config
-from devinterp.ops.logging import Logger
-from devinterp.ops.storage import CheckpointManager
+from devinterp.data import CustomDataloader
+from devinterp.ops.logging import MetricLogger, MetricLoggingConfig
+from devinterp.ops.storage import BaseStorageProvider, CheckpointerConfig
+from devinterp.optim.optimizers import OptimizerConfig
+from devinterp.optim.schedulers import LRScheduler, SchedulerConfig
+from devinterp.utils import int_linspace, int_logspace
 
-wandb.finish()
+logger = logging.getLogger(__name__)
 
 
 class LearnerStateDict(TypedDict):
@@ -24,13 +30,157 @@ class LearnerStateDict(TypedDict):
     scheduler: Optional[Dict]
 
 
+class LearnerConfig(BaseModel):
+    # Dataset & loader
+    num_training_samples: int
+    batch_size: int = 128
+
+    # Training loop
+    # num_epochs: int = None
+    num_steps: int = 100_000
+    logging_config: Optional[MetricLoggingConfig] = None
+    checkpointer_config: Optional[CheckpointerConfig] = None
+
+    # Optimizer
+    optimizer_config: OptimizerConfig = Field(default_factory=OptimizerConfig)
+    scheduler_config: Optional[SchedulerConfig] = None
+
+    # Misc
+    device: str = Field(
+        default_factory=lambda: "cuda" if torch.cuda.is_available() else "cpu"
+    )
+
+    # TODO: Make this frozen
+    class Config:
+        frozen = True
+
+    def __init__(self, **data):
+        super().__init__(**data)
+
+        if self.is_wandb_enabled:
+            wandb_msg = f"Logging to wandb enabled (project: {self.project}, entity: {self.entity})"
+            logger.info(wandb_msg)
+        else:
+            logger.info("Logging to wandb disabled")
+
+        logger.info(
+            yaml.dump(self.model_dump(exclude=("logging_steps", "checkpoint_steps")))
+        )
+
+    # Properties
+
+    @property
+    def num_steps_per_epoch(self):
+        """Number of steps per epoch."""
+        return self.num_training_samples // self.batch_size
+
+    @property
+    def is_wandb_enabled(self):
+        """Whether wandb is enabled."""
+        if self.entity is not None and self.project is None:
+            warnings.warn(
+                "Wandb entity is specified but project is not. Disabling wandb."
+            )
+
+        return self.project is not None
+
+    # Validators
+
+    @validator("logging_steps", "checkpoint_steps", pre=True, always=True)
+    @classmethod
+    def validate_steps(cls, value, values):
+        """
+        Processes steps for logging & taking checkpoints, allowing customization of intervals.
+
+        Args:
+            num_steps: A tuple (x, y) with optional integer values:
+            - x: Specifies the number of steps to take on a linear interval.
+            - y: Specifies the number of steps to take on a log interval.
+
+        Returns:
+            A set of step numbers at which logging or checkpointing should occur.
+
+        Raises:
+            ValueError: If the num_steps input is not valid.
+
+        """
+
+        if isinstance(value, tuple) and len(value) == 2:
+            result = set()
+
+            if value[0] is not None:
+                result |= int_linspace(0, values["num_steps"], value[0], return_type="set")  # type: ignore
+
+            if value[1] is not None:
+                result |= int_logspace(1, values["num_steps"], value[1], return_type="set")  # type: ignore
+
+            return result
+        elif value is None:
+            return set()
+        return set(value)
+
+    @validator("device", pre=True)
+    @classmethod
+    def validate_device(cls, value):
+        """Validates `device` field."""
+        return str(torch.device(value))
+
+    def model_dump(self, *args, **kwargs):
+        """Dumps the model configuration to a dictionary."""
+        config_dict = super().model_dump(*args, **kwargs)
+        config_dict["optimizer_config"] = self.optimizer_config.model_dump()
+
+        if self.scheduler_config is not None:
+            config_dict["scheduler_config"] = self.scheduler_config.model_dump()
+        else:
+            config_dict["scheduler_config"] = None
+
+        return config_dict
+
+    def factory(
+        self,
+        model: torch.nn.Module,
+        train_set: torch.utils.data.Dataset,
+        test_set: torch.utils.data.DataLoader,
+        metrics: Optional[List[Callable[["Learner"], Dict]]] = None,
+    ):
+        """Produces a Learner object from the configuration."""
+        optimizer = self.optimizer_config.factory(model.parameters())
+
+        if self.scheduler_config is not None:
+            scheduler = self.scheduler_config.factory(optimizer)
+        else:
+            scheduler = None
+
+        logger = self.logging_config.factory() if self.logging_config else None
+        checkpointer = (
+            self.checkpointer_config.factory() if self.checkpointer_config else None
+        )
+
+        return Learner(
+            model=model,
+            train_set=train_set,
+            test_set=test_set,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            config=self,
+            logger=logger,
+            checkpointer=checkpointer,
+            metrics=metrics,
+        )
+
+
 class Learner:
     def __init__(
         self,
         model: torch.nn.Module,
         train_set: torch.utils.data.Dataset,
         test_set: torch.utils.data.DataLoader,
-        config: Config,
+        optimizer: torch.optim.Optimizer,
+        config: LearnerConfig,
+        scheduler: Optional[LRScheduler] = None,
+        logger: Optional[MetricLogger] = None,
+        checkpointer: Optional[BaseStorageProvider] = None,
         metrics: Optional[List[Callable[["Learner"], Dict]]] = None,
     ):
         """
@@ -49,33 +199,15 @@ class Learner:
         self.model = model
         self.train_set = train_set
         self.test_set = test_set
-        self.optimizer = config.optimizer_config.factory(model.parameters())
-        self.scheduler = config.scheduler_config.factory(
-            self.optimizer
-        )  # config.scheduler_config.factory(self.optimizer)
-        self.generator = torch.Generator(device="cpu")
-        self.sampler = torch.utils.data.RandomSampler(
-            train_set, generator=self.generator
-        )
-        self.train_loader = torch.utils.data.DataLoader(
-            train_set, batch_size=config.batch_size, sampler=self.sampler
-        )
+        self.optimizer = optimizer
+        self.scheduler = scheduler
+        self.train_loader = CustomDataloader(train_set, batch_size=config.batch_size)
         self.test_loader = torch.utils.data.DataLoader(
             test_set, batch_size=config.batch_size, shuffle=False
         )
         self.metrics = metrics or []
-        self.logger = Logger(
-            project=config.project,
-            entity=config.entity,
-            logging_steps=config.logging_steps,
-            metrics=[],
-            out_file=None,
-            use_df=False,
-        )
-        self.checkpoints = CheckpointManager(
-            f"{model.__class__.__name__}18/{self.train_loader.dataset.__class__.__name__}",
-            "devinterp",
-        )  # TODO: read 18 automatically
+        self.logger = logger
+        self.checkpointer = checkpointer
 
     def measure(self):
         """
@@ -97,9 +229,9 @@ class Learner:
 
         """
         if batch_idx is None:
-            epoch, batch_idx = self.checkpoints[-1]
+            epoch, batch_idx = self.checkpointer[-1]
         else:
-            epoch, batch = min(self.checkpoints, key=lambda x: abs(x[1] - batch_idx))
+            epoch, batch = min(self.checkpointer, key=lambda x: abs(x[1] - batch_idx))
 
             if batch != batch_idx:
                 warnings.warn(
@@ -221,7 +353,7 @@ class Learner:
             batch_idx (int): Batch index to save checkpoint at.
         """
         checkpoint = self.state_dict()
-        self.checkpoints.save_file((epoch, batch_idx), checkpoint)
+        self.checkpointer.save_file((epoch, batch_idx), checkpoint)
 
     def load_checkpoint(self, epoch: int, batch_idx: int):
         """
@@ -231,7 +363,7 @@ class Learner:
             epoch (int): Epoch to load checkpoint from.
             batch_idx (int): Batch index to load checkpoint from.
         """
-        checkpoint = self.checkpoints.load_file((epoch, batch_idx))
+        checkpoint = self.checkpointer.load_file((epoch, batch_idx))
         self.load_state_dict(checkpoint)
 
     def set_seed(self, seed: int):
