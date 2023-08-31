@@ -2,13 +2,13 @@ import csv
 import dataclasses
 import logging
 import warnings
-from  import FileDescriptorOrPath
 from typing import Any, Dict, List, Optional, Protocol
 
+import numpy as np
 import pandas as pd
-from pydantic import BaseModel
 import torch
 import yaml
+from pydantic import BaseModel
 
 import wandb
 
@@ -43,33 +43,36 @@ class WandbLogger(MetricLogger):
     def log(
         self,
         data: Dict[str, Any],
-        step: Optional[int] = None,
-        commit: Optional[bool] = None,
-        sync: Optional[bool] = None,
+        *args,
+        **kwargs,
     ):
         """Log the data at a specific step."""
-        wandb.log(data, step=step, commit=commit, sync=sync)
+        wandb.log(data, *args, **kwargs)
 
 
 class CsvLogger(MetricLogger):
     """Logs data to a CSV file."""
 
-    def __init__(self, out_file: FileDescriptorOrPath, metrics):
+    def __init__(self, out_file: str, metrics):
         self.out_file = out_file
         self.metrics = metrics
         self.current_step = -1
         self.buffer = {}
 
-    def log(self, data, step=None, commit=None, sync=None):
+    def log(self, data, step=None, commit=None, **_):
         """Log the data at a specific step."""
         if step is not None:
-            if step > self.current_step:
-                self._commit()
-                self.current_step = step
-                self.buffer.update(data)
-            else:
+            if step < self.current_step:
                 warning = f"Step must be greater than {self.current_step}, got {step}. Ignoring."
                 warnings.warn(warning)
+                return
+            elif step > self.current_step:
+                if self.current_step >= 0:
+                    self._commit()
+
+                self.current_step = step
+
+        self.buffer.update(data)
 
         if commit:
             self._commit()
@@ -77,10 +80,14 @@ class CsvLogger(MetricLogger):
 
     def _commit(self):
         """Write the buffered data to the CSV file."""
+        if self.current_step < 0:
+            return
+
         with open(self.out_file, "a", newline="") as file:
             writer = csv.writer(file)
             writer.writerow(
-                [self.buffer.get(metric, None) for metric in ["step"] + self.metrics]
+                [self.current_step]
+                + [self.buffer.get(metric, None) for metric in self.metrics]
             )
         self.buffer.clear()
 
@@ -94,34 +101,46 @@ class DataFrameLogger(MetricLogger):
 
     """
 
-    def __init__(self, logging_steps: List[int], metrics: List[str]):
-        self.df = pd.DataFrame(index=logging_steps, columns=["step"] + metrics)
+    def __init__(self, logging_steps: List[int], metrics: List[str], dtype=float):
+        self.df = pd.DataFrame(
+            index=range(len(logging_steps)), columns=["step"] + metrics, dtype=dtype
+        )
+        self.df["step"] = logging_steps
         self.current_step = -1
         self.buffer = {}
 
-    def log(self, data, step=None, commit=None, sync=None):
+    def log(self, data, step=None, commit=None, **_):
         """Log the data at a specific step."""
         if step is not None:
-            if step > self.current_step:
-                self._commit()
-                self.current_step = step
-                self.buffer.update(data)
-            else:
-                warning = f"Step must be greater than {self.current_step}, got {step}. Ignoring."
+            if step not in self.df.step.values:
+                warning = f"Step {step} not in logging_steps. Ignoring."
                 warnings.warn(warning)
+                return
+
+            if step != self.current_step:
+                self._commit()
+
+            self.current_step = step
+
+        self.buffer.update(data)
 
         if commit:
             self._commit()
-            self.current_step += 1  # Auto-increment
 
     def _commit(self):
         """Write the buffered data to the DataFrame."""
-        self.df.loc[self.current_step] = self.buffer
+        if self.current_step < 0:
+            return
+
+        for key, value in self.buffer.items():
+            self.df.loc[self.df.step == self.current_step, key] = value
+
         self.buffer.clear()
 
 
 class StdLogger(MetricLogger):
     """A wrapper for the standard Logger that uses the MetricLogger interface."""
+
     def __init__(self, project):
         self._logger = logging.getLogger(project)
 
@@ -165,15 +184,9 @@ class CompositeLogger(MetricLogger):
     def __init__(self, loggers):
         self.loggers = loggers
 
-    def log(
-        self,
-        data: Dict[str, Any],
-        step: Optional[int] = None,
-        commit: Optional[bool] = None,
-        sync: Optional[bool] = None,
-    ):
+    def log(self, data: Dict[str, Any], *args, **kwargs):
         for logger in self.loggers:
-            logger.log(data, step, commit, sync)
+            logger.log(data, *args, **kwargs)
 
     def info(self, msg):
         for logger in self.loggers:
@@ -192,13 +205,13 @@ class CompositeLogger(MetricLogger):
 
 
 def Logger(
-        project=None,
-        entity=None,
-        logging_steps=[],
-        metrics=[],
-        out_file=None,
-        use_df=False,
-    ):
+    project=None,
+    entity=None,
+    logging_steps=[],
+    metrics=[],
+    out_file=None,
+    use_df=False,
+):
     """For backwards-compatibility. Use CompositeLogger instead."""
     warnings.warn("Logger is deprecated. Use CompositeLogger instead.")
 
@@ -206,7 +219,7 @@ def Logger(
 
     if project and entity:
         loggers.append(WandbLogger(project, entity))
-    
+
     if logging_steps:
         if use_df:
             loggers.append(DataFrameLogger(logging_steps, metrics))
