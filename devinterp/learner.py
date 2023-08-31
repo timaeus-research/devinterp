@@ -125,7 +125,7 @@ class Learner:
 
         self.load_checkpoint(epoch, batch_idx)
 
-    def train(self, resume=0, run_id: Optional[str] = None, verbose: bool = True):
+    def train(self, resume=0, verbose: bool = True):
         """
         Trains the model.
 
@@ -140,21 +140,6 @@ class Learner:
 
         self.model.to(self.config.device)
         self.model.train()
-
-        if self.config.is_wandb_enabled:
-            if resume and not run_id:
-                warnings.warn(
-                    "Resuming from checkpoint but no run_id provided. Will not log to existing wandb run."
-                )
-
-            if not run_id:
-                wandb.init(project=self.config.project, entity=self.config.entity)
-            else:
-                wandb.init(
-                    project=self.config.project,
-                    entity=self.config.entity,
-                    run_id=run_id,
-                )
 
         pbar = verbose and tqdm(
             total=self.config.num_steps,
@@ -190,19 +175,18 @@ class Learner:
 
                 # Log to wandb & save checkpoints according to log_steps
                 if (
-                    self.config.checkpointer_config
-                    and batch_idx in self.config.checkpointer_config.checkpoint_steps
+                    self.checkpointer
+                    and batch_idx in self.config.checkpointer_config.checkpoint_steps  # type: ignore
                 ):
                     self.save_checkpoint(epoch, batch_idx)
 
-                if (
-                    self.config.logger_config
-                    and batch_idx in self.config.logger_config.logging_steps
-                ):
+                if self.logger and batch_idx in self.config.logger_config.logging_steps:  # type: ignore
+                    self.model.eval()
                     self.logger.log(self.evals(), step=batch_idx)
                     self.model.train()
 
-            pbar.close()
+            if pbar:
+                pbar.close()
 
         if self.config.is_wandb_enabled:
             wandb.finish()

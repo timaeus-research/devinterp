@@ -32,14 +32,18 @@ class MetricLogger:
 class WandbLogger(MetricLogger):
     """Logs data to Weights & Biases (wandb) platform.
 
+    Initializing this logger will automatically initialize wandb.
+
     Parameters:
         project (str, optional): Name of the wandb project.
         entity (str, optional): Name of the wandb entity.
     """
 
-    def __init__(self, project, entity):
+    def __init__(self, project: str, entity: str, **kwargs):
         self.project = project
         self.entity = entity
+
+        wandb.init(project=project, entity=entity, **kwargs)
 
     def log(
         self,
@@ -213,6 +217,7 @@ class MetricLoggingConfig(BaseModel):
     out_file: Optional[str] = None
     use_df: Optional[bool] = False
     stdout: Optional[bool] = False
+    run_id: Optional[str] = None
 
     class Config:
         frozen = True
@@ -237,7 +242,12 @@ class MetricLoggingConfig(BaseModel):
         loggers = []
 
         if self.project and self.entity:
-            loggers.append(WandbLogger(self.project, self.entity))
+            kwargs = {}
+
+            if self.run_id:
+                kwargs["run_id"] = self.run_id
+
+            loggers.append(WandbLogger(self.project, self.entity, **kwargs))
 
         if self.logging_steps:
             if self.use_df and self.metrics:
