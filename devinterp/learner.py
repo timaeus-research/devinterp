@@ -26,7 +26,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from tqdm.notebook import tqdm
 
 import wandb
-from devinterp.data import CustomDataloader
+from devinterp.data import CustomDataLoader
 from devinterp.ops.logging import MetricLogger, MetricLoggingConfig
 from devinterp.ops.storage import BaseStorageProvider, CheckpointerConfig
 from devinterp.optim.optimizers import OptimizerConfig
@@ -40,7 +40,7 @@ class LearnerStateDict(TypedDict):
     scheduler: Optional[Dict]
 
 
-class Metric(Protocol):
+class Eval(Protocol):
     def __call__(self, learner: "Learner") -> Dict[str, Any]:
         ...
 
@@ -49,14 +49,13 @@ class Learner:
     def __init__(
         self,
         model: torch.nn.Module,
-        train_set: torch.utils.data.Dataset,
-        test_set: torch.utils.data.DataLoader,
+        dataset: torch.utils.data.Dataset,
         optimizer: torch.optim.Optimizer,
         config: "LearnerConfig",
         scheduler: Optional[LRScheduler] = None,
         logger: Optional[MetricLogger] = None,
         checkpointer: Optional[BaseStorageProvider] = None,
-        metrics: Optional[List[Metric]] = None,
+        evals: Optional[List[Eval]] = None,
         criterion: Callable = F.cross_entropy,
     ):
         """
@@ -64,37 +63,32 @@ class Learner:
 
         Args:
             model (torch.nn.Module): The PyTorch model to be trained.
-            train_set (torch.utils.data.Dataset): The training dataset.
-            test_set (torch.utils.data.DataLoader): The test DataLoader.
+            dataset (torch.utils.data.Dataset): The training dataset.
             config (Config): Configuration object containing hyperparameters.
-            metrics (Optional[List[Callable]]): List of metric functions to evaluate the model.
+            evals (Optional[List[Callable]]): List of metric functions to evaluate the model.
 
         """
 
         self.config = config
         self.model = model
-        self.train_set = train_set
-        self.test_set = test_set
+        self.dataset = dataset
+        self.dataloader = CustomDataLoader(dataset, batch_size=config.batch_size)
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.train_loader = CustomDataloader(train_set, batch_size=config.batch_size)
-        self.test_loader = torch.utils.data.DataLoader(
-            test_set, batch_size=config.batch_size, shuffle=False
-        )
-        self.metrics = metrics or []
+        self.evals = evals or []
         self.logger = logger
         self.checkpointer = checkpointer
         self.criterion = criterion
 
-    def evals(self) -> Dict[str, Any]:
+    def run_evals(self) -> Dict[str, Any]:
         """
-        Applies metrics to the current state of the model and returns results.
+        Applies evals to the current state of the model and returns results.
 
         Returns:
             Dict: Metrics calculated from the current model state.
         """
         return functools.reduce(
-            lambda x, y: x | y, [metric(self) for metric in self.metrics], {}
+            lambda x, y: x | y, [eval_(self) for eval_ in self.evals], {}
         )
 
     def resume(self, batch_idx: Optional[int] = None):
@@ -120,7 +114,7 @@ class Learner:
 
             batch_idx = batch
 
-            self.train_loader.set_seed(epoch)
+            self.dataloader.set_seed(epoch)
             # TODO: loop until this specific batch
 
         self.load_checkpoint(epoch, batch_idx)
@@ -149,7 +143,7 @@ class Learner:
         for epoch in range(0, self.config.num_epochs):
             self.set_seed(epoch)
 
-            for _batch_idx, (data, target) in enumerate(self.train_loader):
+            for _batch_idx, (data, target) in enumerate(self.dataloader):
                 batch_idx = self.config.num_steps_per_epoch * epoch + _batch_idx
                 data, target = data.to(self.config.device), target.to(
                     self.config.device
@@ -182,7 +176,7 @@ class Learner:
 
                 if self.logger and batch_idx in self.config.logger_config.logging_steps:  # type: ignore
                     self.model.eval()
-                    self.logger.log(self.evals(), step=batch_idx)
+                    self.logger.log(self.run_evals(), step=batch_idx)
                     self.model.train()
 
             if pbar:
@@ -257,7 +251,7 @@ class Learner:
         np.random.seed(seed)
         torch.manual_seed(seed)
         random.seed(seed)
-        self.train_loader.set_seed(seed)
+        self.dataloader.set_seed(seed)
 
         if "cuda" in str(self.config.device):
             torch.cuda.manual_seed_all(seed)
@@ -344,9 +338,8 @@ class LearnerConfig(BaseModel):
     def factory(
         self,
         model: torch.nn.Module,
-        train_set: torch.utils.data.Dataset,
-        test_set: torch.utils.data.DataLoader,
-        metrics: Optional[List[Callable[["Learner"], Dict]]] = None,
+        dataset: torch.utils.data.Dataset,
+        evals: Optional[List[Eval]] = None,
     ):
         """Produces a Learner object from the configuration."""
         optimizer = self.optimizer_config.factory(model.parameters())
@@ -363,13 +356,12 @@ class LearnerConfig(BaseModel):
 
         return Learner(
             model=model,
-            train_set=train_set,
-            test_set=test_set,
+            dataset=dataset,
             optimizer=optimizer,
             scheduler=scheduler,
             config=self,
             logger=logger,
             checkpointer=checkpointer,
-            metrics=metrics,
+            evals=evals,
             criterion=getattr(F, self.criterion),
         )
