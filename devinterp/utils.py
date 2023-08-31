@@ -1,8 +1,9 @@
 import warnings
-from typing import Iterable, Literal, Tuple, Union
+from typing import Callable, Iterable, Literal, Tuple, Union, Protocol, Optional
 
 import numpy as np
 import torch
+from torch.nn import functional as F
 
 Reduction = Literal["mean", "sum", "none"]
 ReturnTensor = Literal["pt", "tf", "np"]
@@ -83,6 +84,7 @@ def int_linspace(start, stop, num, return_type="list"):
             f"return_type must be either 'list' or 'set', got {return_type}"
         )
 
+
 def flatten_dict(dict_, prefix="", delimiter="/"):
     """
     Recursively flattens a nested dictionary of metrics into a single-level dictionary.
@@ -144,3 +146,27 @@ def dict_compose(**fns):
         return output
 
     return fn
+
+CriterionLiteral = Literal["mse_loss", "cross_entropy"]
+
+class Criterion(Protocol):
+    def __call__(
+        self,
+        input: torch.Tensor,
+        target: torch.Tensor,
+        size_average: Optional[bool] = None,
+        reduce: Optional[bool] = None,
+        reduction: Reduction = "mean",
+    ) -> torch.Tensor:  # type: ignore
+        pass
+
+
+def get_criterion(
+    criterion: CriterionLiteral,
+) -> Criterion
+    """
+    Returns the criterion corresponding to the given string.
+    """
+    if isinstance(criterion, str):
+        return getattr(F, criterion)
+    return criterion

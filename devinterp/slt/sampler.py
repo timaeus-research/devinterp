@@ -1,6 +1,6 @@
 import itertools
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Literal, Optional, Union
 
 import torch
 import yaml
@@ -12,6 +12,7 @@ from devinterp.config import OptimizerConfig
 from devinterp.slt.ensemble import Ensemble
 from devinterp.slt.observables import Metric, estimate_free_energy, estimate_rlct
 from devinterp.slt.sgld import SGLD
+from devinterp.utils import get_criterion
 
 
 class SamplerConfig(BaseModel):
@@ -34,6 +35,7 @@ class SamplerConfig(BaseModel):
     num_steps_bw_draws: int = 1
     verbose: bool = False
     batch_size: int = 256
+    criterion: Literal["mse_loss", "cross_entropy"]
 
     class Config:
         validate_assignment = True
@@ -64,6 +66,7 @@ class Sampler:
         self.loader = torch.utils.data.DataLoader(
             data, batch_size=config.batch_size, shuffle=True
         )
+        self.criterion = get_criterion(config.criterion)
 
         print(yaml.dump(config.model_dump()))
 
@@ -96,7 +99,7 @@ class Sampler:
         for i, (xs, ys) in zip(range(num_steps), itertools.cycle(self.loader)):
             for j, model in enumerate(self.ensemble):
                 yhats = model(xs)
-                losses = F.mse_loss(yhats, ys, reduction="none")
+                losses = self.criterion(yhats, ys, reduction="none")
                 loss = losses.mean()
                 loss.backward(retain_graph=True)
 
