@@ -1,4 +1,5 @@
 import glob
+import io
 import logging
 import os
 import warnings
@@ -87,7 +88,7 @@ class BaseStorageProvider(Generic[IDType], ABC):
         if not key.startswith(root_dir):
             raise ValueError(f"Key `{key}` does not start with root_dir `{root_dir}`")
         else:
-            key = key[len(root_dir) :]
+            key = key[len(root_dir) + 1 :]
 
         return self.default_key_to_id(key)
 
@@ -186,7 +187,6 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         id_to_key: Optional[Callable[[IDType], str]] = None,
         key_to_id: Optional[Callable[[str], IDType]] = None,
         root_dir: str = "data",
-        tmp_dir: str = "/tmp",
         device: str = "cpu",
     ):
         if not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY"):
@@ -196,25 +196,20 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         self.client = boto3.client("s3")
         self.bucket_name = bucket_name
         self.root_dir = Path(root_dir)
-        self.tmp_dir = Path(tmp_dir)
-
-        full_path = self.tmp_dir / self.root_dir
-        if not os.path.exists(full_path):
-            os.makedirs(full_path)
 
     def save_file(self, file_id: IDType, file: Any):
         """Save a file to an S3 bucket."""
         key = self.id_to_key(file_id)
-        local_path = self.tmp_dir / key
-        torch.save(file, local_path)
-        self.client.upload_file(local_path, self.bucket_name, key)
+        buffer = io.BytesIO()
+        torch.save(file, buffer)
+        self.client.put_object(Bucket=self.bucket_name, Key=key, Body=buffer.getvalue())
 
     def load_file(self, file_id: IDType):
         """Load a file from an S3 bucket."""
         key = self.id_to_key(file_id)
-        local_path = self.tmp_dir / key
-        self.client.download_file(self.bucket_name, key, local_path)
-        return torch.load(local_path, map_location=self.device)
+        response = self.client.get_object(Bucket=self.bucket_name, Key=key)
+        buffer = io.BytesIO(response["Body"].read())
+        return torch.load(buffer, map_location=self.device)
 
     def get_file_ids(self) -> List[IDType]:
         """
@@ -227,7 +222,7 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
                 [
                     self.key_to_id(item["Key"])
                     for item in response["Contents"]
-                    if item["Key"].startswith(self.root_dir)
+                    if item["Key"].startswith(str(self.root_dir))
                 ]
             )
         return []
@@ -287,7 +282,6 @@ def create_storage_provider(
     key_to_id: Optional[Callable[[str], IDType]] = None,
 ):
     """Factory for creating a composite storage provider."""
-    shared_tmp_dir = local_root or "/tmp"
 
     def create_provider(
         provider_type: str, **kwargs
@@ -313,17 +307,13 @@ def create_storage_provider(
     providers = []
 
     if local_root:
-        providers.append(("local", {"root_dir": shared_tmp_dir + "/" + root_dir}))
+        providers.append(("local", {"root_dir": local_root + "/" + root_dir}))
 
     if bucket_name:
         providers.append(
             (
                 "s3",
-                {
-                    "bucket_name": bucket_name,
-                    "root_dir": root_dir,
-                    "tmp_dir": shared_tmp_dir,
-                },
+                {"bucket_name": bucket_name, "root_dir": root_dir},
             )
         )
 
