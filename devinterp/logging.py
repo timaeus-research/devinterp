@@ -1,94 +1,216 @@
-
 import csv
+import dataclasses
 import logging
 import warnings
+from  import FileDescriptorOrPath
+from typing import Any, Dict, List, Optional, Protocol
 
 import pandas as pd
+from pydantic import BaseModel
+import torch
 import yaml
 
 import wandb
 
 
-class Logger:
+class MetricLogger:
     """
-    Logger class for handling logging tasks. Has three modes (which can be used in combination):
-      - Logging to wandb. If you provide a `project` and `entity`, this will write logs to wandb.
-      - Logging to a CSV file. If you provide an `out_file`, this will write logs to a CSV file.
-      - Logging to a Pandas DataFrame. If you set `use_df` to True, this will write logs to a Pandas DataFrame. 
+    Base class for logging. Subclasses should implement the `log` method.
+    """
+
+    def log(
+        self,
+        data: Dict[str, Any],
+        step: Optional[int] = None,
+        commit: Optional[bool] = None,
+        sync: Optional[bool] = None,
+    ):
+        raise NotImplementedError
+
+
+class WandbLogger(MetricLogger):
+    """Logs data to Weights & Biases (wandb) platform.
 
     Parameters:
-        project (str, optional): Name of the wandb project. If both project and entity are provided, will log to wandb.
-        entity (str, optional): Name of the wandb entity. If both project and entity are provided, will log to wandb.
-        logging_steps (list[int], required): List of steps at which logging will occur. Must be provided in ascending order.
-        metrics (list[str], optional): List of metric names that will be logged.
-        out_file (str, optional): Path to the CSV file where logs will be saved. If provided, logs will be written to this file.
-        use_df (bool, optional): If True, logs will be saved to a Pandas DataFrame within the Logger object.
-
-    Methods:
-        log(data: dict, step: int): Logs the provided data at the specified step.
-        get_dataframe(): Returns the DataFrame containing the logs if use_df is True, otherwise raises an error.
+        project (str, optional): Name of the wandb project.
+        entity (str, optional): Name of the wandb entity.
     """
 
-    def __init__(self, project=None, entity=None, logging_steps=[], metrics=[], out_file=None, use_df=False):
+    def __init__(self, project, entity):
         self.project = project
         self.entity = entity
-        self.logging_steps = sorted(list(logging_steps))
-        self.metrics = metrics
+
+    def log(
+        self,
+        data: Dict[str, Any],
+        step: Optional[int] = None,
+        commit: Optional[bool] = None,
+        sync: Optional[bool] = None,
+    ):
+        """Log the data at a specific step."""
+        wandb.log(data, step=step, commit=commit, sync=sync)
+
+
+class CsvLogger(MetricLogger):
+    """Logs data to a CSV file."""
+
+    def __init__(self, out_file: FileDescriptorOrPath, metrics):
         self.out_file = out_file
-        self.use_df = use_df
-        self.current_step_idx = 0
+        self.metrics = metrics
+        self.current_step = -1
         self.buffer = {}
+
+    def log(self, data, step=None, commit=None, sync=None):
+        """Log the data at a specific step."""
+        if step is not None:
+            if step > self.current_step:
+                self._commit()
+                self.current_step = step
+                self.buffer.update(data)
+            else:
+                warning = f"Step must be greater than {self.current_step}, got {step}. Ignoring."
+                warnings.warn(warning)
+
+        if commit:
+            self._commit()
+            self.current_step += 1  # Auto-increment
+
+    def _commit(self):
+        """Write the buffered data to the CSV file."""
+        with open(self.out_file, "a", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(
+                [self.buffer.get(metric, None) for metric in ["step"] + self.metrics]
+            )
+        self.buffer.clear()
+
+
+class DataFrameLogger(MetricLogger):
+    """Logs data to a Pandas DataFrame.
+
+    Parameters
+        logging_steps (list[int], required): List of steps at which logging will occur. Must be provided in ascending order.
+        metrics (list[str], required): List of metric names that will be logged.
+
+    """
+
+    def __init__(self, logging_steps: List[int], metrics: List[str]):
+        self.df = pd.DataFrame(index=logging_steps, columns=["step"] + metrics)
+        self.current_step = -1
+        self.buffer = {}
+
+    def log(self, data, step=None, commit=None, sync=None):
+        """Log the data at a specific step."""
+        if step is not None:
+            if step > self.current_step:
+                self._commit()
+                self.current_step = step
+                self.buffer.update(data)
+            else:
+                warning = f"Step must be greater than {self.current_step}, got {step}. Ignoring."
+                warnings.warn(warning)
+
+        if commit:
+            self._commit()
+            self.current_step += 1  # Auto-increment
+
+    def _commit(self):
+        """Write the buffered data to the DataFrame."""
+        self.df.loc[self.current_step] = self.buffer
+        self.buffer.clear()
+
+
+class StdLogger(MetricLogger):
+    """A wrapper for the standard Logger that uses the MetricLogger interface."""
+    def __init__(self, project):
         self._logger = logging.getLogger(project)
 
-        if self.use_df:
-            self.df = pd.DataFrame(index=logging_steps, columns=["step"] + self.metrics)
+    def format(self, obj):
+        """Format the object for logging."""
+        if isinstance(obj, BaseModel):
+            return yaml.dump(obj.dict())
+        elif dataclasses.is_dataclass(obj):
+            return yaml.dump(dataclasses.asdict(obj))
+        elif isinstance(obj, torch.Tensor):
+            return obj.tolist()  # or any other method to format the tensor
+        elif isinstance(obj, dict):
+            return yaml.dump({k: self.format(v) for k, v in obj.items()})
         else:
-            self.df = None
+            return str(obj)
 
-        if self.out_file:
-            with open(self.out_file, 'w', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow(["step"] + self.metrics)
+    def log(
+        self,
+        data: Dict[str, Any],
+        step: Optional[int] = None,
+        commit: Optional[bool] = None,
+        sync: Optional[bool] = None,
+    ):
+        # Rendering logic here
+        self._logger.info(self.format(data))
 
-        if not self.is_wandb_enabled and not self.use_df and not self.out_file:
-            warnings.warn("Must provide either project and entity, out_file, or use_df")
+    def debug(self, data):
+        self._logger.debug(self.format(data))
 
-    @property
-    def is_wandb_enabled(self):
-        return bool(self.project and self.entity)
+    def info(self, data):
+        self._logger.info(self.format(data))
 
-    def log(self, data, step):
-        if self.current_step_idx >= len(self.logging_steps) or step != self.logging_steps[self.current_step_idx]:
-            raise ValueError(f"Step must be one of the logging_steps ({self.logging_steps}) in correct order")
+    def warning(self, data):
+        self._logger.warning(self.format(data))
 
-        if self.is_wandb_enabled:
-            wandb.log(data, step=step)
+    def error(self, data):
+        self._logger.error(self.format(data))
 
-        self.buffer.update(data)
-        self.buffer["step"] = step
 
-        if self.use_df:
-            self.df.loc[step] = self.buffer
+class CompositeLogger(MetricLogger):
+    def __init__(self, loggers):
+        self.loggers = loggers
 
-        if self.out_file:
-            with open(self.out_file, 'a', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow([self.buffer[metric] if metric in self.buffer else None for metric in ["step"] + self.metrics])
-
-        self.debug(yaml.dump(self.buffer))
-            
-        self.current_step_idx += 1
-
-    def debug(self, msg):
-        self._logger.debug(msg)
+    def log(
+        self,
+        data: Dict[str, Any],
+        step: Optional[int] = None,
+        commit: Optional[bool] = None,
+        sync: Optional[bool] = None,
+    ):
+        for logger in self.loggers:
+            logger.log(data, step, commit, sync)
 
     def info(self, msg):
-        self._logger.info(msg)
+        for logger in self.loggers:
+            if hasattr(logger, "info"):
+                logger.info(msg)
+
+    def debug(self, msg):
+        for logger in self.loggers:
+            if hasattr(logger, "debug"):
+                logger.debug(msg)
 
     def warning(self, msg):
-        self._logger.warning(msg)
+        for logger in self.loggers:
+            if hasattr(logger, "warning"):
+                logger.warning(msg)
 
-    def error(self, msg):
-        self._logger.error(msg)
 
+def Logger(
+        project=None,
+        entity=None,
+        logging_steps=[],
+        metrics=[],
+        out_file=None,
+        use_df=False,
+    ):
+    """For backwards-compatibility. Use CompositeLogger instead."""
+    warnings.warn("Logger is deprecated. Use CompositeLogger instead.")
+
+    loggers = []
+
+    if project and entity:
+        loggers.append(WandbLogger(project, entity))
     
+    if logging_steps:
+        if use_df:
+            loggers.append(DataFrameLogger(logging_steps, metrics))
+        else:
+            loggers.append(CsvLogger(out_file, metrics))
+
+    return CompositeLogger(loggers)
