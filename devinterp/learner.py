@@ -13,7 +13,7 @@ from tqdm.notebook import tqdm
 
 from devinterp.config import Config
 from devinterp.logging import Logger
-from devinterp.storage import CheckpointManager
+from devinterp.ops.storage import CheckpointManager
 
 wandb.finish()
 

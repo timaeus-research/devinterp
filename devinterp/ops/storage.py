@@ -241,6 +241,8 @@ class CompositeStorageProvider(BaseStorageProvider[IDType]):
 
     Args:
         providers (List[BaseStorageProvider]): List of storage providers to use.
+
+    # TODO: Create a StorageProvider Protocol and use that instead of BaseStorageProvider.
     """
 
     def __init__(self, providers: List[BaseStorageProvider[IDType]]):
