@@ -39,6 +39,8 @@ class BaseStorageProvider(Generic[IDType], ABC):
                                         Defaults to None.
         key_to_id (Callable, optional): Function to map a storage key to a file ID.
                                         Defaults to None.
+        device (str, optional): Device to use for loading files. Defaults to "cpu".
+        root_dir (str, optional): Root directory for storage. Defaults to "data".
 
     Attributes:
         file_ids (List[IDType]): List of file IDs in the storage provider.
@@ -50,11 +52,14 @@ class BaseStorageProvider(Generic[IDType], ABC):
         id_to_key: Optional[Callable[[IDType], str]] = None,
         key_to_id: Optional[Callable[[str], IDType]] = None,
         device: str = "cpu",
+        root_dir: str = "data",
     ):
         self._id_to_key = id_to_key or self.default_id_to_key
         self._key_to_id = key_to_id or self.default_key_to_id
-        self.file_ids: List[IDType] = []
         self.device = torch.device(device)
+        self.root_dir = Path(root_dir)
+
+        self.file_ids: List[IDType] = []
 
     @abstractmethod
     def save_file(self, file_id: IDType, file: Any):
@@ -73,10 +78,17 @@ class BaseStorageProvider(Generic[IDType], ABC):
 
     def id_to_key(self, file_id: IDType) -> str:
         """Map a file ID to a storage key."""
-        return self._id_to_key(file_id)
+        return str(self.root_dir / self._id_to_key(file_id))
 
     def key_to_id(self, key: str) -> IDType:
         """Map a storage key to a file ID."""
+        root_dir = str(self.root_dir)
+
+        if not key.startswith(root_dir):
+            raise ValueError(f"Key `{key}` does not start with root_dir `{root_dir}`")
+        else:
+            key = key[len(root_dir) :]
+
         return self.default_key_to_id(key)
 
     @staticmethod
@@ -113,46 +125,47 @@ class BaseStorageProvider(Generic[IDType], ABC):
         return file_id in self.file_ids
 
 
-class LocalStorageProvider(BaseStorageProvider):
+class LocalStorageProvider(BaseStorageProvider[IDType]):
     """Local storage provider.
 
     Args:
-        local_root (str): Base directory in which to save files locally.
         id_to_key (Callable): Function to map a file ID to a storage key.
         key_to_id (Callable): Function to map a storage key to a file ID.
+        device (str): Device to use for loading files.
+        root_dir (str): Base directory in which to save files locally.
     """
 
     def __init__(
         self,
-        local_root: str,
         id_to_key: Optional[Callable[[IDType], str]] = None,
         key_to_id: Optional[Callable[[str], IDType]] = None,
         device: str = "cpu",
+        root_dir: str = "data",
     ):
-        super().__init__(id_to_key, key_to_id, device=device)
-        self.local_root = Path(local_root)
+        super().__init__(id_to_key, key_to_id, device=device, root_dir=root_dir)
+
+        if not os.path.exists(self.root_dir):
+            os.makedirs(self.root_dir)
 
     def save_file(self, file_id: IDType, file: Any):
         """Save a file locally."""
-        key = self.id_to_key(file_id)
-        rel_file_path = self.local_root / key
-        torch.save(file, rel_file_path)
+        torch.save(file, self.id_to_key(file_id))
 
     def load_file(self, file_id: IDType):
         """Load a file locally."""
-        key = self.id_to_key(file_id)
-        rel_file_path = self.local_root / key
-        return torch.load(rel_file_path)
+        return torch.load(self.id_to_key(file_id))
 
     def get_file_ids(self) -> List[IDType]:
         """
         Returns a list of tuples of all files in the local directory.
         """
-        files = glob.glob(f"{self.local_root}/{self.id_to_key('*')}")
-        return sorted([self.name_to_id(os.path.basename(f)) for f in files])  # type: ignore
+        files = glob.glob(f"{self.root_dir}/*")
+        return sorted(
+            [self.key_to_id(str(self.root_dir / os.path.basename(f))) for f in files]
+        )
 
     def __repr__(self):
-        return f"LocalStorageProvider({self.local_root})"
+        return f"LocalStorageProvider({self.root_dir})"
 
 
 class S3StorageProvider(BaseStorageProvider[IDType]):
@@ -162,6 +175,8 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         bucket_name (str): Name of the S3 bucket.
         id_to_key (Callable): Function to map a file ID to a storage key.
         key_to_id (Callable): Function to map a storage key to a file ID.
+        device (str): Device to use for loading files.
+        root_dir (str, optional): Root directory for storage. Defaults to "data".
         tmp_dir (str, optional): Temporary directory for file operations. Defaults to "/tmp".
     """
 
@@ -170,6 +185,7 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         bucket_name: str,
         id_to_key: Optional[Callable[[IDType], str]] = None,
         key_to_id: Optional[Callable[[str], IDType]] = None,
+        root_dir: str = "data",
         tmp_dir: str = "/tmp",
         device: str = "cpu",
     ):
@@ -179,19 +195,26 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         super().__init__(id_to_key, key_to_id, device=device)
         self.client = boto3.client("s3")
         self.bucket_name = bucket_name
+        self.root_dir = Path(root_dir)
         self.tmp_dir = Path(tmp_dir)
+
+        full_path = self.tmp_dir / self.root_dir
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
 
     def save_file(self, file_id: IDType, file: Any):
         """Save a file to an S3 bucket."""
-        temp_path = self.tmp_dir / self.id_to_key(file_id)
-        torch.save(file, temp_path)
-        self.client.upload_file(temp_path, self.bucket_name, self.id_to_key(file_id))
+        key = self.id_to_key(file_id)
+        local_path = self.tmp_dir / key
+        torch.save(file, local_path)
+        self.client.upload_file(local_path, self.bucket_name, key)
 
     def load_file(self, file_id: IDType):
         """Load a file from an S3 bucket."""
-        temp_path = self.tmp_dir / self.id_to_key(file_id)
-        self.client.download_file(self.bucket_name, self.id_to_key(file_id), temp_path)
-        return torch.load(temp_path, map_location=self.device)
+        key = self.id_to_key(file_id)
+        local_path = self.tmp_dir / key
+        self.client.download_file(self.bucket_name, key, local_path)
+        return torch.load(local_path, map_location=self.device)
 
     def get_file_ids(self) -> List[IDType]:
         """
@@ -204,16 +227,13 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
                 [
                     self.key_to_id(item["Key"])
                     for item in response["Contents"]
-                    if item["Key"].startswith(
-                        self.parent_dir
-                    )  # TODO: Filter for the right files
+                    if item["Key"].startswith(self.root_dir)
                 ]
             )
-
         return []
 
     def __repr__(self):
-        return f"S3StorageProvider({self.bucket_name}, {self.tmp_dir})"
+        return f"S3StorageProvider({self.bucket_name}, {self.root_dir}, {self.tmp_dir})"
 
 
 class CompositeStorageProvider(BaseStorageProvider[IDType]):
@@ -256,131 +276,105 @@ class CompositeStorageProvider(BaseStorageProvider[IDType]):
         return f"CompositeStorageProvider({self.providers})"
 
 
-# TODO: Rename the following
+def create_storage_provider(
+    bucket_name: Optional[str] = None,
+    local_root: Optional[str] = None,
+    root_dir: str = "data",
+    device="cpu",
+    id_to_key: Optional[Callable[[IDType], str]] = None,
+    key_to_id: Optional[Callable[[str], IDType]] = None,
+):
+    """Factory for creating a composite storage provider."""
+    shared_tmp_dir = local_root or "/tmp"
+
+    def create_provider(
+        provider_type: str, **kwargs
+    ) -> Union[S3StorageProvider, LocalStorageProvider]:
+        if provider_type == "s3":
+            return S3StorageProvider(**kwargs)
+        elif provider_type == "local":
+            return LocalStorageProvider(**kwargs)
+
+        raise ValueError("Invalid provider_type.")
+
+    def create_composite_provider(
+        types_and_configs: List[Tuple[str, dict]]
+    ) -> CompositeStorageProvider:
+        providers = [
+            create_provider(
+                t, device=device, id_to_key=id_to_key, key_to_id=key_to_id, **c
+            )
+            for t, c in types_and_configs
+        ]
+        return CompositeStorageProvider(providers)
+
+    providers = []
+
+    if local_root:
+        providers.append(("local", {"root_dir": shared_tmp_dir + "/" + root_dir}))
+
+    if bucket_name:
+        providers.append(
+            (
+                "s3",
+                {
+                    "bucket_name": bucket_name,
+                    "root_dir": root_dir,
+                    "tmp_dir": shared_tmp_dir,
+                },
+            )
+        )
+
+    return create_composite_provider(providers)
+
+
 def StorageProvider(
     bucket_name: Optional[str] = None,
     local_root: Optional[str] = None,
     parent_dir: str = "data",
     device="cpu",
 ):
-    """A factory for creating composite storage providers and syncing them with a shared temp directory."""
-    shared_temp_dir = local_root or "/tmp"
+    """Factory for creating a composite storage provider."""
 
-    def create_provider(
-        provider_type: str, **kwargs
-    ) -> Union[S3StorageProvider, LocalStorageProvider]:
-        if provider_type == "s3":
-            return S3StorageProvider(tmp_dir=shared_temp_dir, **kwargs)
-        elif provider_type == "local":
-            return LocalStorageProvider(local_root=shared_temp_dir, **kwargs)
-        else:
-            raise ValueError("Invalid provider_type.")
-
-    def create_composite_provider(
-        types_and_configs: List[Tuple[str, dict]]
-    ) -> CompositeStorageProvider:
-        providers = [
-            create_provider(t, device=device, **c) for t, c in types_and_configs
-        ]
-        return CompositeStorageProvider(providers)
-
-    providers = []
-
-    if bucket_name:
-        providers.append(("s3", {"bucket_name": bucket_name, "parent_dir": parent_dir}))
-
-    if local_root:
-        providers.append(
-            ("local", {"local_root": local_root, "parent_dir": parent_dir})
-        )
-
-    return create_composite_provider(providers)
-
-
-class StorageProvider(Generic[IDType], ABC):
-    """
-    Wrapper for either local or cloud (S3) storage (or both).
-
-    :param bucket_name: The name of the S3 bucket to store checkpoints (Optional)
-    :param local_root: If provided, then the base directory in which to save files locally. If omitted, files will not be saved locally. (Optional)
-    :param save_locally: If True, saves checkpoints locally without deleting them (Optional)
-    """
-
-    file_ids: List[IDType]
-
-    def __init__(
-        self,
-        bucket_name: Optional[str] = None,
-        local_root: Optional[str] = None,
-        parent_dir: str = "data",
-        device=torch.device("cpu"),
-    ):
-        self.bucket_name = bucket_name
-        self.is_local_enabled = local_root is not None
-        self.local_root = Path(local_root or "tmp")
-        self.parent_dir = parent_dir
-        self.device = device
-
-        self.file_ids = []  # Any non-int hashable type.
-        self.client = None
-
-        # Cloud
-
-        # Local
-
-        local_path = os.path.join(self.local_root, parent_dir)
-        if not os.path.exists(local_path):
-            os.makedirs(local_path)
-
-        if not self.bucket_name and not self.local_root:
-            warnings.warn(
-                "Neither S3 bucket name provided nor local_root is defined. Files will not be persisted."
-            )
-
-    def id_to_name(self, file_id: Union[IDType, Literal["*"]]) -> str:
-        """Should contain no `/` and should handle the wildcard."""
-        raise NotImplementedError
-
-    def id_to_key(self, file_id: Union[IDType, Literal["*"]]) -> str:
-        return f"{self.parent_dir}/{self.id_to_name(file_id)}.pt"
-
-        checkpoint = torch.load(rel_file_path, map_location=self.device)
-
-        if not self.is_local_enabled and self.bucket_name and self.client:
-            os.remove(rel_file_path)
-
-        return checkpoint
+    warnings.warn("StorageProvider is deprecated. Use create_storage_provider instead.")
+    return create_storage_provider(
+        bucket_name=bucket_name,
+        local_root=local_root,
+        root_dir=parent_dir,
+        device=device,
+    )
 
 
 EpochAndBatch = Tuple[int, int]
 
 
-class CheckpointManager(StorageProvider[EpochAndBatch]):
-    def __init__(
-        self,
-        project_dir: str,
-        bucket_name: Optional[str] = None,
-        local_root: Optional[str] = None,
-        device=torch.device("cpu"),
-    ):
-        super().__init__(
-            bucket_name, local_root, f"checkpoints/{project_dir}", device=device
-        )
+def CheckpointManager(
+    project_dir: str,
+    bucket_name: Optional[str] = None,
+    local_root: Optional[str] = None,
+    device: str = "cpu",
+):
+    """Factory for creating a storage provider for checkpoints."""
 
-    @staticmethod
-    def id_to_name(file_id: Union[EpochAndBatch, Literal["*"]]) -> str:
-        if file_id == "*":
-            return "*"
+    warnings.warn(
+        "CheckpointManager is deprecated. Use create_storage_provider instead."
+    )
 
+    def id_to_key(file_id: Union[EpochAndBatch, Literal["*"]]) -> str:
         epoch, batch = file_id
         return f"checkpoint_epoch_{epoch}_batch_{batch}"
 
-    @staticmethod
-    def name_to_id(name: str) -> EpochAndBatch:
+    def key_to_id(name: str) -> EpochAndBatch:
         parts = name.split("_")
         epoch = int(parts[-3])
         batch_idx = int(parts[-1].split(".")[0])
         return epoch, batch_idx
 
-    def __repr__(self):
-        return f"CheckpointManager({self.parent_dir}, {self.bucket_name})"
+    return create_storage_provider(
+        bucket_name=bucket_name,
+        local_root=local_root,
+        root_dir=f"checkpoints/{project_dir}",
+        device=device,
+        id_to_key=id_to_key,
+        key_to_id=key_to_id,
+    )
