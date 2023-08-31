@@ -5,22 +5,8 @@ import os
 import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import (
-    IO,
-    Any,
-    BinaryIO,
-    Callable,
-    Dict,
-    Generic,
-    List,
-    Literal,
-    Optional,
-    Set,
-    Tuple,
-    TypedDict,
-    TypeVar,
-    Union,
-)
+from typing import (IO, Any, BinaryIO, Callable, Dict, Generic, List, Literal,
+                    Optional, Set, Tuple, TypedDict, TypeVar, Union)
 
 import boto3
 import torch
@@ -243,6 +229,7 @@ class CompositeStorageProvider(BaseStorageProvider[IDType]):
 
     def __init__(self, providers: List[BaseStorageProvider[IDType]]):
         self.providers = providers
+        super().__init__()
 
     def save_file(self, file_id: IDType, file: Any):
         """Save a file using all the underlying storage providers."""

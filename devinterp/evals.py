@@ -1,4 +1,5 @@
 import functools
+from abc import ABC
 from typing import Any, Dict, List, Optional, Protocol
 
 import torch
@@ -21,6 +22,7 @@ class Evaluator(Protocol):
         scheduler: Optional[LRScheduler],
     ) -> Dict[str, Any]:
         ...
+    
 
 
 class MSEEvaluator(Evaluator):
