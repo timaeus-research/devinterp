@@ -1,48 +1,30 @@
-import functools
 import logging
 import math
 import random
 import warnings
-from typing import (
-    Any,
-    Callable,
-    Container,
-    Dict,
-    List,
-    Optional,
-    Protocol,
-    Set,
-    Tuple,
-    TypedDict,
-)
+from typing import Callable, Dict, List, Optional, TypedDict
 
 import numpy as np
-import pandas as pd
 import torch
 import torch.nn.functional as F
 import yaml
 from pydantic import BaseModel, Field, validator
-from torch.optim.lr_scheduler import LambdaLR
 from tqdm.notebook import tqdm
 
 import wandb
 from devinterp.data import CustomDataLoader
+from devinterp.evals import Evaluator
 from devinterp.ops.logging import MetricLogger, MetricLoggingConfig
 from devinterp.ops.storage import BaseStorageProvider, CheckpointerConfig
 from devinterp.optim.optimizers import OptimizerConfig
 from devinterp.optim.schedulers import LRScheduler, SchedulerConfig
-from devinterp.utils import CriterionLiteral, int_linspace, int_logspace
+from devinterp.utils import CriterionLiteral
 
 
 class LearnerStateDict(TypedDict):
     model: Dict
     optimizer: Dict
     scheduler: Optional[Dict]
-
-
-class Eval(Protocol):
-    def __call__(self, learner: "Learner") -> Dict[str, Any]:
-        ...
 
 
 class Learner:
@@ -55,7 +37,7 @@ class Learner:
         scheduler: Optional[LRScheduler] = None,
         logger: Optional[MetricLogger] = None,
         checkpointer: Optional[BaseStorageProvider] = None,
-        evals: Optional[List[Eval]] = None,
+        evaluator: Optional[Evaluator] = None,
         criterion: Callable = F.cross_entropy,
     ):
         """
@@ -75,21 +57,10 @@ class Learner:
         self.dataloader = CustomDataLoader(dataset, batch_size=config.batch_size)
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.evals = evals or []
+        self.evaluator = evaluator
         self.logger = logger
         self.checkpointer = checkpointer
         self.criterion = criterion
-
-    def run_evals(self) -> Dict[str, Any]:
-        """
-        Applies evals to the current state of the model and returns results.
-
-        Returns:
-            Dict: Metrics calculated from the current model state.
-        """
-        return functools.reduce(
-            lambda x, y: x | y, [eval_(self) for eval_ in self.evals], {}
-        )
 
     def resume(self, batch_idx: Optional[int] = None):
         """
@@ -176,7 +147,12 @@ class Learner:
 
                 if self.logger and batch_idx in self.config.logger_config.logging_steps:  # type: ignore
                     self.model.eval()
-                    self.logger.log(self.run_evals(), step=batch_idx)
+                    evals = (
+                        self.evaluator(self.model, self.optimizer, self.scheduler)
+                        if self.evaluator
+                        else {"Batch/Loss": loss.item()}
+                    )
+                    self.logger.log(evals, step=batch_idx)
                     self.model.train()
 
             if pbar:
@@ -339,7 +315,7 @@ class LearnerConfig(BaseModel):
         self,
         model: torch.nn.Module,
         dataset: torch.utils.data.Dataset,
-        evals: Optional[List[Eval]] = None,
+        evals: Optional[List[Evaluator]] = None,
     ):
         """Produces a Learner object from the configuration."""
         optimizer = self.optimizer_config.factory(model.parameters())
