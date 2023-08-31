@@ -1,5 +1,6 @@
 import itertools
 from dataclasses import dataclass
+from logging import Logger
 from typing import Callable, Dict, Literal, Optional, Union
 
 import torch
@@ -13,6 +14,8 @@ from devinterp.slt.ensemble import Ensemble
 from devinterp.slt.observables import Metric, estimate_free_energy, estimate_rlct
 from devinterp.slt.sgld import SGLD
 from devinterp.utils import get_criterion
+
+logger = Logger(__name__)
 
 
 class SamplerConfig(BaseModel):
@@ -68,7 +71,7 @@ class Sampler:
         )
         self.criterion = get_criterion(config.criterion)
 
-        print(yaml.dump(config.model_dump()))
+        logger.info(yaml.dump(config.model_dump()))
 
     def sample(
         self,

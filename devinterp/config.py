@@ -1,7 +1,6 @@
 import logging
 import warnings
-from typing import (Callable, Iterable, List, Literal, Optional, Set, Tuple,
-                    Union)
+from typing import Callable, Iterable, List, Literal, Optional, Set, Tuple, Union
 
 import torch
 import yaml
@@ -21,8 +20,9 @@ class OptimizerConfig(BaseModel):
     betas: Optional[Tuple[float, float]] = None
     noise_level: Optional[float] = None
     elasticity: Optional[float] = None
-    temperature: Optional[Union[Literal['adaptive'], float]] = None
-    num_samples: Optional[int] = None  # If -1, then this needs to be filled in later. 
+    temperature: Optional[Union[Literal["adaptive"], float]] = None
+    num_samples: Optional[int] = None  # If -1, then this needs to be filled in later.
+
     class Config:
         frozen = True
 
@@ -38,17 +38,23 @@ class OptimizerConfig(BaseModel):
 
         return super().model_dump(include=fields, *args, **kwargs)
 
-    @model_validator(mode='after')
-    def validate_optimizer_type(self) -> 'OptimizerConfig':
+    @model_validator(mode="after")
+    def validate_optimizer_type(self) -> "OptimizerConfig":
         if self.optimizer_type == "SGLD":
-            assert self.noise_level is not None, "noise_level must be specified for SGLD"
+            assert (
+                self.noise_level is not None
+            ), "noise_level must be specified for SGLD"
             assert self.elasticity is not None, "elasticity must be specified for SGLD"
-            assert self.temperature is not None, "temperature must be specified for SGLD"
-            assert self.num_samples is not None, "num_samples must be specified for SGLD"
+            assert (
+                self.temperature is not None
+            ), "temperature must be specified for SGLD"
+            assert (
+                self.num_samples is not None
+            ), "num_samples must be specified for SGLD"
         elif self.optimizer_type == "SGD":
             assert self.momentum is not None, "momentum must be specified for SGD"
         elif self.optimizer_type in {"Adam", "AdamW"}:
-            assert self.betas is not None, "betas must be specified for Adam/AdamW"  
+            assert self.betas is not None, "betas must be specified for Adam/AdamW"
 
         return self
 
@@ -67,8 +73,11 @@ class OptimizerConfig(BaseModel):
         else:
             raise ValueError(f"Unknown optimizer type: {optimizer_type}")
 
+
 class SchedulerConfig(BaseModel):
-    scheduler_type: Literal["StepLR", "CosineAnnealingLR", "MultiStepLR", "LambdaLR", "OneCycleLR"] 
+    scheduler_type: Literal[
+        "StepLR", "CosineAnnealingLR", "MultiStepLR", "LambdaLR", "OneCycleLR"
+    ]
     step_size: Optional[int] = None
     gamma: Optional[float] = None
     T_max: Optional[int] = None
@@ -99,15 +108,17 @@ class SchedulerConfig(BaseModel):
         elif self.scheduler_type == "MultiStepLR":
             fields.update({"milestones", "gamma"})
         elif self.scheduler_type == "OneCycleLR":
-            fields.update({
-                "max_lr",
-                "total_steps",
-                "anneal_strategy",
-                "div_factor",
-                "final_div_factor",
-                "pct_start",
-                "cycle_momentum",
-            })
+            fields.update(
+                {
+                    "max_lr",
+                    "total_steps",
+                    "anneal_strategy",
+                    "div_factor",
+                    "final_div_factor",
+                    "pct_start",
+                    "cycle_momentum",
+                }
+            )
 
         # Add other scheduler types as needed
 
@@ -120,16 +131,21 @@ class SchedulerConfig(BaseModel):
         if scheduler_type == "StepLR":
             return torch.optim.lr_scheduler.StepLR(optimizer, **scheduler_params)
         elif scheduler_type == "CosineAnnealingLR":
-            return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, **scheduler_params)
+            return torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, **scheduler_params
+            )
         elif scheduler_type == "MultiStepLR":
             return torch.optim.lr_scheduler.MultiStepLR(optimizer, **scheduler_params)
         elif scheduler_type == "LambdaLR" and self.lr_lambda is not None:
-            return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=self.lr_lambda)
+            return torch.optim.lr_scheduler.LambdaLR(
+                optimizer, lr_lambda=self.lr_lambda
+            )
         elif scheduler_type == "OneCycleLR":
             return torch.optim.lr_scheduler.OneCycleLR(optimizer, **scheduler_params)
         else:
             raise ValueError(f"Unknown scheduler type: {scheduler_type}")
-        
+
+
 class Config(BaseModel):
     # Dataset & loader
     num_training_samples: int
@@ -158,33 +174,25 @@ class Config(BaseModel):
 
     @property
     def num_steps_per_epoch(self):
+        """Number of steps per epoch."""
         return self.num_training_samples // self.batch_size
 
-    # @validator("num_steps", pre=True, always=True)
-    # def validate_num_steps(cls, value, values):
-    #     print("steps", value, values)
-    #     if value is None:
-    #         return values['num_epochs'] * values['num_training_samples'] // values['batch_size']
-    
-    # @validator("num_epochs", pre=True, always=True)
-    # def validate_num_epochs(cls, value, values):
-    #     print("epochs", value, values)
-    #     if value is None:
-    #         return (values['num_steps'] * values['batch_size'] // values['num_training_samples']) + 1
-    
     @validator("optimizer_config", pre=True)
+    @classmethod
     def validate_optimizer_config(cls, value):
         if isinstance(value, dict):
             return OptimizerConfig(**value)
         return value
-    
+
     @validator("scheduler_config", pre=True)
+    @classmethod
     def validate_scheduler_config(cls, value):
         if isinstance(value, dict):
             return SchedulerConfig(**value)
         return value
 
     @validator("logging_steps", "checkpoint_steps", pre=True, always=True)
+    @classmethod
     def validate_steps(cls, value, values):
         """
         Processes steps for logging & taking checkpoints, allowing customization of intervals.
@@ -228,7 +236,9 @@ class Config(BaseModel):
         else:
             logger.info("Logging to wandb disabled")
 
-        logger.info(yaml.dump(self.model_dump(exclude=("logging_steps", "checkpoint_steps"))))
+        logger.info(
+            yaml.dump(self.model_dump(exclude=("logging_steps", "checkpoint_steps")))
+        )
 
     @property
     def is_wandb_enabled(self):
@@ -238,7 +248,7 @@ class Config(BaseModel):
             )
 
         return self.project is not None
-    
+
     @property
     def num_steps_per_epoch(self):
         return self.num_training_samples // self.batch_size
@@ -246,7 +256,7 @@ class Config(BaseModel):
     @validator("device", pre=True)
     def validate_device(cls, value):
         return torch.device(value)
-    
+
     def model_dump(self, *args, **kwargs):
         config_dict = super().model_dump(*args, **kwargs)
         config_dict["optimizer_config"] = self.optimizer_config.model_dump()
