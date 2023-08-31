@@ -26,7 +26,9 @@ from typing import (
 import boto3
 import torch
 from botocore.exceptions import ClientError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
+
+from devinterp.ops.utils import process_steps
 
 logger = logging.getLogger(__name__)
 
@@ -349,6 +351,12 @@ class CheckpointerConfig(BaseModel):
 
     class Config:
         frozen = True
+
+    @validator("checkpoint_steps", pre=True, always=True)
+    @classmethod
+    def validate_checkpoint_steps(cls, v):
+        """Validate `checkpoint_steps`."""
+        return process_steps(v)
 
     def factory(self):
         def id_to_key(file_id: Union[EpochAndBatch, Literal["*"]]) -> str:

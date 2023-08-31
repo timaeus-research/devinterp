@@ -2,15 +2,16 @@ import csv
 import dataclasses
 import logging
 import warnings
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, Set
 
 import numpy as np
 import pandas as pd
 import torch
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 
 import wandb
+from devinterp.ops.utils import process_steps
 
 
 class MetricLogger:
@@ -207,7 +208,7 @@ class CompositeLogger(MetricLogger):
 class MetricLoggingConfig(BaseModel):
     project: Optional[str] = None
     entity: Optional[str] = None
-    logging_steps: Optional[List[int]] = None
+    logging_steps: Set[int] = Field(default_factory=set)
     metrics: Optional[List[str]] = None
     out_file: Optional[str] = None
     use_df: Optional[bool] = False
@@ -224,6 +225,12 @@ class MetricLoggingConfig(BaseModel):
             )
 
         return self.project is not None
+
+    @validator("logging_steps", pre=True, always=True)
+    @classmethod
+    def validate_logging_steps(cls, v):
+        """Validate the `logging_steps` field."""
+        return process_steps(v)
 
     def factory(self):
         """Creates a MetricLogger based on the configuration."""

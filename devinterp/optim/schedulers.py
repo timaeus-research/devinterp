@@ -1,4 +1,4 @@
-from typing import Callable, List, Literal, Optional, Protocol
+from typing import Any, Callable, Dict, List, Literal, Optional, Protocol
 
 import torch
 from pydantic import BaseModel
@@ -8,16 +8,22 @@ class LRScheduler(Protocol):
     def step(self, epoch: Optional[int] = None):
         ...
 
-    def get_last_lr(self):
+    def get_last_lr(self) -> List[float]:
         ...
 
-    def load_state_dict(self, state_dict):
+    def load_state_dict(self, state_dict) -> None:
         ...
 
-    def state_dict(self):
+    def state_dict(self) -> dict:
         ...
 
-    def print_lr(self):
+    def print_lr(
+        self,
+        is_verbose: bool,
+        group: Dict[str, Any],
+        lr: float,
+        epoch: int | None = ...,
+    ) -> None:
         ...
 
 
@@ -71,7 +77,7 @@ class SchedulerConfig(BaseModel):
 
         return super().model_dump(include=fields, *args, **kwargs)
 
-    def factory(self, optimizer: torch.optim.Optimizer):
+    def factory(self, optimizer: torch.optim.Optimizer) -> LRScheduler:
         scheduler_type = self.scheduler_type
         scheduler_params = self.model_dump(exclude={"scheduler_type"})
 

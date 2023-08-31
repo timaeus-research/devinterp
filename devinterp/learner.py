@@ -3,7 +3,18 @@ import logging
 import math
 import random
 import warnings
-from typing import Any, Callable, Container, Dict, List, Optional, Set, Tuple, TypedDict
+from typing import (
+    Any,
+    Callable,
+    Container,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    TypedDict,
+)
 
 import numpy as np
 import pandas as pd
@@ -20,15 +31,18 @@ from devinterp.ops.logging import MetricLogger, MetricLoggingConfig
 from devinterp.ops.storage import BaseStorageProvider, CheckpointerConfig
 from devinterp.optim.optimizers import OptimizerConfig
 from devinterp.optim.schedulers import LRScheduler, SchedulerConfig
-from devinterp.utils import int_linspace, int_logspace
-
-logger = logging.getLogger(__name__)
+from devinterp.utils import CriterionLiteral, int_linspace, int_logspace
 
 
 class LearnerStateDict(TypedDict):
     model: Dict
     optimizer: Dict
     scheduler: Optional[Dict]
+
+
+class Metric(Protocol):
+    def __call__(self, learner: "Learner") -> Dict[str, Any]:
+        ...
 
 
 class Learner:
@@ -38,11 +52,12 @@ class Learner:
         train_set: torch.utils.data.Dataset,
         test_set: torch.utils.data.DataLoader,
         optimizer: torch.optim.Optimizer,
-        config: LearnerConfig,
+        config: "LearnerConfig",
         scheduler: Optional[LRScheduler] = None,
         logger: Optional[MetricLogger] = None,
         checkpointer: Optional[BaseStorageProvider] = None,
-        metrics: Optional[List[Callable[["Learner"], Dict]]] = None,
+        metrics: Optional[List[Metric]] = None,
+        criterion: Callable = F.cross_entropy,
     ):
         """
         Initializes the Learner object.
@@ -69,8 +84,9 @@ class Learner:
         self.metrics = metrics or []
         self.logger = logger
         self.checkpointer = checkpointer
+        self.criterion = criterion
 
-    def measure(self) -> Dict[str, Any]:
+    def evals(self) -> Dict[str, Any]:
         """
         Applies metrics to the current state of the model and returns results.
 
@@ -102,9 +118,14 @@ class Learner:
                     f"Could not find checkpoint with batch_idx {batch_idx}. Resuming from closest batch ({batch}) instead."
                 )
 
+            batch_idx = batch
+
+            self.train_loader.set_seed(epoch)
+            # TODO: loop until this specific batch
+
         self.load_checkpoint(epoch, batch_idx)
 
-    def train(self, resume=0, run_id: Optional[str] = None):
+    def train(self, resume=0, run_id: Optional[str] = None, verbose: bool = True):
         """
         Trains the model.
 
@@ -135,7 +156,7 @@ class Learner:
                     run_id=run_id,
                 )
 
-        pbar = tqdm(
+        pbar = verbose and tqdm(
             total=self.config.num_steps,
             desc=f"Epoch 0 Batch 0/{self.config.num_steps} Loss: ?.??????",
         )
@@ -150,7 +171,7 @@ class Learner:
                 )
                 self.optimizer.zero_grad()
                 output = self.model(data)
-                loss = F.cross_entropy(output, target)
+                loss = self.criterion(output, target)
                 loss.backward()
                 self.optimizer.step()
 
@@ -158,21 +179,27 @@ class Learner:
                     self.scheduler.step()
 
                 # Update progress bar description
-                pbar.set_description(
-                    f"Epoch {epoch} Batch {batch_idx}/{self.config.num_steps} Loss: {loss.item():.6f}"
-                )
-                pbar.update(1)
+                if pbar:
+                    pbar.set_description(
+                        f"Epoch {epoch} Batch {batch_idx}/{self.config.num_steps} Loss: {loss.item():.6f}"
+                    )
+                    pbar.update(1)
 
                 if self.config.is_wandb_enabled:
-                    # TODO: Figure out how to make this work with Logger
                     wandb.log({"Batch/Loss": loss.item()}, step=batch_idx)
 
                 # Log to wandb & save checkpoints according to log_steps
-                if batch_idx in self.config.checkpoint_steps:
+                if (
+                    self.config.checkpointer_config
+                    and batch_idx in self.config.checkpointer_config.checkpoint_steps
+                ):
                     self.save_checkpoint(epoch, batch_idx)
 
-                if batch_idx in self.config.logging_steps:
-                    self.logger.log(self.measure(), step=batch_idx)
+                if (
+                    self.config.logger_config
+                    and batch_idx in self.config.logger_config.logging_steps
+                ):
+                    self.logger.log(self.evals(), step=batch_idx)
                     self.model.train()
 
             pbar.close()
@@ -216,6 +243,9 @@ class Learner:
             epoch (int): Epoch to save checkpoint at.
             batch_idx (int): Batch index to save checkpoint at.
         """
+        if self.checkpointer is None:
+            raise ValueError("Cannot save checkpoint without a checkpointer.")
+
         checkpoint = self.state_dict()
         self.checkpointer.save_file((epoch, batch_idx), checkpoint)
 
@@ -227,6 +257,9 @@ class Learner:
             epoch (int): Epoch to load checkpoint from.
             batch_idx (int): Batch index to load checkpoint from.
         """
+        if self.checkpointer is None:
+            raise ValueError("Cannot load checkpoint without a checkpointer.")
+
         checkpoint = self.checkpointer.load_file((epoch, batch_idx))
         self.load_state_dict(checkpoint)
 
@@ -240,10 +273,13 @@ class Learner:
         np.random.seed(seed)
         torch.manual_seed(seed)
         random.seed(seed)
-        self.generator.manual_seed(seed)
+        self.train_loader.set_seed(seed)
 
         if "cuda" in str(self.config.device):
             torch.cuda.manual_seed_all(seed)
+
+
+logger = logging.getLogger(__name__)
 
 
 class LearnerConfig(BaseModel):
@@ -254,7 +290,7 @@ class LearnerConfig(BaseModel):
     # Training loop
     # num_epochs: int = None
     num_steps: int = 100_000
-    logging_config: Optional[MetricLoggingConfig] = None
+    logger_config: Optional[MetricLoggingConfig] = None
     checkpointer_config: Optional[CheckpointerConfig] = None
 
     # Optimizer
@@ -265,6 +301,7 @@ class LearnerConfig(BaseModel):
     device: str = Field(
         default_factory=lambda: "cuda" if torch.cuda.is_available() else "cpu"
     )
+    criterion: CriterionLiteral = "cross_entropy"
 
     # TODO: Make this frozen
     class Config:
@@ -274,7 +311,7 @@ class LearnerConfig(BaseModel):
         super().__init__(**data)
 
         if self.is_wandb_enabled:
-            wandb_msg = f"Logging to wandb enabled (project: {self.project}, entity: {self.entity})"
+            wandb_msg = f"Logging to wandb enabled (project: {self.logger_config.project}, entity: {self.logger_config.entity})"
             logger.info(wandb_msg)
         else:
             logger.info("Logging to wandb disabled")
@@ -298,42 +335,9 @@ class LearnerConfig(BaseModel):
     @property
     def is_wandb_enabled(self):
         """Whether wandb is enabled."""
-        return self.logging_config and self.logging_config.is_wandb_enabled
+        return self.logger_config and self.logger_config.is_wandb_enabled
 
     # Validators
-
-    @validator("logging_steps", "checkpoint_steps", pre=True, always=True)
-    @classmethod
-    def validate_steps(cls, value, values):
-        """
-        Processes steps for logging & taking checkpoints, allowing customization of intervals.
-
-        Args:
-            num_steps: A tuple (x, y) with optional integer values:
-            - x: Specifies the number of steps to take on a linear interval.
-            - y: Specifies the number of steps to take on a log interval.
-
-        Returns:
-            A set of step numbers at which logging or checkpointing should occur.
-
-        Raises:
-            ValueError: If the num_steps input is not valid.
-
-        """
-
-        if isinstance(value, tuple) and len(value) == 2:
-            result = set()
-
-            if value[0] is not None:
-                result |= int_linspace(0, values["num_steps"], value[0], return_type="set")  # type: ignore
-
-            if value[1] is not None:
-                result |= int_logspace(1, values["num_steps"], value[1], return_type="set")  # type: ignore
-
-            return result
-        elif value is None:
-            return set()
-        return set(value)
 
     @validator("device", pre=True)
     @classmethod
@@ -368,7 +372,7 @@ class LearnerConfig(BaseModel):
         else:
             scheduler = None
 
-        logger = self.logging_config.factory() if self.logging_config else None
+        logger = self.logger_config.factory() if self.logger_config else None
         checkpointer = (
             self.checkpointer_config.factory() if self.checkpointer_config else None
         )
@@ -383,4 +387,5 @@ class LearnerConfig(BaseModel):
             logger=logger,
             checkpointer=checkpointer,
             metrics=metrics,
+            criterion=getattr(F, self.criterion),
         )
