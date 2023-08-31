@@ -178,7 +178,6 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         key_to_id (Callable): Function to map a storage key to a file ID.
         device (str): Device to use for loading files.
         root_dir (str, optional): Root directory for storage. Defaults to "data".
-        tmp_dir (str, optional): Temporary directory for file operations. Defaults to "/tmp".
     """
 
     def __init__(
@@ -228,7 +227,7 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         return []
 
     def __repr__(self):
-        return f"S3StorageProvider({self.bucket_name}, {self.root_dir}, {self.tmp_dir})"
+        return f"S3StorageProvider({self.bucket_name}, {self.root_dir})"
 
 
 class CompositeStorageProvider(BaseStorageProvider[IDType]):
