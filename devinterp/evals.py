@@ -1,119 +1,131 @@
-from typing import Callable, Dict, Literal
+import functools
+from abc import ABC
+from typing import Any, Dict, List, Optional, Protocol
 
 import torch
+from torch import nn
+from torch.utils.data import DataLoader
 
-from devinterp.config import Config
-from devinterp.utils import flatten_dict
-
-Reduction = Literal["mean", "sum"]
-Metric = Callable[
-    [torch.nn.Module, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
-]  # model, data, target, output -> value
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+from devinterp.optim.schedulers import LRScheduler
 
 
-def dataloader_map(
-    model: torch.nn.Module,
-    loader: torch.utils.data.DataLoader,
-    metrics: Dict[str, Metric],
-    device: torch.device = DEVICE,
-):
+class Evaluator(Protocol):
+    """Defines a protocol for evaluation methods.
+
+    The __call__ method should be implemented to perform evaluation and return results as a dictionary.
     """
-    Applies metrics to each batch in a DataLoader and accumulates the results in a dictionary.
 
-    Parameters:
-        model: PyTorch model to evaluate.
-        loader: DataLoader to pull data from.
-        metrics: Dictionary of metrics to evaluate.
-        device: Device to use for computation.
+    def __call__(
+        self,
+        model: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: Optional[LRScheduler],
+    ) -> Dict[str, Any]:
+        ...
+    
 
-    Returns:
-        metric_values: Dictionary containing metric results for each item in the DataLoader.
+
+class MSEEvaluator(Evaluator):
+    """Evaluates Mean Squared Error (MSE) over multiple datasets.
+
+    Args:
+        delimiter (str): Delimiter used for forming key names in the result dictionary.
+        dataloaders (DataLoader): Keyword arguments representing dataset name and corresponding DataLoader.
     """
-    metric_values = {
-        metric_name: torch.zeros(len(loader.dataset), device=device)
-        for metric_name in metrics.keys()
-    }
 
-    model.eval()
-    with torch.no_grad():
-        for i, (data, target) in enumerate(loader):
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            for metric_name, metric_fn in metrics.items():
-                metric_values[metric_name][
-                    i * len(data) : (i + 1) * len(data)
-                ] = metric_fn(model, data, target, output)
+    def __init__(self, delimiter: str = "/", **dataloaders: DataLoader):
+        self.dataloaders = dataloaders
+        self.delimiter = delimiter
 
-    return metric_values
+    def __call__(
+        self,
+        model: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: Optional[LRScheduler],
+    ) -> Dict[str, Any]:
+        """Calculates and returns MSE for each dataset.
+
+        Returns:
+            Dict: Dictionary containing MSE values for each dataset.
+        """
+
+        mse_sums = {}
+        for name, dataloader in self.dataloaders.items():
+            mse_sum = 0
+            count = 0
+            for x, y in dataloader:
+                output = model(x)
+                mse_sum += ((output - y) ** 2).sum().item()
+                count += len(y)
+            mse_sums[f"{name}{self.delimiter}mse"] = mse_sum / count
+        return mse_sums
 
 
-def dataloader_reduce(
-    model: torch.nn.Module,
-    loader: torch.utils.data.DataLoader,
-    metrics: Dict[str, Metric],
-    reduction: Reduction = "mean",
-    device: torch.device = DEVICE,
-):
+class CrossEntropyEvaluator(Evaluator):
+    """Evaluates Cross-Entropy loss and accuracy over multiple datasets.
+
+    Args:
+        delimiter (str): Delimiter used for forming key names in the result dictionary.
+        dataloaders (DataLoader): Keyword arguments representing dataset name and corresponding DataLoader.
     """
-    Calculates and reduces metrics over an entire DataLoader.
 
-    Parameters:
-        model: PyTorch model to evaluate.
-        loader: DataLoader to pull data from.
-        metrics: Dictionary of metrics to evaluate.
-        reduction: Method for reducing metric values ("mean" or other custom methods).
-        device: Device to use for computation.
+    def __init__(self, delimiter: str = "/", **dataloaders: DataLoader):
+        self.dataloaders = dataloaders
+        self.delimiter = delimiter
 
-    Returns:
-        metric_values: Dictionary containing the reduced metric values.
+    def __call__(
+        self,
+        model: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: Optional[LRScheduler],
+    ) -> Dict[str, Any]:
+        """Calculates and returns cross-entropy and accuracy for each dataset.
+
+        Returns:
+            Dict: Dictionary containing cross-entropy and accuracy values for each dataset.
+        """
+        accuracies = {}
+        cross_entropies = {}
+        for name, dataloader in self.dataloaders.items():
+            loss_sum = 0
+            count = 0
+            correct = 0
+
+            loss_fn = nn.CrossEntropyLoss(reduction="sum")
+            for x, y in dataloader:
+                output = model(x)
+                loss_sum += loss_fn(output, y).item()
+                correct += (output.argmax(dim=1) == y).sum().item()
+                count += len(y)
+
+            accuracies[f"{name}{self.delimiter}accuracy"] = correct / count
+            cross_entropies[f"{name}{self.delimiter}cross_entropy"] = loss_sum / count
+        return {**accuracies, **cross_entropies}
+
+
+class ComposeEvaluators(Evaluator):
+    """Composes multiple evaluation methods into one.
+
+    Args:
+        evals (List[Evaluator]): List of evaluation methods to be applied.
     """
-    metric_values = {
-        metric_name: torch.zeros(1, device=device) for metric_name in metrics.keys()
-    }
-    total = torch.zeros(1, device=device)
 
-    model.eval()
-    with torch.no_grad():
-        for data, target in loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            total += len(data)
-            for metric_name, metric_fn in metrics.items():
-                metric_values[metric_name] += metric_fn(model, data, target, output)
+    def __init__(self, evals: List[Evaluator]):
+        self.evals = evals
 
-    if reduction == "mean":
-        for metric_name in metrics.keys():
-            metric_values[metric_name] /= total
+    def __call__(
+        self,
+        model: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: Optional[LRScheduler],
+    ) -> Dict[str, Any]:
+        """Applies all evaluation methods and combines their results.
 
-    return metric_values
-
-
-def dataloaders_reduce(
-    model: torch.nn.Module,
-    loaders: Dict[str, torch.utils.data.DataLoader],
-    metrics: Dict[str, Metric],
-    reduction: Reduction = "mean",
-    device: torch.device = DEVICE,
-):
-    """
-    Calculates and reduces metrics over multiple DataLoaders.
-
-    Parameters:
-        model: PyTorch model to evaluate.
-        loaders: Dictionary of DataLoaders to pull data from.
-        metrics: Dictionary of metrics to evaluate.
-        reduction: Method for reducing metric values ("mean" or other custom methods).
-        device: Device to use for computation.
-
-    Returns:
-        Dictionary containing the reduced metric values for each DataLoader.
-    """
-    return flatten_dict(
-        {
-            loader_name: dataloader_reduce(
-                model, loader, metrics, reduction, device=device
-            )
-            for loader_name, loader in loaders.items()
-        }
-    )
+        Returns:
+            Dict: Combined dictionary of evaluation metrics from all evaluation methods.
+        """
+        return functools.reduce(
+            lambda x, y: x | y,
+            (eval_(model, optimizer, scheduler) for eval_ in self.evals),
+            {},
+        )

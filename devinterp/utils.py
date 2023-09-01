@@ -1,5 +1,6 @@
 import warnings
-from typing import Callable, Iterable, Literal, Tuple, Union, Protocol, Optional
+from typing import (Callable, Iterable, Literal, Optional, Protocol, Tuple,
+                    Union)
 
 import numpy as np
 import torch
@@ -170,3 +171,15 @@ def get_criterion(
     if isinstance(criterion, str):
         return getattr(F, criterion)
     return criterion
+
+
+def nested_update(d1: dict, d2: dict):
+    """
+    Updates the values in d1 with the values in d2, recursively.
+    """
+    for k, v in d2.items():
+        if isinstance(v, dict):
+            d1[k] = nested_update(d1.get(k, {}), v)
+        else:
+            d1[k] = v
+    return d1
