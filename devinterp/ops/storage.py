@@ -93,6 +93,10 @@ class BaseStorageProvider(Generic[IDType], ABC):
         )
         return key.replace(".pt", "")  # type: ignore
 
+    def sync(self):
+        self.file_ids = self.get_file_ids()
+        return self
+
     def __iter__(self):
         for file_id in self.file_ids:
             yield self.load_file(file_id)

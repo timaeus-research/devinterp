@@ -9,7 +9,7 @@ from torchtyping import TensorType
 from devinterp.utils import dict_compose
 
 
-class Metric(Protocol):
+class MicroscopicObservable(Protocol):
     @staticmethod
     def __call__(
         xs: TensorType["batch_size", "input_dim"],

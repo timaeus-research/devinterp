@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, Union
+from typing import (Any, Callable, Dict, List, Literal, Optional, Protocol,
+                    Union)
 
 import torch
 from pydantic import BaseModel

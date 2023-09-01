@@ -11,7 +11,7 @@ from torch.nn import functional as F
 
 from devinterp.optim.optimizers import OptimizerConfig
 from devinterp.slt.ensemble import Ensemble
-from devinterp.slt.observables import Metric, estimate_free_energy, estimate_rlct
+from devinterp.slt.observables import MicroscopicObservable, estimate_free_energy, estimate_rlct
 from devinterp.optim.sgld import SGLD
 from devinterp.utils import get_criterion
 
@@ -75,8 +75,8 @@ class Sampler:
 
     def sample(
         self,
-        kwargs: Optional[Dict[str, Metric]] = None,
-        summary_fn: Callable = lambda **kwargs: kwargs,
+        observables: Optional[Dict[str, MicroscopicObservable]] = None,
+        summary_fn: Optional[Callable] = None,
     ):
         """
         Performs the sampling process, returning metric summaries as specified.
@@ -88,9 +88,9 @@ class Sampler:
         self.ensemble.train()
         self.ensemble.zero_grad()
 
-        kwargs = kwargs or {}
-        if "losses" not in kwargs:
-            kwargs["losses"] = lambda xs, ys, yhats, losses, loss, model: loss
+        observables = observables or {}
+        if "losses" not in observables:
+            observables["losses"] = lambda xs, ys, yhats, losses, loss, model: loss
 
         loss_init = 0
         draws = {m: [[] for _ in range(self.ensemble.num_chains)] for m in kwargs}
@@ -110,7 +110,7 @@ class Sampler:
                     i >= self.config.num_burnin_steps
                     and i % self.config.num_steps_bw_draws == 0
                 ):
-                    for m, fn in kwargs.items():
+                    for m, fn in observables.items():
                         draws[m][j].append(fn(xs, ys, yhats, losses, loss, model))
 
                 if i == 0 and j == 0:
@@ -121,4 +121,7 @@ class Sampler:
 
         draws = {m: torch.Tensor(v) for m, v in draws.items()}
 
-        return summary_fn(loss_init=loss_init, num_samples=len(self.data), **draws)
+        if summary_fn:
+            return summary_fn(loss_init=loss_init, num_samples=len(self.data), **draws)
+
+        return draws

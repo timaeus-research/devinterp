@@ -1,12 +1,14 @@
 import functools
 from abc import ABC
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Callable, Dict, List, Optional, Protocol
 
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
 from devinterp.optim.schedulers import LRScheduler
+from devinterp.slt.observables import MicroscopicObservable, estimate_rlct
+from devinterp.slt.sampler import Sampler
 
 
 class Evaluator(Protocol):
@@ -129,3 +131,22 @@ class ComposeEvaluators(Evaluator):
             (eval_(model, optimizer, scheduler) for eval_ in self.evals),
             {},
         )
+
+
+class SamplerEvaluator(Evaluator):
+    def __init__(self, sampler: Sampler, observables: Dict[str, MicroscopicObservable], summary_fn: Callable):
+        self.sampler = sampler
+        self.observables = observables
+        self.summary_fn = summary_fn
+
+    def __call__(
+        self,
+        model: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: Optional[LRScheduler],
+    ) -> Dict[str, Any]:
+        return self.sampler.sample(self.observables, self.summary_fn)
+
+    @classmethod
+    def create_rlct_evaluator(cls, sampler: Sampler):
+        return cls(sampler, None, estimate_rlct)
