@@ -303,19 +303,27 @@ class LearnerConfig(BaseModel):
     def model_dump(self, *args, **kwargs):
         """Dumps the model configuration to a dictionary."""
         config_dict = super().model_dump(*args, **kwargs)
-        config_dict["logger_config"] = self.logger_config.model_dump(exclude=["logging_steps"]) if self.logger_config else None
-        config_dict["checkpointer_config"] = self.checkpointer_config.model_dump(exclude=["checkpoint_steps"]) if self.checkpointer_config else None
+        config_dict["logger_config"] = (
+            self.logger_config.model_dump(exclude=["logging_steps"])
+            if self.logger_config
+            else None
+        )
+        config_dict["checkpointer_config"] = (
+            self.checkpointer_config.model_dump(exclude=["checkpoint_steps"])
+            if self.checkpointer_config
+            else None
+        )
 
         return config_dict
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     @classmethod
     def validate_config(cls, data: Any):
         num_steps = data["num_steps"]
-        
+
         checkpoint_config = data.get("checkpointer_config", None)
         logger_config = data.get("logger_config", None)
-        
+
         # Automatically expand `checkpoint_steps` for checkpointer and `logging_steps` for logger
         # "log_space": 10 -> "log_space": [1, num_steps, 10]
         checkpoint_steps = checkpoint_config.get("checkpoint_steps", None)
@@ -326,11 +334,6 @@ class LearnerConfig(BaseModel):
         logger_steps = logger_config.get("logging_steps", None)
         if isinstance(logger_steps, dict):
             expand_steps_config_(logger_steps, num_steps)
-
-        # Sync with wandb (side-effects!)
-        if logger_config["project"] is not None and logger_config["entity"] is not None:
-            wandb.init(project=logger_config["project"], entity=logger_config["entity"])
-            nested_update(data, wandb.config)
 
         return data
 
@@ -365,3 +368,13 @@ class LearnerConfig(BaseModel):
             criterion=getattr(F, self.criterion),
         )
 
+    @classmethod
+    def from_wandb(cls, logger_config=None, **kwargs):
+        logger_config = logger_config or {}
+
+        # Sync with wandb (side-effects!)
+        if logger_config["project"] is not None and logger_config["entity"] is not None:
+            wandb.init(project=logger_config["project"], entity=logger_config["entity"])
+            nested_update(kwargs, wandb.config)
+
+        return cls(logger_config=logger_config, **kwargs)
