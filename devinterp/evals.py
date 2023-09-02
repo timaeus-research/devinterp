@@ -134,7 +134,7 @@ class ComposeEvaluators(Evaluator):
 
 
 class SamplerEvaluator(Evaluator):
-    def __init__(self, sampler: Sampler, observables: Dict[str, MicroscopicObservable], summary_fn: Callable):
+    def __init__(self, sampler: Sampler, observables: Optional[Dict[str, MicroscopicObservable]] = None, summary_fn: Optional[Callable]=None):
         self.sampler = sampler
         self.observables = observables
         self.summary_fn = summary_fn

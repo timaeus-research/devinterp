@@ -10,9 +10,13 @@ from torch import nn
 from torch.nn import functional as F
 
 from devinterp.optim.optimizers import OptimizerConfig
-from devinterp.slt.ensemble import Ensemble
-from devinterp.slt.observables import MicroscopicObservable, estimate_free_energy, estimate_rlct
 from devinterp.optim.sgld import SGLD
+from devinterp.slt.ensemble import Ensemble
+from devinterp.slt.observables import (
+    MicroscopicObservable,
+    estimate_free_energy,
+    estimate_rlct,
+)
 from devinterp.utils import get_criterion
 
 logger = Logger(__name__)
@@ -43,6 +47,9 @@ class SamplerConfig(BaseModel):
     class Config:
         validate_assignment = True
         # frozen = True
+
+    def factory(self, model: nn.Module, data: torch.utils.data.Dataset):
+        return Sampler(model, data, self)
 
 
 class Sampler:
@@ -93,7 +100,7 @@ class Sampler:
             observables["losses"] = lambda xs, ys, yhats, losses, loss, model: loss
 
         loss_init = 0
-        draws = {m: [[] for _ in range(self.ensemble.num_chains)] for m in kwargs}
+        draws = {m: [[] for _ in range(self.ensemble.num_chains)] for m in observables}
         num_steps = (
             self.config.num_draws_per_chain * self.config.num_steps_bw_draws
             + self.config.num_burnin_steps
