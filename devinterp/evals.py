@@ -24,7 +24,6 @@ class Evaluator(Protocol):
         scheduler: Optional[LRScheduler],
     ) -> Dict[str, Any]:
         ...
-    
 
 
 class MSEEvaluator(Evaluator):
@@ -134,7 +133,12 @@ class ComposeEvaluators(Evaluator):
 
 
 class SamplerEvaluator(Evaluator):
-    def __init__(self, sampler: Sampler, observables: Optional[Dict[str, MicroscopicObservable]] = None, summary_fn: Optional[Callable]=None):
+    def __init__(
+        self,
+        sampler: Sampler,
+        observables: Optional[Dict[str, MicroscopicObservable]] = None,
+        summary_fn: Optional[Callable] = None,
+    ):
         self.sampler = sampler
         self.observables = observables
         self.summary_fn = summary_fn
@@ -142,11 +146,11 @@ class SamplerEvaluator(Evaluator):
     def __call__(
         self,
         model: nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: Optional[LRScheduler],
+        optimizer: Optional[torch.optim.Optimizer] = None,
+        scheduler: Optional[LRScheduler] = None,
     ) -> Dict[str, Any]:
         return self.sampler.sample(self.observables, self.summary_fn)
 
     @classmethod
     def create_rlct_evaluator(cls, sampler: Sampler):
-        return cls(sampler, None, estimate_rlct)
+        return cls(sampler, summary_fn=estimate_rlct)
