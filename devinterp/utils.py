@@ -1,6 +1,5 @@
 import warnings
-from typing import (Callable, Iterable, Literal, Optional, Protocol, Tuple,
-                    Union)
+from typing import Callable, Iterable, Literal, Optional, Protocol, Tuple, Union
 
 import numpy as np
 import torch
@@ -148,7 +147,9 @@ def dict_compose(**fns):
 
     return fn
 
+
 CriterionLiteral = Literal["mse_loss", "cross_entropy"]
+
 
 class Criterion(Protocol):
     def __call__(
@@ -183,3 +184,15 @@ def nested_update(d1: dict, d2: dict):
         else:
             d1[k] = v
     return d1
+
+
+def get_default_device():
+    """
+    Returns the default device for PyTorch.
+    """
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")

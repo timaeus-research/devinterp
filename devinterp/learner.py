@@ -19,7 +19,7 @@ from devinterp.ops.storage import BaseStorageProvider, CheckpointerConfig
 from devinterp.ops.utils import expand_steps_config_
 from devinterp.optim.optimizers import OptimizerConfig
 from devinterp.optim.schedulers import LRScheduler, SchedulerConfig
-from devinterp.utils import CriterionLiteral, nested_update
+from devinterp.utils import CriterionLiteral, get_default_device, nested_update
 
 
 class LearnerStateDict(TypedDict):
@@ -253,9 +253,7 @@ class LearnerConfig(BaseModel):
     scheduler_config: Optional[SchedulerConfig] = None
 
     # Misc
-    device: str = Field(
-        default_factory=lambda: "cuda" if torch.cuda.is_available() else "cpu"
-    )
+    device: str = Field(default_factory=get_default_device)
     criterion: CriterionLiteral = "cross_entropy"
 
     # TODO: Make this frozen

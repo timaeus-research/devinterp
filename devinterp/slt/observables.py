@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Dict, Protocol
 
 import numpy as np
 import torch
@@ -18,7 +18,7 @@ class MicroscopicObservable(Protocol):
         losses: TensorType["batch_size"],
         loss: TensorType[1],
         model: nn.Module,
-    ) -> Any:
+    ) -> Dict:
         raise NotImplementedError
 
 

@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 from devinterp.optim.schedulers import LRScheduler
 from devinterp.slt.observables import MicroscopicObservable, estimate_rlct
-from devinterp.slt.sampler import Sampler
+# from devinterp.slt.sampler import Sampler
 
 
 class Evaluator(Protocol):
@@ -132,6 +132,8 @@ class ComposeEvaluators(Evaluator):
         )
 
 
+        
+"""
 class SamplerEvaluator(Evaluator):
     def __init__(
         self,
@@ -154,3 +156,4 @@ class SamplerEvaluator(Evaluator):
     @classmethod
     def create_rlct_evaluator(cls, sampler: Sampler):
         return cls(sampler, summary_fn=estimate_rlct)
+"""
