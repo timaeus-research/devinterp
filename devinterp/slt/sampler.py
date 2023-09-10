@@ -162,7 +162,7 @@ def estimate_rlct(
     pbar: bool = True,
     baseline: Literal["init", "min"] = "init",
     device: torch.device = torch.device("cpu"),
-):
+) -> float:
     trace = sample(
         model=model,
         loader=loader,

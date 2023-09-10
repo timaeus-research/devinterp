@@ -1,6 +1,7 @@
 import logging
 import math
 import random
+import time
 import warnings
 from typing import Any, Callable, Dict, List, Optional, TypedDict
 
@@ -63,33 +64,33 @@ class Learner:
         self.checkpointer = checkpointer
         self.criterion = criterion
 
-    def resume(self, batch_idx: Optional[int] = None):
+    def resume(self, step: Optional[int] = None):
         """
         Resumes training from a saved checkpoint.
 
         Args:
-            batch_idx (Optional[int]): Batch index to resume training from.
+            step (Optional[int]): Batch index to resume training from.
 
         """
         if self.checkpointer is None:
             raise ValueError("Cannot resume training without a checkpointer.")
 
-        if batch_idx is None:
-            epoch, batch_idx = self.checkpointer[-1]
+        if step is None:
+            epoch, step = self.checkpointer[-1]
         else:
-            epoch, batch = min(self.checkpointer, key=lambda x: abs(x[1] - batch_idx))
+            epoch, batch = min(self.checkpointer, key=lambda x: abs(x[1] - step))
 
-            if batch != batch_idx:
+            if batch != step:
                 warnings.warn(
-                    f"Could not find checkpoint with batch_idx {batch_idx}. Resuming from closest batch ({batch}) instead."
+                    f"Could not find checkpoint with step {step}. Resuming from closest batch ({batch}) instead."
                 )
 
-            batch_idx = batch
+            step = batch
 
             self.dataloader.set_seed(epoch)
             # TODO: loop until this specific batch
 
-        self.load_checkpoint(epoch, batch_idx)
+        self.load_checkpoint(epoch, step)
 
     def train(self, resume=0, verbose: bool = True):
         """
@@ -112,11 +113,24 @@ class Learner:
             desc=f"Epoch 0 Batch 0/{self.config.num_steps} Loss: ?.??????",
         )
 
+        last_logged_time = 0
+
+        def maybe_log_batch_loss(throttle_sec=1):
+            """Throttled logging of batch loss."""
+            nonlocal last_logged_time
+            current_time = time.time()
+
+            if current_time - last_logged_time >= throttle_sec:  # 1 second
+                if self.config.is_wandb_enabled:
+                    wandb.log({"Batch/Loss": loss.item()}, step=step)
+
+                last_logged_time = current_time
+
         for epoch in range(0, self.config.num_epochs):
             self.set_seed(epoch)
 
             for _batch_idx, (data, target) in enumerate(self.dataloader):
-                batch_idx = self.config.num_steps_per_epoch * epoch + _batch_idx
+                step = self.config.num_steps_per_epoch * epoch + _batch_idx
                 data, target = data.to(self.config.device), target.to(
                     self.config.device
                 )
@@ -132,28 +146,27 @@ class Learner:
                 # Update progress bar description
                 if pbar:
                     pbar.set_description(
-                        f"Epoch {epoch} Batch {batch_idx}/{self.config.num_steps} Loss: {loss.item():.6f}"
+                        f"Epoch {epoch} Batch {step}/{self.config.num_steps} Loss: {loss.item():.6f}"
                     )
                     pbar.update(1)
 
-                if self.config.is_wandb_enabled:
-                    wandb.log({"Batch/Loss": loss.item()}, step=batch_idx)
+                maybe_log_batch_loss()
 
                 # Log to wandb & save checkpoints according to log_steps
                 if (
                     self.checkpointer
-                    and batch_idx in self.config.checkpointer_config.checkpoint_steps  # type: ignore
+                    and step in self.config.checkpointer_config.checkpoint_steps  # type: ignore
                 ):
-                    self.save_checkpoint(epoch, batch_idx)
+                    self.save_checkpoint(step)
 
-                if self.logger and batch_idx in self.config.logger_config.logging_steps:  # type: ignore
+                if self.logger and step in self.config.logger_config.logging_steps:  # type: ignore
                     self.model.eval()
                     evals = (
                         self.evaluator(self.model, self.optimizer, self.scheduler)
                         if self.evaluator
                         else {"Batch/Loss": loss.item()}
                     )
-                    self.logger.log(evals, step=batch_idx)
+                    self.logger.log(evals, step=step)
                     self.model.train()
 
             if pbar:
@@ -190,32 +203,32 @@ class Learner:
         if self.scheduler is not None and checkpoint["scheduler"] is not None:
             self.scheduler.load_state_dict(checkpoint["scheduler"])
 
-    def save_checkpoint(self, epoch: int, batch_idx: int):
+    def save_checkpoint(self, step: int):
         """
         Saves a checkpoint of the current Learner state.
 
         Args:
             epoch (int): Epoch to save checkpoint at.
-            batch_idx (int): Batch index to save checkpoint at.
+            step (int): Batch index to save checkpoint at.
         """
         if self.checkpointer is None:
             raise ValueError("Cannot save checkpoint without a checkpointer.")
 
         checkpoint = self.state_dict()
-        self.checkpointer.save_file((epoch, batch_idx), checkpoint)
+        self.checkpointer.save_file(step, checkpoint)
 
-    def load_checkpoint(self, epoch: int, batch_idx: int):
+    def load_checkpoint(self, step: int):
         """
         Loads a checkpoint of the Learner state.
 
         Args:
             epoch (int): Epoch to load checkpoint from.
-            batch_idx (int): Batch index to load checkpoint from.
+            step (int): Batch index to load checkpoint from.
         """
         if self.checkpointer is None:
             raise ValueError("Cannot load checkpoint without a checkpointer.")
 
-        checkpoint = self.checkpointer.load_file((epoch, batch_idx))
+        checkpoint = self.checkpointer.load_file(step)
         self.load_state_dict(checkpoint)
 
     def set_seed(self, seed: int):

@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 
 from devinterp.optim.schedulers import LRScheduler
 from devinterp.slt.observables import MicroscopicObservable, estimate_rlct
+
 # from devinterp.slt.sampler import Sampler
 
 
@@ -104,7 +105,7 @@ class CrossEntropyEvaluator(Evaluator):
         return {**accuracies, **cross_entropies}
 
 
-class ComposeEvaluators(Evaluator):
+class CombineEvaluators(Evaluator):
     """Composes multiple evaluation methods into one.
 
     Args:
@@ -132,7 +133,50 @@ class ComposeEvaluators(Evaluator):
         )
 
 
-        
+class RepeatEvaluator(Evaluator):
+    """Repeats a stochastic evaluation method multiple times and yields some statistics."""
+
+    def __init__(self, eval: Evaluator, num_repeats: int = 10, delimiter: str = "/"):
+        self.eval = eval
+        self.num_repeats = num_repeats
+        self.delimiter = delimiter
+
+    def __call__(
+        self,
+        model: nn.Module,
+        optimizer: Optional[torch.optim.Optimizer] = None,
+        scheduler: Optional[LRScheduler] = None,
+    ) -> Dict[str, Any]:
+        """Applies the evaluation method multiple times and yields some statistics.
+
+        Returns:
+            Dict: Dictionary containing the mean and standard deviation of the evaluation results.
+        """
+        evals = {}
+
+        for i in range(self.num_repeats):
+            result = self.eval(model, optimizer, scheduler)
+            for key, value in result.items():
+                if key not in evals:
+                    evals[key] = []
+                evals[key].append(value)
+
+        means = {key: torch.tensor(value).mean().item() for key, value in evals.items()}
+        stds = {key: torch.tensor(value).std().item() for key, value in evals.items()}
+
+        # Convert to a dict of with keys "<key>/<i,mean,std>"
+        results = {}
+
+        for key, value in evals.items():
+            results[f"{key}{self.delimiter}mean"] = means[key]
+            results[f"{key}{self.delimiter}std"] = stds[key]
+
+            for i, v in enumerate(value):
+                results[f"{key}{self.delimiter}{i}"] = v
+
+        return results
+
+
 """
 class SamplerEvaluator(Evaluator):
     def __init__(

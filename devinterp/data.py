@@ -120,10 +120,10 @@ def dataloaders_reduce(
 
 class CustomDataLoader(torch.utils.data.DataLoader):
     def __init__(self, data: torch.utils.data.Dataset, *args, **kwargs):
-        self.generator = torch.Generator(device="cpu")
-        sampler = torch.utils.data.RandomSampler(data, generator=self.generator)
-        kwargs.update({"sampler": self.sampler})
+        generator = torch.Generator(device="cpu")
+        sampler = torch.utils.data.RandomSampler(data, generator=generator)
+        kwargs.update({"sampler": sampler})
         super().__init__(data, *args, **kwargs)
 
     def set_seed(self, seed: int):
-        self.generator.manual_seed(seed)
+        self.sampler.generator.manual_seed(seed)

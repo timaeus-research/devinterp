@@ -5,8 +5,23 @@ import os
 import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import (IO, Any, BinaryIO, Callable, Dict, Generic, List, Literal,
-                    Optional, Set, Tuple, TypedDict, TypeVar, Union)
+from typing import (
+    IO,
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Literal,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    TypedDict,
+    TypeVar,
+    Union,
+)
 
 import boto3
 import torch
@@ -17,7 +32,10 @@ from devinterp.ops.utils import process_steps
 
 logger = logging.getLogger(__name__)
 
-IDType = TypeVar("IDType")
+
+T = TypeVar("T")
+
+IDType = TypeVar("IDType", bound=Union[int, str, Tuple[Union[int, str], ...]])
 
 
 class BaseStorageProvider(Generic[IDType], ABC):
@@ -312,24 +330,15 @@ def create_storage_provider(
     return create_composite_provider(providers)
 
 
-def StorageProvider(
-    bucket_name: Optional[str] = None,
-    local_root: Optional[str] = None,
-    parent_dir: str = "data",
-    device="cpu",
-):
-    """Factory for creating a composite storage provider."""
-
-    warnings.warn("StorageProvider is deprecated. Use create_storage_provider instead.")
-    return create_storage_provider(
-        bucket_name=bucket_name,
-        local_root=local_root,
-        root_dir=parent_dir,
-        device=device,
-    )
+def int_id_to_key(file_id: int) -> str:
+    """Map an integer file ID to a storage key."""
+    return f"{file_id}.pt"
 
 
-EpochAndBatch = Tuple[int, int]
+def key_to_int_id(key: str) -> int:
+    """Map a storage key to an integer file ID."""
+    parts = key.split(".")
+    return int(parts[0])
 
 
 class CheckpointerConfig(BaseModel):
@@ -348,59 +357,12 @@ class CheckpointerConfig(BaseModel):
         """Validate `checkpoint_steps`."""
         return process_steps(v)
 
-    def factory_v1(self):
-        def id_to_key(file_id: Union[EpochAndBatch, Literal["*"]]) -> str:
-            epoch, batch = file_id
-            return f"checkpoint_epoch_{epoch}_batch_{batch}.pt"
-
-        def key_to_id(name: str) -> EpochAndBatch:
-            parts = name.split("_")
-            epoch = int(parts[-3])
-            batch_idx = int(parts[-1].split(".")[0])
-            return epoch, batch_idx
-
-        return create_storage_provider(
-            bucket_name=self.bucket_name,
-            local_root=self.local_root,
-            root_dir=f"checkpoints/{self.project_dir}",
-            device=self.device,
-            id_to_key=id_to_key,
-            key_to_id=key_to_id,
-        )
-    
     def factory(self):
-        def id_to_key(file_id: int) -> str:
-            return f"{file_id}.pt"
-
-        def key_to_id(name: str) -> int:
-            parts = name.split(".")
-            return int(parts[0])
-
         return create_storage_provider(
             bucket_name=self.bucket_name,
             local_root=self.local_root,
             root_dir=f"checkpoints/{self.project_dir}",
             device=self.device,
-            id_to_key=id_to_key,
-            key_to_id=key_to_id,
+            id_to_key=int_id_to_key,
+            key_to_id=key_to_int_id,
         )
-
-
-def CheckpointManager(
-    project_dir: str,
-    bucket_name: Optional[str] = None,
-    local_root: Optional[str] = None,
-    device: str = "cpu",
-):
-    """Factory for creating a storage provider for checkpoints."""
-
-    warnings.warn(
-        "CheckpointManager is deprecated. Use create_storage_provider instead."
-    )
-
-    return CheckpointerConfig(
-        project_dir=project_dir,
-        bucket_name=bucket_name,
-        local_root=local_root,
-        device=device,
-    ).factory()
