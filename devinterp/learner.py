@@ -49,7 +49,7 @@ class Learner:
             model (torch.nn.Module): The PyTorch model to be trained.
             dataset (torch.utils.data.Dataset): The training dataset.
             config (Config): Configuration object containing hyperparameters.
-            evals (Optional[List[Callable]]): List of metric functions to evaluate the model.
+        evals (Optional[List[Callable]]): List of metric functions to evaluate the model.
 
         """
 
@@ -110,7 +110,7 @@ class Learner:
 
         pbar = verbose and tqdm(
             total=self.config.num_steps,
-            desc=f"Epoch 0 Batch 0/{self.config.num_steps} Loss: ?.??????",
+            desc=f"Training...",
         )
 
         last_logged_time = 0
@@ -129,26 +129,17 @@ class Learner:
         for epoch in range(0, self.config.num_epochs):
             self.set_seed(epoch)
 
-            for _batch_idx, (data, target) in enumerate(self.dataloader):
+            for _batch_idx, (xs, ys) in enumerate(self.dataloader):
                 step = self.config.num_steps_per_epoch * epoch + _batch_idx
-                data, target = data.to(self.config.device), target.to(
-                    self.config.device
-                )
+                xs, ys = xs.to(self.config.device), ys.to(self.config.device)
                 self.optimizer.zero_grad()
-                output = self.model(data)
-                loss = self.criterion(output, target)
+                y_preds = self.model(xs)
+                loss = self.criterion(y_preds, ys)
                 loss.backward()
                 self.optimizer.step()
 
                 if self.scheduler:
                     self.scheduler.step()
-
-                # Update progress bar description
-                if pbar:
-                    pbar.set_description(
-                        f"Epoch {epoch} Batch {step}/{self.config.num_steps} Loss: {loss.item():.6f}"
-                    )
-                    pbar.update(1)
 
                 maybe_log_batch_loss()
 
@@ -161,12 +152,15 @@ class Learner:
 
                 if self.logger and step in self.config.logger_config.logging_steps:  # type: ignore
                     self.model.eval()
-                    evals = (
-                        self.evaluator(self.model, self.optimizer, self.scheduler)
-                        if self.evaluator
-                        else {"Batch/Loss": loss.item()}
-                    )
-                    self.logger.log(evals, step=step)
+
+                    with torch.no_grad():
+                        evals = (
+                            self.evaluator(self.model, self.optimizer, self.scheduler)
+                            if self.evaluator
+                            else {"Batch/Loss": loss.item()}
+                        )
+                        self.logger.log(evals, step=step)
+
                     self.model.train()
 
             if pbar:

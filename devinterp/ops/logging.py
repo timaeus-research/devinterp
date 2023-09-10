@@ -2,7 +2,7 @@ import csv
 import dataclasses
 import logging
 import warnings
-from typing import Any, Dict, List, Optional, Protocol, Set
+from typing import Any, Dict, Iterable, List, Optional, Protocol, Set
 
 import numpy as np
 import pandas as pd
@@ -58,14 +58,31 @@ class WandbLogger(MetricLogger):
 class CsvLogger(MetricLogger):
     """Logs data to a CSV file."""
 
-    def __init__(self, out_file: str, metrics):
+    def __init__(self, out_file: str):
         self.out_file = out_file
-        self.metrics = metrics
+        self.metrics = []
         self.current_step = -1
         self.buffer = {}
 
+    def add_metrics(self, new_metrics: Iterable[str]):
+        """Update the list of metrics to be logged."""
+        self.metrics += list(new_metrics)
+
+        try:
+            logs = pd.read_csv(self.out_file)
+        except FileNotFoundError:
+            logs = pd.DataFrame(columns=["step"])
+
+        logs = logs.reindex(columns=list(logs.columns) + list(new_metrics))
+        logs.to_csv(self.out_file, index=False)
+
     def log(self, data, step=None, commit=None, **_):
         """Log the data at a specific step."""
+        new_metrics = set(data.keys()) - set(self.metrics)
+
+        if new_metrics:
+            self.add_metrics(new_metrics)
+
         if step is not None:
             if step < self.current_step:
                 warning = f"Step must be greater than {self.current_step}, got {step}. Ignoring."
@@ -106,16 +123,26 @@ class DataFrameLogger(MetricLogger):
 
     """
 
-    def __init__(self, logging_steps: List[int], metrics: List[str], dtype=float):
+    def __init__(self, logging_steps: List[int], dtype=float):
+        self.metrics = []
         self.df = pd.DataFrame(
-            index=range(len(logging_steps)), columns=["step"] + metrics, dtype=dtype
+            index=range(len(logging_steps)), columns=["step"], dtype=dtype
         )
         self.df["step"] = logging_steps
         self.current_step = -1
         self.buffer = {}
 
+    def add_metrics(self, new_metrics: Iterable[str]):
+        self.metrics += list(new_metrics)
+        self.df = self.df.reindex(columns=list(self.df.columns) + list(new_metrics))
+
     def log(self, data, step=None, commit=None, **_):
         """Log the data at a specific step."""
+        new_metrics = set(data.keys()) - set(self.metrics)
+
+        if new_metrics:
+            self.add_metrics(new_metrics)
+
         if step is not None:
             if step not in self.df.step.values:
                 warning = f"Step {step} not in logging_steps. Ignoring."
@@ -170,7 +197,7 @@ class StdLogger(MetricLogger):
         sync: Optional[bool] = None,
     ):
         # Rendering logic here
-        self._logger.info(self.format(data))
+        self._logger.info("Step %s\n%s", step, self.format(data))
 
     def debug(self, data):
         self._logger.debug(self.format(data))
@@ -213,7 +240,6 @@ class MetricLoggingConfig(BaseModel):
     project: Optional[str] = None
     entity: Optional[str] = None
     logging_steps: Set[int] = Field(default_factory=set)
-    metrics: Optional[List[str]] = None
     out_file: Optional[str] = None
     use_df: Optional[bool] = False
     stdout: Optional[bool] = False
@@ -250,10 +276,10 @@ class MetricLoggingConfig(BaseModel):
             loggers.append(WandbLogger(self.project, self.entity, **kwargs))
 
         if self.logging_steps:
-            if self.use_df and self.metrics:
-                loggers.append(DataFrameLogger(self.logging_steps, self.metrics))
-            elif self.out_file:
-                loggers.append(CsvLogger(self.out_file, self.metrics))
+            if self.use_df:
+                loggers.append(DataFrameLogger(list(self.logging_steps)))
+            if self.out_file:
+                loggers.append(CsvLogger(self.out_file))
 
         if self.stdout:
             loggers.append(StdLogger(self.project or "MetricLogger"))
@@ -265,7 +291,6 @@ def Logger(
     project=None,
     entity=None,
     logging_steps=[],
-    metrics=[],
     out_file=None,
     use_df=False,
 ):
@@ -275,7 +300,6 @@ def Logger(
         project=project,
         entity=entity,
         logging_steps=logging_steps,
-        metrics=metrics,
         out_file=out_file,
         use_df=use_df,
     ).factory()

@@ -85,33 +85,41 @@ def int_linspace(start, stop, num, return_type="list"):
         )
 
 
-def flatten_dict(dict_, prefix="", delimiter="/"):
+def flatten_dict(dict_, prefix="", delimiter="/", flatten_lists=False):
     """
     Recursively flattens a nested dictionary of metrics into a single-level dictionary.
 
     Parameters:
-        metrics (dict): The dictionary to flatten. It can contain nested dictionaries.
+        dict_ (dict): The dictionary to flatten. It can contain nested dictionaries and lists.
         prefix (str, optional): A string prefix to prepend to the keys in the flattened dictionary.
                                  This is used internally for the recursion and should not typically
                                  be set by the caller.
+        delimiter (str, optional): The delimiter to use between keys in the flattened dictionary.
+        flatten_lists (bool, optional): Whether to flatten lists in the dictionary. If True, list
+                                        elements are treated as separate metrics.
 
     Returns:
         dict: A flattened dictionary where the keys are constructed by concatenating the keys from
-              the original dictionary, separated by slashes.
+              the original dictionary, separated by the specified delimiter.
 
     Example:
         Input:
             {
                 "Train": {"Loss": "train_loss", "Accuracy": "train_accuracy"},
                 "Test": {"Loss": "test_loss", "Details": {"Test/Accuracy": "test_accuracy"}},
+                "List": [1, 2, [3, 4]]
             }
 
-        Output:
+        Output (with flatten_lists=True):
             {
                 'Train/Loss': 'train_loss',
                 'Train/Accuracy': 'train_accuracy',
                 'Test/Loss': 'test_loss',
-                'Test/Details/Test/Accuracy': 'test_accuracy'
+                'Test/Details/Test/Accuracy': 'test_accuracy',
+                'List/0': 1,
+                'List/1': 2,
+                'List/2/0': 3,
+                'List/2/1': 4
             }
     """
     flattened = {}
@@ -119,12 +127,38 @@ def flatten_dict(dict_, prefix="", delimiter="/"):
         if isinstance(value, dict):
             flattened.update(
                 flatten_dict(
-                    value, prefix=f"{prefix}{key}{delimiter}", delimiter=delimiter
+                    value,
+                    prefix=f"{prefix}{key}{delimiter}",
+                    delimiter=delimiter,
+                    flatten_lists=flatten_lists,
                 )
             )
+        elif isinstance(value, list) and flatten_lists:
+            for i, v in enumerate(value):
+                if isinstance(v, (dict, list)):
+                    flattened.update(
+                        flatten_dict(
+                            {str(i): v},
+                            prefix=f"{prefix}{key}{delimiter}",
+                            delimiter=delimiter,
+                            flatten_lists=flatten_lists,
+                        )
+                    )
+                else:
+                    flattened[f"{prefix}{key}{delimiter}{i}"] = v
         else:
             flattened[f"{prefix}{key}"] = value
     return flattened
+
+
+def map_nested(f, x):
+    """Recursively applies a function to a nested dictionary or list."""
+    if isinstance(x, dict):
+        return {k: map_nested(f, v) for k, v in x.items()}
+    elif isinstance(x, list):
+        return [map_nested(f, v) for v in x]
+    else:
+        return f(x)
 
 
 def dict_compose(**fns):

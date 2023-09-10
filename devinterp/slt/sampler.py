@@ -18,6 +18,7 @@ from tqdm import tqdm
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.observables import MicroscopicObservable
+from devinterp.utils import Criterion
 
 
 def sample_single_chain(
@@ -59,14 +60,16 @@ def sample_single_chain(
 
     for i, (xs, ys) in iterator:
         xs, ys = xs.to(device), ys.to(device)
-        y_pred = model(xs)
-        loss = criterion(y_pred, ys)
+        y_preds = model(xs)
+        print(y_preds.requires_grad, ys.requires_grad, xs.requires_grad)
+        loss = criterion(y_preds, ys)
+        print(loss.requires_grad, loss.grad_fn)
         loss.backward()
 
         if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
             draw_idx = (i - num_burnin_steps) // num_steps_bw_draws
             local_draws.loc[draw_idx, "chain"] = chain
-            local_draws.loc[draw_idx, "loss"] = loss.item()
+            local_draws.loc[draw_idx, "loss"] = loss.detach().item()
 
         optimizer.step()
         optimizer.zero_grad()
@@ -80,11 +83,11 @@ def sample(
     criterion: torch.nn.Module,
     step: Literal["sgld"],
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
-    num_draws: int = 1000,
-    num_chains: int = 4,
-    num_burnin_steps: int = 1000,
+    num_draws: int = 100,
+    num_chains: int = 10,
+    num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
-    cores: Optional[int] = None,
+    cores: Optional[int] = 1,
     seed: Optional[Union[int, List[int]]] = None,
     pbar: bool = True,
     device: torch.device = torch.device("cpu"),
@@ -150,14 +153,14 @@ def sample(
 def estimate_rlct(
     model: torch.nn.Module,
     loader: DataLoader,
-    criterion: torch.nn.Module,
+    criterion: Criterion,
     step: Literal["sgld"],
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
-    num_draws: int = 1000,
-    num_chains: int = 4,
-    num_burnin_steps: int = 1000,
+    num_draws: int = 100,
+    num_chains: int = 10,
+    num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
-    cores: Optional[int] = None,
+    cores: Optional[int] = 1,
     seed: Optional[Union[int, List[int]]] = None,
     pbar: bool = True,
     baseline: Literal["init", "min"] = "init",
