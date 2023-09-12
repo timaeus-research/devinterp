@@ -22,6 +22,7 @@ class SGNHT(torch.optim.Optimizer):
         for group in self.param_groups:
             # Default value of thermostat is the diffusion factor
             group['thermostat'] = torch.tensor(diffusion_factor)
+            group['temperature'] = np.log(group["num_samples"])
             for p in group['params']:
                 param_state = self.state[p]
                 param_state['momentum'] = np.sqrt(lr) * torch.randn_like(p.data)
@@ -38,12 +39,13 @@ class SGNHT(torch.optim.Optimizer):
                 for p in group['params']:
                     if p.grad is None:
                         continue
-
+                    
                     param_state = self.state[p]
                     momentum = param_state['momentum']
 
                     # Gradient term
-                    dw = (group["num_samples"] / group["batch_size"]) * p.grad.data
+                    dw = p.grad.data * (group["num_samples"] / group["temperature"])
+
                     momentum.sub_(group['lr'] * dw)
 
                     # Friction term
