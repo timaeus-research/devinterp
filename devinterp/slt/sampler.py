@@ -11,8 +11,7 @@ from torch.nn import functional as F
 
 from devinterp.optim.optimizers import OptimizerConfig
 from devinterp.slt.ensemble import Ensemble
-from devinterp.slt.observables import Metric, estimate_free_energy, estimate_rlct
-from devinterp.optim.sgld import SGLD
+from devinterp.slt.observables import Metric, estimate_rlct
 from devinterp.utils import get_criterion
 
 logger = Logger(__name__)
@@ -38,7 +37,7 @@ class SamplerConfig(BaseModel):
     num_steps_bw_draws: int = 1
     verbose: bool = False
     batch_size: int = 256
-    criterion: Literal["mse_loss", "cross_entropy"]
+    criterion: Union[Literal["mse_loss", "cross_entropy"], str]
 
     class Config:
         validate_assignment = True
@@ -98,7 +97,7 @@ class Sampler:
             self.config.num_draws_per_chain * self.config.num_steps_bw_draws
             + self.config.num_burnin_steps
         )
-
+        weights = []
         for i, (xs, ys) in zip(range(num_steps), itertools.cycle(self.loader)):
             for j, model in enumerate(self.ensemble):
                 yhats = model(xs)
@@ -112,13 +111,14 @@ class Sampler:
                 ):
                     for m, fn in kwargs.items():
                         draws[m][j].append(fn(xs, ys, yhats, losses, loss, model))
-
+                        if weights:
+                            weights.append(model.state_dict()['weights'].detach().clone())
+                        else:
+                            weights = [model.state_dict()['weights'].detach().clone()]
                 if i == 0 and j == 0:
                     loss_init = loss.item()
 
             self.optimizer.step()
             self.optimizer.zero_grad()
-
         draws = {m: torch.Tensor(v) for m, v in draws.items()}
-
         return summary_fn(loss_init=loss_init, num_samples=len(self.data), **draws)

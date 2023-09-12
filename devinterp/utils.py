@@ -148,7 +148,7 @@ def dict_compose(**fns):
 
     return fn
 
-CriterionLiteral = Literal["mse_loss", "cross_entropy"]
+CriterionLiteral =Union[Literal["mse_loss", "cross_entropy"], str]
 
 class Criterion(Protocol):
     def __call__(
