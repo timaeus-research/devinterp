@@ -20,7 +20,7 @@ class Ensemble(nn.Module):
         super().__init__()
         self.model = model
         self.models = nn.ModuleList(
-            [model] + [deepcopy(model) for _ in range(num_chains - 1)]
+            [deepcopy(model) for _ in range(num_chains)]
         )
         self.num_chains = num_chains
 
