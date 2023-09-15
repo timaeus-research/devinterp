@@ -26,7 +26,7 @@ class DLN(nn.Module):
                 0, self.init_variance
             )  # Note: this is not normalized by the input dimension
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x):
         for linear in self.linears:
             x = linear(x)
         return x

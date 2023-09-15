@@ -126,15 +126,27 @@ class Learner:
 
                 last_logged_time = current_time
 
+        def log(step):
+            self.model.eval()
+            evals = (
+                self.evaluator(self.model, self.optimizer, self.scheduler)
+                if self.evaluator
+                else {"Batch/Loss": loss.item()}
+            )
+            self.logger.log(evals, step=step)
+            self.model.train()
+
+        step = 0
+
         for epoch in range(0, self.config.num_epochs):
             self.set_seed(epoch)
 
-            for _batch_idx, (xs, ys) in enumerate(self.dataloader):
+            for _batch_idx, (x, y) in enumerate(self.dataloader):
                 step = self.config.num_steps_per_epoch * epoch + _batch_idx
-                xs, ys = xs.to(self.config.device), ys.to(self.config.device)
+                x, y = x.to(self.config.device), y.to(self.config.device)
                 self.optimizer.zero_grad()
-                y_preds = self.model(xs)
-                loss = self.criterion(y_preds, ys)
+                y_hat = self.model(x)
+                loss = self.criterion(y_hat, y)
                 loss.backward()
                 self.optimizer.step()
 
@@ -151,20 +163,12 @@ class Learner:
                     self.save_checkpoint(step)
 
                 if self.logger and step in self.config.logger_config.logging_steps:  # type: ignore
-                    self.model.eval()
+                    log(step=step)
 
-                    with torch.no_grad():
-                        evals = (
-                            self.evaluator(self.model, self.optimizer, self.scheduler)
-                            if self.evaluator
-                            else {"Batch/Loss": loss.item()}
-                        )
-                        self.logger.log(evals, step=step)
+        if pbar:
+            pbar.close()
 
-                    self.model.train()
-
-            if pbar:
-                pbar.close()
+        log(step=step)
 
         if self.config.is_wandb_enabled:
             wandb.finish()

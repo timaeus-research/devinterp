@@ -28,10 +28,10 @@ class DLNDataset(Dataset):
         self.num_samples = num_samples
         self.noise_level = noise_level
 
-        inputs = torch.rand(self.num_samples, self.num_features, device=device)
+        inputs = torch.rand(self.num_samples, self.num_features, device=device).detach()
 
         num_outputs = self.teacher.to_matrix().shape[1]
-        labels = teacher(inputs) + noise_level * torch.rand(num_outputs)
+        labels = (teacher(inputs) + noise_level * torch.rand(num_outputs)).detach()
         self.data = torch.utils.data.TensorDataset(inputs, labels)
 
     def __len__(self):

@@ -4,7 +4,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from logging import Logger
-from multiprocessing import Pool, cpu_count
 from typing import Callable, Dict, List, Literal, Optional, Union
 
 import numpy as np
@@ -12,9 +11,10 @@ import pandas as pd
 import torch
 import yaml
 from torch import nn
+from torch.multiprocessing import Pool, cpu_count
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from tqdm import tqdm
+from tqdm import tqdms
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.observables import MicroscopicObservable
@@ -59,22 +59,23 @@ def sample_single_chain(
     model.train()
 
     for i, (xs, ys) in iterator:
+        optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
-        print(y_preds.requires_grad, ys.requires_grad, xs.requires_grad)
         loss = criterion(y_preds, ys)
-        print(loss.requires_grad, loss.grad_fn)
         loss.backward()
+        optimizer.step()
 
         if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
             draw_idx = (i - num_burnin_steps) // num_steps_bw_draws
             local_draws.loc[draw_idx, "chain"] = chain
             local_draws.loc[draw_idx, "loss"] = loss.detach().item()
 
-        optimizer.step()
-        optimizer.zero_grad()
-
     return local_draws
+
+
+def _sample_single_chain(kwargs):
+    return sample_single_chain(**kwargs)
 
 
 def sample(
@@ -87,7 +88,7 @@ def sample(
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
-    cores: Optional[int] = 1,
+    cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     pbar: bool = True,
     device: torch.device = torch.device("cpu"),
@@ -122,10 +123,10 @@ def sample(
     else:
         seeds = [None] * num_chains
 
-    def _sample_single_chain(chain_seed):
-        return sample_single_chain(
-            chain=chain_seed[0],
-            seed=chain_seed[1],
+    def get_args(i):
+        return dict(
+            chain=i,
+            seed=seeds[i],
             ref_model=model,
             loader=loader,
             criterion=criterion,
@@ -138,13 +139,19 @@ def sample(
             device=device,
         )
 
-    # with Pool(cores) as pool:
-    #    results = pool.map(func, list(zip(range(num_chains), seeds)))
-
     results = []
 
-    for chain, seed in zip(range(num_chains), seeds):
-        results.append(_sample_single_chain((chain, seed)))
+    if cores > 1:
+        if str(device) == "cpu":
+            with Pool(cores) as pool:
+                results = pool.map(
+                    _sample_single_chain, [get_args(i) for i in range(num_chains)]
+                )
+        else:
+            raise NotImplementedError("Cannot currently use multiprocessing with GPU")
+    else:
+        for i in range(num_chains):
+            results.append(_sample_single_chain(get_args(i)))
 
     results_df = pd.concat(results, ignore_index=True)
     return results_df
@@ -160,7 +167,7 @@ def estimate_rlct(
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
-    cores: Optional[int] = 1,
+    cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     pbar: bool = True,
     baseline: Literal["init", "min"] = "init",
