@@ -286,6 +286,23 @@ class MetricLoggingConfig(BaseModel):
 
         return CompositeLogger(loggers)
 
+    def __repr_args__(self):
+        return [
+            ("project", self.project),
+            ("entity", self.entity),
+            (
+                "logging_steps",
+                f"({min(self.logging_steps)}...{max(self.logging_steps)}) {len(self.logging_steps)} steps",
+            ),
+            ("out_file", self.out_file),
+            ("use_df", self.use_df),
+            ("stdout", self.stdout),
+            ("run_id", self.run_id),
+        ]
+
+    def __repr__(self):
+        return f"MetricLoggingConfig({', '.join(f'{k}={v}' for k, v in self.__repr_args__())})"
+
 
 def Logger(
     project=None,

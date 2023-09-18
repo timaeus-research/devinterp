@@ -3,6 +3,7 @@ import math
 import random
 import time
 import warnings
+from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional, TypedDict
 
 import numpy as np
@@ -195,11 +196,12 @@ class Learner:
         Args:
             checkpoint (LearnerStateDict): Dictionary containing model, optimizer, and scheduler states.
         """
-        self.model.load_state_dict(checkpoint["model"])
-        self.optimizer.load_state_dict(checkpoint["optimizer"])
+        with self.temp_to(torch.device("cpu")):
+            self.model.load_state_dict(checkpoint["model"])
+            self.optimizer.load_state_dict(checkpoint["optimizer"])
 
-        if self.scheduler is not None and checkpoint["scheduler"] is not None:
-            self.scheduler.load_state_dict(checkpoint["scheduler"])
+            if self.scheduler is not None and checkpoint["scheduler"] is not None:
+                self.scheduler.load_state_dict(checkpoint["scheduler"])
 
     def save_checkpoint(self, step: int):
         """
@@ -212,8 +214,9 @@ class Learner:
         if self.checkpointer is None:
             raise ValueError("Cannot save checkpoint without a checkpointer.")
 
-        checkpoint = self.state_dict()
-        self.checkpointer.save_file(step, checkpoint)
+        with self.temp_to(torch.device("cpu")):
+            checkpoint = self.state_dict()
+            self.checkpointer.save_file(step, checkpoint)
 
     def load_checkpoint(self, step: int):
         """
@@ -243,6 +246,21 @@ class Learner:
 
         if "cuda" in str(self.config.device):
             torch.cuda.manual_seed_all(seed)
+
+    @contextmanager
+    def temp_to(self, device: torch.device):
+        """
+        Temporarily sets the device of the Learner.
+
+        Args:
+            device (torch.device): Device to temporarily set.
+        """
+        old_device = self.config.device
+        self.config.device = device
+        self.model.to(device)
+        yield
+        self.config.device = old_device
+        self.model.to(old_device)
 
 
 logger_ = logging.getLogger(__name__)

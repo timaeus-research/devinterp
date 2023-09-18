@@ -10,15 +10,14 @@ import numpy as np
 import pandas as pd
 import torch
 import yaml
+from devinterp.optim.sgld import SGLD
+from devinterp.slt.observables import MicroscopicObservable
+from devinterp.utils import Criterion
 from torch import nn
 from torch.multiprocessing import Pool, cpu_count
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from tqdm import tqdms
-
-from devinterp.optim.sgld import SGLD
-from devinterp.slt.observables import MicroscopicObservable
-from devinterp.utils import Criterion
+from tqdm import tqdm
 
 
 def sample_single_chain(

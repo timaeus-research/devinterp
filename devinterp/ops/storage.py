@@ -5,30 +5,14 @@ import os
 import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import (
-    IO,
-    Any,
-    BinaryIO,
-    Callable,
-    Dict,
-    Generic,
-    List,
-    Literal,
-    Optional,
-    Protocol,
-    Set,
-    Tuple,
-    TypedDict,
-    TypeVar,
-    Union,
-)
+from typing import (IO, Any, BinaryIO, Callable, Dict, Generic, List, Literal,
+                    Optional, Protocol, Set, Tuple, TypedDict, TypeVar, Union)
 
 import boto3
 import torch
 from botocore.exceptions import ClientError
-from pydantic import BaseModel, Field, validator
-
 from devinterp.ops.utils import process_steps
+from pydantic import BaseModel, Field, validator
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +42,12 @@ class BaseStorageProvider(Generic[IDType], ABC):
         self,
         id_to_key: Optional[Callable[[IDType], str]] = None,
         key_to_id: Optional[Callable[[str], IDType]] = None,
-        device: str = "cpu",
+        device: Optional[str] = None,
         root_dir: str = "data",
     ):
         self._id_to_key = id_to_key or self.default_id_to_key
         self._key_to_id = key_to_id or self.default_key_to_id
-        self.device = torch.device(device)
+        self.device = torch.device(device) if device else None
         self.root_dir = Path(root_dir)
 
         self.file_ids: List[IDType] = []
@@ -96,7 +80,7 @@ class BaseStorageProvider(Generic[IDType], ABC):
         else:
             key = key[len(root_dir) + 1 :]
 
-        return self.default_key_to_id(key)
+        return self._key_to_id(key)
 
     @staticmethod
     def default_id_to_key(file_id: IDType) -> str:
@@ -109,7 +93,7 @@ class BaseStorageProvider(Generic[IDType], ABC):
         warnings.warn(
             "Using default key_to_id. This yields a string, which may not be what you want."
         )
-        return key.replace(".pt", "")  # type: ignore
+        return key.split("/")[-1].replace(".pt", "")  # type: ignore
 
     def sync(self):
         self.file_ids = self.get_file_ids()
@@ -150,7 +134,7 @@ class LocalStorageProvider(BaseStorageProvider[IDType]):
         self,
         id_to_key: Optional[Callable[[IDType], str]] = None,
         key_to_id: Optional[Callable[[str], IDType]] = None,
-        device: str = "cpu",
+        device: Optional[str] = None,
         root_dir: str = "data",
     ):
         super().__init__(id_to_key, key_to_id, device=device, root_dir=root_dir)
@@ -196,7 +180,7 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         id_to_key: Optional[Callable[[IDType], str]] = None,
         key_to_id: Optional[Callable[[str], IDType]] = None,
         root_dir: str = "data",
-        device: str = "cpu",
+        device: Optional[str] = None,
     ):
         if not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY"):
             raise EnvironmentError("AWS environment variables not set.")
@@ -218,13 +202,16 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         key = self.id_to_key(file_id)
         response = self.client.get_object(Bucket=self.bucket_name, Key=key)
         buffer = io.BytesIO(response["Body"].read())
-        return torch.load(buffer, map_location=self.device)
+
+        if self.device:
+            return torch.load(buffer, map_location=self.device)
+
+        return torch.load(buffer)
 
     def get_file_ids(self) -> List[IDType]:
         """
         Returns a list of tuples of all files in the bucket directory.
         """
-
         response = self.client.list_objects_v2(Bucket=self.bucket_name)
         if "Contents" in response:
             return sorted(
@@ -237,7 +224,7 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         return []
 
     def __repr__(self):
-        return f"S3StorageProvider({self.bucket_name}, {self.root_dir})"
+        return f"S3StorageProvider(s3://{self.bucket_name}/{self.root_dir})"
 
 
 class CompositeStorageProvider(BaseStorageProvider[IDType]):
@@ -287,7 +274,7 @@ def create_storage_provider(
     bucket_name: Optional[str] = None,
     local_root: Optional[str] = None,
     root_dir: str = "data",
-    device="cpu",
+    device: Optional[str] = None,
     id_to_key: Optional[Callable[[IDType], str]] = None,
     key_to_id: Optional[Callable[[str], IDType]] = None,
 ):
@@ -337,8 +324,9 @@ def int_id_to_key(file_id: int) -> str:
 
 def key_to_int_id(key: str) -> int:
     """Map a storage key to an integer file ID."""
-    parts = key.split(".")
-    return int(parts[0])
+    file_name = key.split("/")[-1]
+    file_id = file_name.split(".")[0]
+    return int(file_id)
 
 
 class CheckpointerConfig(BaseModel):
@@ -346,7 +334,7 @@ class CheckpointerConfig(BaseModel):
     project_dir: str = "checkpoints"
     bucket_name: Optional[str] = None
     local_root: Optional[str] = None
-    device: str = "cpu"
+    device: Optional[str] = None
 
     class Config:
         frozen = True
@@ -366,3 +354,17 @@ class CheckpointerConfig(BaseModel):
             id_to_key=int_id_to_key,
             key_to_id=key_to_int_id,
         )
+
+    def __repr_args__(self):
+        return [
+            ("bucket_name", self.bucket_name),
+            ("project_dir", self.project_dir),
+            ("local_root", self.local_root),
+            (
+                "checkpoint_steps",
+                f"({min(self.checkpoint_steps)}...{max(self.checkpoint_steps)}) {len(self.checkpoint_steps)} steps",
+            ),
+        ]
+
+    def __repr__(self):
+        return f"CheckpointerConfig({', '.join(f'{k}={v}' for k, v in self.__repr_args__())})"
