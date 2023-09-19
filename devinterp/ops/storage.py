@@ -5,14 +5,30 @@ import os
 import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import (IO, Any, BinaryIO, Callable, Dict, Generic, List, Literal,
-                    Optional, Protocol, Set, Tuple, TypedDict, TypeVar, Union)
+from typing import (
+    IO,
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Literal,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    TypedDict,
+    TypeVar,
+    Union,
+)
 
 import boto3
 import torch
 from botocore.exceptions import ClientError
-from devinterp.ops.utils import process_steps
 from pydantic import BaseModel, Field, validator
+
+from devinterp.ops.utils import process_steps
 
 logger = logging.getLogger(__name__)
 
@@ -212,15 +228,16 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         """
         Returns a list of tuples of all files in the bucket directory.
         """
-        response = self.client.list_objects_v2(Bucket=self.bucket_name)
+        response = self.client.list_objects_v2(
+            Bucket=self.bucket_name, Prefix=str(self.root_dir)
+        )
+
         if "Contents" in response:
             return sorted(
-                [
-                    self.key_to_id(item["Key"])
-                    for item in response["Contents"]
-                    if item["Key"].startswith(str(self.root_dir))
-                ]
+                [self.key_to_id(item["Key"]) for item in response["Contents"]]
             )
+
+        warnings.warn(f"No files found in bucket {self.bucket_name}.")
         return []
 
     def __repr__(self):
