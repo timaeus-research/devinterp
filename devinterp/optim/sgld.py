@@ -52,8 +52,8 @@ class SGLD(torch.optim.Optimizer):
         posterior.
     """
 
-    def __init__(self, params, lr=1e-3, noise_level=1., weight_decay=0., elasticity=0., temperature: Union[Literal['adaptive'], float]=1., num_samples=1):
-        defaults = dict(lr=lr, noise_level=noise_level, weight_decay=weight_decay, elasticity=elasticity, temperature=temperature, num_samples=num_samples)
+    def __init__(self, params, lr=1e-3, noise_level=1., weight_decay=0., elasticity=0., temperature: Union[Literal['adaptive'], float]=1., bounding_box_size=None,  num_samples=1):
+        defaults = dict(lr=lr, noise_level=noise_level, weight_decay=weight_decay, elasticity=elasticity, temperature=temperature, bounding_box_size=bounding_box_size, num_samples=num_samples)
         super(SGLD, self).__init__(params, defaults)
 
         # Save the initial parameters if the elasticity term is set
@@ -70,7 +70,7 @@ class SGLD(torch.optim.Optimizer):
             for p in group['params']:
                 if p.grad is None:
                     continue
-
+                param_state = self.state[p]
                 dw = p.grad.data * group["num_samples"] / group['temperature']
 
                 if group['weight_decay'] != 0:
@@ -85,3 +85,6 @@ class SGLD(torch.optim.Optimizer):
                 # Add Gaussian noise
                 noise = torch.normal(mean=0., std=group['noise_level'], size=dw.size(), device=dw.device)
                 p.data.add_(noise, alpha=group['lr'] ** 0.5)
+                # Rebound if exceeded bounding box size
+                if group['bounding_box_size'] is not None:
+                    torch.clamp_(p.data, min=param_state['initial_param'] - group['bounding_box_size'], max=param_state['initial_param'] + group['bounding_box_size'])

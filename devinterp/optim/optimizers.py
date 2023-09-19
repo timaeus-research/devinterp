@@ -29,11 +29,11 @@ class OptimizerConfig(BaseModel):
         # Only export relevant fields based on optimizer_type
         fields = {"optimizer_type", "lr"}
         if self.optimizer_type == "SGD":
-            fields.add("momentum",  "weight_decay")
+            fields.update("momentum",  "weight_decay")
         elif self.optimizer_type in {"Adam", "AdamW"}:
-            fields.add("betas",  "weight_decay")
+            fields.update("betas",  "weight_decay")
         elif self.optimizer_type == "SGLD":
-            fields.update({"noise_level", "elasticity", "temperature", "num_samples",  "weight_decay"})
+            fields.update({"noise_level", "elasticity", "temperature", "bounding_box_size", "num_samples",  "weight_decay"})
         elif self.optimizer_type == "SGNHT":
             fields.update({"diffusion_factor", "bounding_box_size", "num_samples", "batch_size"})
         return super().model_dump(include=fields, *args, **kwargs)
