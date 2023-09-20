@@ -75,7 +75,7 @@ class Sampler:
     def sample(
         self,
         kwargs: Optional[Dict[str, Metric]] = None,
-        summary_fn: Callable = lambda **kwargs: kwargs,
+        summary_fn: Callable = lambda **kwargs: kwargs, save_weights=False
     ):
         """
         Performs the sampling process, returning metric summaries as specified.
@@ -97,7 +97,7 @@ class Sampler:
             self.config.num_draws_per_chain * self.config.num_steps_bw_draws
             + self.config.num_burnin_steps
         )
-        # weights = []
+        weights = None
         for i, (xs, ys) in zip(range(num_steps), itertools.cycle(self.loader)):
             for j, model in enumerate(self.ensemble):
                 yhats = model(xs)
@@ -111,14 +111,19 @@ class Sampler:
                 ):
                     for m, fn in kwargs.items():
                         draws[m][j].append(fn(xs, ys, yhats, losses, loss, model))
-                        # if weights:
-                        #     weights.append(model.state_dict()['weights'].detach().clone())
-                        # else:
-                        #     weights = [model.state_dict()['weights'].detach().clone()]
+                        if save_weights:
+                            if weights:
+                                weights.append(model.state_dict()['weights'].detach().clone())
+                            else:
+                                weights = [model.state_dict()['weights'].detach().clone()]
                 if i == 0 and j == 0:
                     loss_init = loss.item()
 
             self.optimizer.step()
             self.optimizer.zero_grad()
         draws = {m: torch.Tensor(v) for m, v in draws.items()}
-        return summary_fn(loss_init=loss_init, num_samples=len(self.data), **draws)
+        if save_weights:
+            weights = {'weights': weights}
+            return summary_fn(loss_init=loss_init, num_samples=len(self.data), **weights)
+        else:
+            return summary_fn(loss_init=loss_init, num_samples=len(self.data), **draws)
