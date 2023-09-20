@@ -26,7 +26,7 @@ class SGNHT(torch.optim.Optimizer):
             for p in group['params']:
                 param_state = self.state[p]
                 param_state['momentum'] = np.sqrt(lr) * torch.randn_like(p.data)
-                param_state['initial_param'] = p.data
+                param_state['initial_param'] = p.data.clone().detach()
 
     def step(self, closure=None):
         """

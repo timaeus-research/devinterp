@@ -61,7 +61,7 @@ class SGLD(torch.optim.Optimizer):
             if group['elasticity'] != 0:
                 for p in group['params']:
                     param_state = self.state[p]
-                    param_state['initial_param'] = torch.clone(p.data).detach()
+                    param_state['initial_param'] = p.data.clone().detach()
             if group['temperature'] == "adaptive":  # TODO: Better name
                 group['temperature'] = np.log(group["num_samples"])
 
