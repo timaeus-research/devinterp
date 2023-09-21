@@ -65,8 +65,9 @@ class BaseStorageProvider(Generic[IDType], ABC):
         self._key_to_id = key_to_id or self.default_key_to_id
         self.device = torch.device(device) if device else None
         self.root_dir = Path(root_dir)
-
         self.file_ids: List[IDType] = []
+
+        self.sync()
 
     @abstractmethod
     def save_file(self, file_id: IDType, file: Any):
@@ -201,10 +202,9 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         if not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY"):
             raise EnvironmentError("AWS environment variables not set.")
 
-        super().__init__(id_to_key, key_to_id, device=device)
         self.client = boto3.client("s3")
         self.bucket_name = bucket_name
-        self.root_dir = Path(root_dir)
+        super().__init__(id_to_key, key_to_id, device=device, root_dir=root_dir)
 
     def save_file(self, file_id: IDType, file: Any):
         """Save a file to an S3 bucket."""
@@ -228,16 +228,20 @@ class S3StorageProvider(BaseStorageProvider[IDType]):
         """
         Returns a list of tuples of all files in the bucket directory.
         """
+        logger.info("Retrieving file IDs from S3 bucket...")
         response = self.client.list_objects_v2(
             Bucket=self.bucket_name, Prefix=str(self.root_dir)
         )
 
         if "Contents" in response:
+            logger.info("Found %d files in S3 bucket.", len(response["Contents"]))
+
             return sorted(
                 [self.key_to_id(item["Key"]) for item in response["Contents"]]
             )
 
         warnings.warn(f"No files found in bucket {self.bucket_name}.")
+        logger.info(response)
         return []
 
     def __repr__(self):
@@ -285,6 +289,12 @@ class CompositeStorageProvider(BaseStorageProvider[IDType]):
 
     def __repr__(self):
         return f"CompositeStorageProvider({self.providers})"
+
+    def sync(self):
+        for provider in self.providers:
+            provider.sync()
+
+        self.file_ids = self.get_file_ids()
 
 
 def create_storage_provider(

@@ -9,11 +9,11 @@ from typing import Any, Callable, Dict, List, Optional, TypedDict
 import numpy as np
 import torch
 import torch.nn.functional as F
+import wandb
 import yaml
 from pydantic import BaseModel, Field, model_validator, validator
 from tqdm.notebook import tqdm
 
-import wandb
 from devinterp.data import CustomDataLoader
 from devinterp.evals import Evaluator
 from devinterp.ops.logging import MetricLogger, MetricLoggingConfig
@@ -270,6 +270,7 @@ class LearnerConfig(BaseModel):
     # Dataset & loader
     num_training_samples: int
     batch_size: int = 128
+    run_name: Optional[str] = None
 
     # Training loop
     # num_epochs: int = None
@@ -401,7 +402,18 @@ class LearnerConfig(BaseModel):
 
         # Sync with wandb (side-effects!)
         if logger_config["project"] is not None and logger_config["entity"] is not None:
-            wandb.init(project=logger_config["project"], entity=logger_config["entity"])
+            if "run_name" in kwargs:
+                run_name = kwargs.pop("run_name")
+                wandb.init(
+                    project=logger_config["project"],
+                    entity=logger_config["entity"],
+                    name=run_name,
+                )
+            else:
+                wandb.init(
+                    project=logger_config["project"], entity=logger_config["entity"]
+                )
+
             nested_update(kwargs, wandb.config)
 
         return cls(logger_config=logger_config, **kwargs)
