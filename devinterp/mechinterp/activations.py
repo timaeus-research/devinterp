@@ -10,70 +10,67 @@ Transform = Callable[[torch.Tensor], torch.Tensor]
 
 class ActivationProbe:
     """
-    A utility class to extract the activation value of a specific neuron within a neural network.
+    A utility class to extract the activation value of a specific layer or neuron within a neural network.
     
-    The location of the target neuron is defined using a string that can specify the layer, channel, and spatial coordinates (y, x). The format allows flexibility in defining the location:
+    The location of the target is defined using a string that can specify the layer, channel, and spatial coordinates (y, x). The format allows flexibility in defining the location:
     
-    - 'layer1.0.conv1.weight.3': Only channel is specified; y and x default to the center (or one-off from center if the width and height are even).
-    - 'layer1.0.conv1.weight.3.2': Channel and y are specified; x defaults to center.
-    - 'layer1.0.conv1.weight.3..2': Channel and x are specified; y defaults to center.
-    - 'layer1.0.conv1.weight.3.2.2': Channel, y, and x are all specified.
+    - 'layer1.0.conv1': Targets the entire layer.
+    - 'layer1.0.conv1.3': Targets channel 3 in the specified layer.
+    - 'layer1.0.conv1.3.2.2': Targets channel 3, y-coordinate 2, and x-coordinate 2 in the specified layer.
+    - 'layer1.0.conv1.*': Targets all neurons in the specified layer.
     
-    The class provides methods to register a forward hook into a PyTorch model to capture the activation of the specified neuron during model inference.
+    The class provides methods to register a forward hook into a PyTorch model to capture the activation of the specified target during model inference.
     
     Attributes:
         model: The PyTorch model from which to extract the activation.
-        location (str): The dot-separated path specifying the layer, channel, y, and x coordinates.
+        layer_location (List[str]): List of strings specifying the layer hierarchy.
+        neuron_location (List[int]): List of integers specifying the channel, y, and x coordinates.
         activation: The value of the activation at the specified location.
         
     Example:
         model = ResNet18()
-        extractor = ActivationProbe(model, 'layer1.0.conv1.weight.3')
+        extractor = ActivationProbe(model, 'layer1.0.conv1.3')
         handle = extractor.register_hook()
         output = model(input_tensor)
         print(extractor.activation)  # Prints the activation value
 
-    # TODO: Allow wildcards in the location string to extract composite activations (for an entire layer at a time).
-    # TODO: Implement basic arithmetic operators so that you can combine activations (e.g. `0.4 * ActivationProbe(model, 'layer1.0.conv1.weight.3') + 0.6 * ActivationProbe(model, 'layer1.0.conv1.weight.4')`).
+    The wildcard '*' in neuron_location means that all neurons in the specified layer will be targeted.
+    For example, 'layer1.0.conv1.*' will capture activations for all neurons in the 'layer1.0.conv1' layer.
     """
     
     def __init__(self, model, location):
         self.activation = None
         self.model = model
-        self.location = location.split('.')
-        self.layer_path = []
-        self.channel = None
-        self.y = None
-        self.x = None
+        location = location.split('.')
+        self.layer_location = []
+        self.neuron_location = []
 
-        # Split the location into layer path and neuron indices
-        state_dict_keys = list(model.state_dict().keys())
-        for part in self.location:
-            self.layer_path.append(part)
-            path = '.'.join(self.layer_path)
-            
-            if any(key.startswith(path) for key in state_dict_keys):
-                continue
-            else:
-                self.layer_path.pop()
-                self.channel, *yx = map(int, self.location[len(self.layer_path):])
-                if yx:
-                    self.y = yx[0]
-                    if len(yx) > 1:
-                        self.x = yx[1]
-                break
 
         # Get the target layer
         self.layer = model
-        for part in self.layer_path[:-1]:
-            self.layer = getattr(self.layer, part)
+        for part in location:
+            if hasattr(self.layer, part):
+                self.layer_location.append(part)
+                self.layer = getattr(self.layer, part)
+            else:
+                if part == "*":
+                    self.layer_location.append(...)
+                else:
+                    self.neuron_location.append(int(part))
 
     def hook_fn(self, module, input, output):
         self.activation = output
 
+        if self.neuron_location:
+            # Assumes first index is over batch 
+            self.activation = self.activation[(..., *self.neuron_location)]
+
     def register_hook(self):
-        handle = self.layer.register_forward_hook(self.hook_fn)
-        return handle
+        self.handle = self.layer.register_forward_hook(self.hook_fn)
+        return self.handle
+    
+    def unregister_hook(self):
+        self.handle.remove()
     
     @contextmanager
     def watch(self):

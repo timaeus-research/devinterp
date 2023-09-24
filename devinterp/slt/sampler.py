@@ -161,7 +161,6 @@ def estimate_rlct(
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     pbar: bool = True,
-    baseline: Literal["init", "min"] = "init",
     device: torch.device = torch.device("cpu"),
 ) -> float:
     trace = sample(
@@ -180,11 +179,7 @@ def estimate_rlct(
         device=device,
     )
 
-    if baseline == "init":
-        baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
-    elif baseline == "min":
-        baseline_loss = trace["loss"].min()
-
+    baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
     avg_loss = trace.groupby("chain")["loss"].mean().mean()
     num_samples = len(loader.dataset)
 
