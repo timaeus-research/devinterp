@@ -20,7 +20,6 @@ def sample_single_chain(
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
-    step: Literal["sgld"] = "sgld",
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
@@ -31,11 +30,10 @@ def sample_single_chain(
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
-    if step == "sgld":
-        optimizer_kwargs = optimizer_kwargs or {}
-        optimizer = sampling_method(
-            model.parameters(), **optimizer_kwargs
-        )  # Replace with your actual optimizer kwargs
+    optimizer_kwargs = optimizer_kwargs or {}
+    optimizer = sampling_method(
+        model.parameters(), **optimizer_kwargs
+    )  # Replace with your actual optimizer kwargs
 
     if seed is not None:
         torch.manual_seed(seed)
