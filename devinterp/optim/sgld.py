@@ -58,8 +58,8 @@ class SGLD(torch.optim.Optimizer):
 
         # Save the initial parameters if the elasticity term is set
         for group in self.param_groups:
-            if group['elasticity'] != 0:
-                for p in group['params']:
+            if group["elasticity"] != 0:
+                for p in group["params"]:
                     param_state = self.state[p]
                     param_state['initial_param'] = p.data.clone().detach()
             if group['temperature'] == "adaptive":  # TODO: Better name
@@ -67,20 +67,20 @@ class SGLD(torch.optim.Optimizer):
 
     def step(self, closure=None):
         for group in self.param_groups:
-            for p in group['params']:
+            for p in group["params"]:
                 if p.grad is None:
                     continue
                 param_state = self.state[p]
                 dw = p.grad.data * group["num_samples"] / group['temperature']
 
-                if group['weight_decay'] != 0:
-                    dw.add_(p.data, alpha=group['weight_decay'])
+                if group["weight_decay"] != 0:
+                    dw.add_(p.data, alpha=group["weight_decay"])
 
-                if group['elasticity'] != 0:
-                    initial_param = self.state[p]['initial_param']
-                    dw.add_((p.data - initial_param), alpha=group['elasticity'])
+                if group["elasticity"] != 0:
+                    initial_param = self.state[p]["initial_param"]
+                    dw.add_((p.data - initial_param), alpha=group["elasticity"])
 
-                p.data.add_(dw, alpha = -0.5 * group['lr'])
+                p.data.add_(dw, alpha=-0.5 * group["lr"])
 
                 # Add Gaussian noise
                 noise = torch.normal(mean=0., std=group['noise_level'], size=dw.size(), device=dw.device)

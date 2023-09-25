@@ -67,8 +67,8 @@ psutil==5.9.5
 ptyprocess==0.7.0
 pure-eval==0.2.2
 pyarrow==12.0.1
-pydantic==2.1.1
-pydantic_core==2.4.0
+pydantic
+pydantic_core
 Pygments==2.15.1
 pyparsing==3.0.9
 python-dateutil==2.8.2

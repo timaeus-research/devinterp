@@ -1,129 +1,188 @@
 import itertools
-from dataclasses import dataclass
-from logging import Logger
-from typing import Callable, Dict, Literal, Optional, Union
+from copy import deepcopy
+from typing import Callable, Dict, List, Literal, Optional, Union
 
+import numpy as np
+import pandas as pd
 import torch
-import yaml
-from pydantic import BaseModel, Field, validator
 from torch import nn
-from torch.nn import functional as F
+from torch.multiprocessing import Pool, cpu_count
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-from devinterp.optim.optimizers import OptimizerConfig
-from devinterp.slt.ensemble import Ensemble
-from devinterp.slt.observables import Metric, estimate_rlct
-from devinterp.utils import get_criterion
-
-logger = Logger(__name__)
+from devinterp.optim.sgld import SGLD
 
 
-class SamplerConfig(BaseModel):
+def sample_single_chain(
+    ref_model: nn.Module,
+    loader: DataLoader,
+    criterion: Callable,
+    num_draws=100,
+    num_burnin_steps=0,
+    num_steps_bw_draws=1,
+    step: Literal["sgld"] = "sgld",
+    optimizer_kwargs: Optional[Dict] = None,
+    chain: int = 0,
+    seed: Optional[int] = None,
+    pbar: bool = False,
+    device: torch.device = torch.device("cpu"),
+    sampling_method: torch.optim.Optimizer = SGLD,
+):
+    # Initialize new model and optimizer for this chain
+    model = deepcopy(ref_model).to(device)
+
+    if step == "sgld":
+        optimizer_kwargs = optimizer_kwargs or {}
+        # TODO extract
+        optimizer = sampling_method(
+            model.parameters(), **optimizer_kwargs
+        )  # Replace with your actual optimizer kwargs
+
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
+    local_draws = pd.DataFrame(index=range(num_draws), columns=["chain", "loss"])
+
+    iterator = zip(range(num_steps), itertools.cycle(loader))
+
+    if pbar:
+        iterator = tqdm(iterator, desc=f"Chain {chain}", total=num_steps)
+
+    model.train()
+
+    for i, (xs, ys) in iterator:
+        optimizer.zero_grad()
+        xs, ys = xs.to(device), ys.to(device)
+        y_preds = model(xs)
+        loss = criterion(y_preds, ys)
+        loss.backward()
+        optimizer.step()
+
+        if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
+            draw_idx = (i - num_burnin_steps) // num_steps_bw_draws
+            local_draws.loc[draw_idx, "chain"] = chain
+            local_draws.loc[draw_idx, "loss"] = loss.detach().item()
+
+    return local_draws
+
+
+def _sample_single_chain(kwargs):
+    return sample_single_chain(**kwargs)
+
+
+def sample(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    criterion: torch.nn.Module,
+    step: Literal["sgld"],
+    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
+    num_draws: int = 100,
+    num_chains: int = 10,
+    num_burnin_steps: int = 0,
+    num_steps_bw_draws: int = 1,
+    cores: int = 1,
+    seed: Optional[Union[int, List[int]]] = None,
+    pbar: bool = True,
+    device: torch.device = torch.device("cpu"),
+):
     """
-    Configuration class for Sampler. Specifies optimizer, number of chains, sampling settings, etc.
+    Sample model weights using a given optimizer, supporting multiple chains.
 
-    Attributes (example):
-        optimizer_config (OptimizerConfig): Configuration for the optimizer.
-        num_chains (int): Number of independent chains for sampling.
-        num_draws_per_chain (int): Number of draws per chain.
-        num_burnin_steps (int): Number of burnin steps.
-        verbose (bool): Whether to print verbose output.
-        batch_size (int): Batch size for dataloader.
+    Parameters:
+        model (torch.nn.Module): The neural network model.
+        step (Literal['sgld']): The name of the optimizer to use to step.
+        loader (DataLoader): DataLoader for input data.
+        criterion (torch.nn.Module): Loss function.
+        num_draws (int): Number of samples to draw.
+        num_chains (int): Number of chains to run.
+        num_burnin_steps (int): Number of burn-in steps before sampling.
+        num_steps_bw_draws (int): Number of steps between each draw.
+        cores (Optional[int]): Number of cores for parallel execution.
+        seed (Optional[Union[int, List[int]]]): Random seed(s) for sampling.
+        progressbar (bool): Whether to display a progress bar.
+        optimizer_kwargs (Optional[Dict[str, Union[float, Literal['adaptive']]]]): Keyword arguments for the optimizer.
     """
+    if cores is None:
+        cores = min(4, cpu_count())
 
-    optimizer_config: OptimizerConfig  # This isn't working for some unknown reason
-    num_chains: int = 5
-    num_draws_per_chain: int = 10
-    num_burnin_steps: int = 0
-    num_steps_bw_draws: int = 1
-    verbose: bool = False
-    batch_size: int = 256
-    criterion: Union[Literal["mse_loss", "cross_entropy"], str]
-
-    class Config:
-        validate_assignment = True
-        # frozen = True
-
-
-class Sampler:
-    """
-    Class for sampling from a given model using a specified optimizer and dataset.
-
-    Attributes:
-        config (SamplerConfig): Configuration for sampling.
-        model (nn.Module): The original model.
-        ensemble (Ensemble): Container for independent model instances.
-        optimizer (Optimizer): The optimizer to use for sampling.
-        data (Dataset): Dataset for sampling.
-        loader (DataLoader): DataLoader for the dataset.
-    """
-
-    def __init__(
-        self, model: nn.Module, data: torch.utils.data.Dataset, config: SamplerConfig
-    ):
-        self.config = config
-        self.model = model
-        self.ensemble = Ensemble(model, num_chains=config.num_chains)
-        self.optimizer = config.optimizer_config.factory(self.ensemble.parameters())
-        self.data = data
-        self.loader = torch.utils.data.DataLoader(
-            data, batch_size=config.batch_size, shuffle=True
-        )
-        self.criterion = get_criterion(config.criterion)
-
-        logger.info(yaml.dump(config.model_dump()))
-
-    def sample(
-        self,
-        kwargs: Optional[Dict[str, Metric]] = None,
-        summary_fn: Callable = lambda **kwargs: kwargs, save_weights=False
-    ):
-        """
-        Performs the sampling process, returning metric summaries as specified.
-
-        Parameters:
-            metrics (Optional[Dict[str, Metric]]): Metrics to compute during sampling.
-            summary_fn (Callable): Function to summarize metrics after sampling.
-        """
-        self.ensemble.train()
-        self.ensemble.zero_grad()
-
-        kwargs = kwargs or {}
-        if "losses" not in kwargs:
-            kwargs["losses"] = lambda xs, ys, yhats, losses, loss, model: loss
-
-        loss_init = 0
-        draws = {m: [[] for _ in range(self.ensemble.num_chains)] for m in kwargs}
-        num_steps = (
-            self.config.num_draws_per_chain * self.config.num_steps_bw_draws
-            + self.config.num_burnin_steps
-        )
-        weights = None
-        for i, (xs, ys) in zip(range(num_steps), itertools.cycle(self.loader)):
-            for j, model in enumerate(self.ensemble):
-                yhats = model(xs)
-                losses = self.criterion(yhats, ys, reduction="none")
-                loss = losses.mean()
-                loss.backward(retain_graph=True)
-
-                if (
-                    i >= self.config.num_burnin_steps
-                    and i % self.config.num_steps_bw_draws == 0
-                ):
-                    for m, fn in kwargs.items():
-                        draws[m][j].append(fn(xs, ys, yhats, losses, loss, model))
-                        if save_weights:
-                            if weights:
-                                weights.append(model.state_dict()['weights'].detach().clone())
-                            else:
-                                weights = [model.state_dict()['weights'].detach().clone()]
-                if i == 0 and j == 0:
-                    loss_init = loss.item()
-
-            self.optimizer.step()
-            self.optimizer.zero_grad()
-        draws = {m: torch.Tensor(v) for m, v in draws.items()}
-        if save_weights:
-            weights = {'weights': weights}
-            return summary_fn(loss_init=loss_init, num_samples=len(self.data), **weights)
+    if seed is not None:
+        if isinstance(seed, int):
+            seeds = [seed + i for i in range(num_chains)]
+        elif len(seed) != num_chains:
+            raise ValueError("Length of seed list must match number of chains")
         else:
-            return summary_fn(loss_init=loss_init, num_samples=len(self.data), **draws)
+            seeds = seed
+    else:
+        seeds = [None] * num_chains
+
+    def get_args(i):
+        return dict(
+            chain=i,
+            seed=seeds[i],
+            ref_model=model,
+            loader=loader,
+            criterion=criterion,
+            num_draws=num_draws,
+            num_burnin_steps=num_burnin_steps,
+            num_steps_bw_draws=num_steps_bw_draws,
+            step=step,
+            optimizer_kwargs=optimizer_kwargs,
+            pbar=pbar,
+            device=device,
+        )
+
+    results = []
+
+    if cores > 1:
+        if str(device) == "cpu":
+            with Pool(cores) as pool:
+                results = pool.map(
+                    _sample_single_chain, [get_args(i) for i in range(num_chains)]
+                )
+        else:
+            raise NotImplementedError("Cannot currently use multiprocessing with GPU")
+    else:
+        for i in range(num_chains):
+            results.append(_sample_single_chain(get_args(i)))
+
+    results_df = pd.concat(results, ignore_index=True)
+    return results_df
+
+
+def estimate_rlct(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    criterion: Callable,
+    step: Literal["sgld"],
+    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
+    num_draws: int = 100,
+    num_chains: int = 10,
+    num_burnin_steps: int = 0,
+    num_steps_bw_draws: int = 1,
+    cores: int = 1,
+    seed: Optional[Union[int, List[int]]] = None,
+    pbar: bool = True,
+    device: torch.device = torch.device("cpu"),
+) -> float:
+    trace = sample(
+        model=model,
+        loader=loader,
+        criterion=criterion,
+        step=step,
+        optimizer_kwargs=optimizer_kwargs,
+        num_draws=num_draws,
+        num_chains=num_chains,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_bw_draws=num_steps_bw_draws,
+        cores=cores,
+        seed=seed,
+        pbar=pbar,
+        device=device,
+    )
+
+    baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
+    avg_loss = trace.groupby("chain")["loss"].mean().mean()
+    num_samples = len(loader.dataset)
+
+    return (avg_loss - baseline_loss) * num_samples / np.log(num_samples)
