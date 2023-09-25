@@ -1,23 +1,16 @@
 import itertools
-import multiprocessing
 from copy import deepcopy
-from dataclasses import dataclass
-from functools import partial
-from logging import Logger
 from typing import Callable, Dict, List, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
 import torch
-import yaml
-from devinterp.optim.sgld import SGLD
-from devinterp.slt.observables import MicroscopicObservable
-from devinterp.utils import Criterion
 from torch import nn
 from torch.multiprocessing import Pool, cpu_count
-from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+from devinterp.optim.sgld import SGLD
 
 
 def sample_single_chain(
@@ -32,7 +25,6 @@ def sample_single_chain(
     chain: int = 0,
     seed: Optional[int] = None,
     pbar: bool = False,
-    observor: Optional[MicroscopicObservable] = None,
     device: torch.device = torch.device("cpu"),
 ):
     # Initialize new model and optimizer for this chain
@@ -159,7 +151,7 @@ def sample(
 def estimate_rlct(
     model: torch.nn.Module,
     loader: DataLoader,
-    criterion: Criterion,
+    criterion: Callable,
     step: Literal["sgld"],
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
@@ -169,7 +161,6 @@ def estimate_rlct(
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     pbar: bool = True,
-    baseline: Literal["init", "min"] = "init",
     device: torch.device = torch.device("cpu"),
 ) -> float:
     trace = sample(
@@ -188,11 +179,7 @@ def estimate_rlct(
         device=device,
     )
 
-    if baseline == "init":
-        baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
-    elif baseline == "min":
-        baseline_loss = trace["loss"].min()
-
+    baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
     avg_loss = trace.groupby("chain")["loss"].mean().mean()
     num_samples = len(loader.dataset)
 
