@@ -2,6 +2,8 @@ from contextlib import contextmanager
 from typing import Callable, Optional, Tuple, Union
 
 import torch
+from devinfra.utils.iterables import prepend_dict
+from torch import nn
 from torch.nn import functional as F
 from torchvision import transforms
 from tqdm import tqdm
@@ -45,7 +47,6 @@ class ActivationProbe:
         self.layer_location = []
         self.neuron_location = []
 
-
         # Get the target layer
         self.layer = model
         for part in location:
@@ -54,7 +55,7 @@ class ActivationProbe:
                 self.layer = getattr(self.layer, part)
             else:
                 if part == "*":
-                    self.layer_location.append(...)
+                    self.neuron_location.append(...)
                 else:
                     self.neuron_location.append(int(part))
 
@@ -77,4 +78,47 @@ class ActivationProbe:
         handle = self.register_hook()
         yield
         handle.remove()
+
+class ProbedModule(nn.Module):
+    def __init__(self, module: nn.Module):
+        self.module = module
+
+    @classmethod
+    def create_recursively(cls, module: nn.Module):
+        self = cls(module)
+
+        for n, c in self.named_children():
+            setattr(self, n, ProbedModule(c))
+
+    @property
+    def cache(self):
+        cache = {
+            "": self.output,
+        }
+
+        for n, c in self.named_children():
+            if hasattr(c, "cache"):
+                cache.update(prepend_dict(c.cache, n))
+    
+    def forward(self, *args, **kwargs):
+        self.output = self.module(*args, **kwargs)
+        return self.output
+    
+    def run_with_cache(self, *args, **kwargs):
+        output = self.forward(*args, **kwargs)
+        return output, self.cache
+    
+
+def attach_probe_(model: nn.Module, location=""):
+    model.probe = ActivationProbe(model, location)
+
+    def run_with_cache(*args, **kwargs):
+        output = model(*args, **kwargs)
+        return output, model.probe.activations
+
+    model.run_with_cache = run_with_cache
+
+def attach_probe(model: nn.Module, location=""):
+    ActivationProbe(model, location)
+    return ProbedModule(model, probe)
 
