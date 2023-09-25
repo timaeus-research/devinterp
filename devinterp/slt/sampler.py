@@ -33,7 +33,6 @@ def sample_single_chain(
 
     if step == "sgld":
         optimizer_kwargs = optimizer_kwargs or {}
-        # TODO extract
         optimizer = sampling_method(
             model.parameters(), **optimizer_kwargs
         )  # Replace with your actual optimizer kwargs
