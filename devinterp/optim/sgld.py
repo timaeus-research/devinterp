@@ -52,18 +52,36 @@ class SGLD(torch.optim.Optimizer):
         posterior.
     """
 
-    def __init__(self, params, lr=1e-3, noise_level=1., weight_decay=0., elasticity=0., temperature: Union[Literal['adaptive'], float]=1., bounding_box_size=None,  num_samples=1):
-        defaults = dict(lr=lr, noise_level=noise_level, weight_decay=weight_decay, elasticity=elasticity, temperature=temperature, bounding_box_size=bounding_box_size, num_samples=num_samples)
+    def __init__(
+        self,
+        params,
+        lr=1e-3,
+        noise_level=1.0,
+        weight_decay=0.0,
+        elasticity=0.0,
+        temperature: Union[Literal["adaptive"], float] = 1.0,
+        bounding_box_size=None,
+        num_samples=1,
+    ):
+        defaults = dict(
+            lr=lr,
+            noise_level=noise_level,
+            weight_decay=weight_decay,
+            elasticity=elasticity,
+            temperature=temperature,
+            bounding_box_size=bounding_box_size,
+            num_samples=num_samples,
+        )
         super(SGLD, self).__init__(params, defaults)
 
         # Save the initial parameters if the elasticity term is set
         for group in self.param_groups:
-            if group["elasticity"] != 0:
+            if group["elasticity"] != 0 or group["bounding_box_size"] != 0:
                 for p in group["params"]:
                     param_state = self.state[p]
-                    param_state['initial_param'] = p.data.clone().detach()
-            if group['temperature'] == "adaptive":  # TODO: Better name
-                group['temperature'] = np.log(group["num_samples"])
+                    param_state["initial_param"] = p.data.clone().detach()
+            if group["temperature"] == "adaptive":  # TODO: Better name
+                group["temperature"] = np.log(group["num_samples"])
 
     def step(self, closure=None):
         for group in self.param_groups:
@@ -71,7 +89,7 @@ class SGLD(torch.optim.Optimizer):
                 if p.grad is None:
                     continue
                 param_state = self.state[p]
-                dw = p.grad.data * group["num_samples"] / group['temperature']
+                dw = p.grad.data * group["num_samples"] / group["temperature"]
 
                 if group["weight_decay"] != 0:
                     dw.add_(p.data, alpha=group["weight_decay"])
@@ -83,8 +101,14 @@ class SGLD(torch.optim.Optimizer):
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
 
                 # Add Gaussian noise
-                noise = torch.normal(mean=0., std=group['noise_level'], size=dw.size(), device=dw.device)
-                p.data.add_(noise, alpha=group['lr'] ** 0.5)
+                noise = torch.normal(
+                    mean=0.0, std=group["noise_level"], size=dw.size(), device=dw.device
+                )
+                p.data.add_(noise, alpha=group["lr"] ** 0.5)
                 # Rebound if exceeded bounding box size
-                if group['bounding_box_size'] is not None:
-                    torch.clamp_(p.data, min=param_state['initial_param'] - group['bounding_box_size'], max=param_state['initial_param'] + group['bounding_box_size'])
+                if group["bounding_box_size"] is not None:
+                    torch.clamp_(
+                        p.data,
+                        min=param_state["initial_param"] - group["bounding_box_size"],
+                        max=param_state["initial_param"] + group["bounding_box_size"],
+                    )

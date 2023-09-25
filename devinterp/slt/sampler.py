@@ -20,12 +20,14 @@ def sample_single_chain(
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
+    sampling_method: torch.optim.Optimizer = SGLD,
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
     pbar: bool = False,
+    verbose=True,
     device: torch.device = torch.device("cpu"),
-    sampling_method: torch.optim.Optimizer = SGLD,
+    return_weights=False,
 ):
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
@@ -39,12 +41,18 @@ def sample_single_chain(
         torch.manual_seed(seed)
 
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
-    local_draws = pd.DataFrame(index=range(num_draws), columns=["chain", "loss"])
+
+    local_draws = pd.DataFrame(
+        index=range(num_draws),
+        columns=["chain", "loss"] + (["model_weights"] if return_weights else []),
+    )
 
     iterator = zip(range(num_steps), itertools.cycle(loader))
 
     if pbar:
-        iterator = tqdm(iterator, desc=f"Chain {chain}", total=num_steps)
+        iterator = tqdm(
+            iterator, desc=f"Chain {chain}", total=num_steps, disable=not verbose
+        )
 
     model.train()
 
@@ -53,6 +61,7 @@ def sample_single_chain(
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
         loss = criterion(y_preds, ys)
+
         loss.backward()
         optimizer.step()
 
@@ -60,6 +69,10 @@ def sample_single_chain(
             draw_idx = (i - num_burnin_steps) // num_steps_bw_draws
             local_draws.loc[draw_idx, "chain"] = chain
             local_draws.loc[draw_idx, "loss"] = loss.detach().item()
+            if return_weights:
+                local_draws.loc[draw_idx, "model_weights"] = (
+                    model.state_dict()["weights"].clone().detach()
+                )
 
     return local_draws
 
@@ -72,6 +85,7 @@ def sample(
     model: torch.nn.Module,
     loader: DataLoader,
     criterion: torch.nn.Module,
+    sampling_method: torch.optim.Optimizer = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
     num_chains: int = 10,
@@ -81,6 +95,8 @@ def sample(
     seed: Optional[Union[int, List[int]]] = None,
     pbar: bool = True,
     device: torch.device = torch.device("cpu"),
+    verbose: bool = True,
+    return_weights: bool = False,
 ):
     """
     Sample model weights using a given optimizer, supporting multiple chains.
@@ -122,9 +138,12 @@ def sample(
             num_draws=num_draws,
             num_burnin_steps=num_burnin_steps,
             num_steps_bw_draws=num_steps_bw_draws,
+            sampling_method=sampling_method,
             optimizer_kwargs=optimizer_kwargs,
             pbar=pbar,
             device=device,
+            verbose=verbose,
+            return_weights=return_weights,
         )
 
     results = []
@@ -149,6 +168,7 @@ def estimate_rlct(
     model: torch.nn.Module,
     loader: DataLoader,
     criterion: Callable,
+    sampling_method: torch.optim.Optimizer = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
     num_chains: int = 10,
@@ -158,11 +178,13 @@ def estimate_rlct(
     seed: Optional[Union[int, List[int]]] = None,
     pbar: bool = True,
     device: torch.device = torch.device("cpu"),
+    verbose: bool = True,
 ) -> float:
     trace = sample(
         model=model,
         loader=loader,
         criterion=criterion,
+        sampling_method=sampling_method,
         optimizer_kwargs=optimizer_kwargs,
         num_draws=num_draws,
         num_chains=num_chains,
@@ -172,8 +194,8 @@ def estimate_rlct(
         seed=seed,
         pbar=pbar,
         device=device,
+        verbose=verbose,
     )
-
     baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
     avg_loss = trace.groupby("chain")["loss"].mean().mean()
     num_samples = len(loader.dataset)
