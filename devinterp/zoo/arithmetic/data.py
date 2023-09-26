@@ -3,7 +3,8 @@ import json
 import math
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Literal, Optional, Protocol, Tuple, TypedDict, Union
+from typing import (Dict, List, Literal, Optional, Protocol, Tuple, TypedDict,
+                    Union)
 
 import numpy as np
 import torch
@@ -11,20 +12,17 @@ from pydantic import BaseModel
 from torch import LongTensor, Tensor
 from torch.utils.data import DataLoader, Dataset, Subset, TensorDataset
 
-from devinterp.zoo.arithmetic.utils import (
-    is_prime,
-    modular_division,
-    modular_exponentiation,
-)
+from devinterp.zoo.arithmetic.utils import (is_prime, modular_division,
+                                            modular_exponentiation)
 
 DEFAULT_MODULUS = 97
 DEFAULT_DATA_DIR = "data"
 
-Operator = Literal["/", "*", "+", "-", "^", "**"]
+OperatorLiteral = Literal["/", "*", "+", "-", "^", "**"]
 
 
 class ModularArithmeticConfig(BaseModel):
-    operator: Operator
+    operator: OperatorLiteral
     modulus: int
     seed: Optional[int] = None
     split: Optional[float] = None
@@ -78,7 +76,7 @@ class ModularArithmetic(Dataset):
             config.split is None and config.seed is None and config.train is None
         ), "Not implemented"
 
-        def apply(i: int, j: int, operator: Operator, modulus: int):
+        def apply(i: int, j: int, operator: OperatorLiteral, modulus: int):
             if operator == "+":
                 return (i + j) % modulus
             elif operator == "-":

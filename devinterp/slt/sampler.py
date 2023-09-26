@@ -84,7 +84,7 @@ def _sample_single_chain(kwargs):
 def sample(
     model: torch.nn.Module,
     loader: DataLoader,
-    criterion: torch.nn.Module,
+    criterion: Callable,
     sampling_method: torch.optim.Optimizer = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
