@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from torch.multiprocessing import Pool, cpu_count
+from torch.multiprocessing import Pool, cpu_count, set_start_method
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -149,7 +149,9 @@ def sample(
     results = []
 
     if cores > 1:
+        set_start_method('spawn')
         if str(device) == "cpu":
+            
             with Pool(cores) as pool:
                 results = pool.map(
                     _sample_single_chain, [get_args(i) for i in range(num_chains)]
