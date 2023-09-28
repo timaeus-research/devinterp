@@ -172,8 +172,8 @@ class TransformerConfig(pydantic.BaseModel):
     d_vocab: int
     num_layers: int = 1
     d_model: int = 128
-    d_mlp: int
-    d_head: int
+    d_mlp: int = 128 * 4
+    d_head: int = 128 // 4
     num_heads: int = 4
     num_ctx: int = 3
     act_fn: ActivationFunctionLiteral = "relu"

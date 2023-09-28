@@ -27,7 +27,7 @@ class SyntheticDataset(Dataset, ABC):
 
         Args:
             num_samples: The number of samples to generate.
-            num_features: The length of the feature vector.
+            num_features: The dimension of the feature vector.
             sparsity: (float) the probability that a given feature is zero or (int) the number of features that are set to one.
             importance: The importance of the features. If None, then the features are weighted uniformly.
                         Otherwise, the features are weighted by `importance ** (1 + i)`, where `i` is the index of the feature.
@@ -63,8 +63,9 @@ class SyntheticDataset(Dataset, ABC):
             )
         elif isinstance(self.sparsity, int):
             mask = torch.zeros((self.num_samples, self.num_features))
-            indices = torch.randperm(self.num_features)[: self.sparsity]
-            mask[:, indices] = 1
+            for i in range(self.num_samples):
+                indices = torch.randperm(self.num_features)[:self.sparsity]
+                mask[i, indices] = 1
 
             return mask
 

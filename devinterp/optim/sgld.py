@@ -38,6 +38,7 @@ class SGLD(torch.optim.Optimizer):
     :param weight_decay: L2 regularization term, applied as weight decay (default: 0)
     :param elasticity: Strength of the force pulling weights back to their initial values (default: 0)
     :param temperature: Temperature. (default: 1)
+    :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
     :param num_samples: Number of samples to average over (default: 1)
 
     Example:
@@ -59,7 +60,8 @@ class SGLD(torch.optim.Optimizer):
         noise_level=1.0,
         weight_decay=0.0,
         elasticity=0.0,
-        temperature: Union[Literal["adaptive"], float] = 1.0,
+        temperature: Union[Literal["adaptive"], float] = 'adaptive',
+        bounding_box_size=None,
         num_samples=1,
     ):
         defaults = dict(
@@ -68,16 +70,17 @@ class SGLD(torch.optim.Optimizer):
             weight_decay=weight_decay,
             elasticity=elasticity,
             temperature=temperature,
+            bounding_box_size=bounding_box_size,
             num_samples=num_samples,
         )
         super(SGLD, self).__init__(params, defaults)
 
         # Save the initial parameters if the elasticity term is set
         for group in self.param_groups:
-            if group["elasticity"] != 0:
+            if group["elasticity"] != 0 or group["bounding_box_size"] != 0:
                 for p in group["params"]:
                     param_state = self.state[p]
-                    param_state["initial_param"] = torch.clone(p.data).detach()
+                    param_state["initial_param"] = p.data.clone().detach()
             if group["temperature"] == "adaptive":  # TODO: Better name
                 group["temperature"] = np.log(group["num_samples"])
 
@@ -86,7 +89,7 @@ class SGLD(torch.optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None:
                     continue
-
+                param_state = self.state[p]
                 dw = p.grad.data * group["num_samples"] / group["temperature"]
 
                 if group["weight_decay"] != 0:
@@ -103,3 +106,10 @@ class SGLD(torch.optim.Optimizer):
                     mean=0.0, std=group["noise_level"], size=dw.size(), device=dw.device
                 )
                 p.data.add_(noise, alpha=group["lr"] ** 0.5)
+                # Rebound if exceeded bounding box size
+                if group["bounding_box_size"]:
+                    torch.clamp_(
+                        p.data,
+                        min=param_state["initial_param"] - group["bounding_box_size"],
+                        max=param_state["initial_param"] + group["bounding_box_size"],
+                    )
