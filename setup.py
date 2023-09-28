@@ -8,7 +8,7 @@ def get_requirements():
 setup(
     name="devinterp",
     version="0.0.0",
-    packages=find_packages(),
+    packages=find_packages(include=['devinterp', 'devinterp.*']),
     # license="LICENSE",
     description="A library for doing research on developmental interpretability.",
     long_description=open("README.md").read(),
