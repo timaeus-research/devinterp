@@ -1,0 +1,1 @@
+from devinterp.zoo.normal_crossing.model import PolyModel
