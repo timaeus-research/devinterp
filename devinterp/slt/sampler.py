@@ -33,9 +33,7 @@ def sample_single_chain(
     model = deepcopy(ref_model).to(device)
 
     optimizer_kwargs = optimizer_kwargs or {}
-    optimizer = sampling_method(
-        model.parameters(), **optimizer_kwargs
-    ) 
+    optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
 
     if seed is not None:
         torch.manual_seed(seed)

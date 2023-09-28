@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 
+
 def get_requirements():
     with open("requirements.txt") as f:
         return f.read().splitlines()
@@ -8,7 +9,7 @@ def get_requirements():
 setup(
     name="devinterp",
     version="0.0.0",
-    packages=find_packages(include=['devinterp', 'devinterp.*']),
+    packages=find_packages(include=["devinterp", "devinterp.*"]),
     # license="LICENSE",
     description="A library for doing research on developmental interpretability.",
     long_description=open("README.md").read(),

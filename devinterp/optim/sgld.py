@@ -60,7 +60,7 @@ class SGLD(torch.optim.Optimizer):
         noise_level=1.0,
         weight_decay=0.0,
         elasticity=0.0,
-        temperature: Union[Literal["adaptive"], float] = 'adaptive',
+        temperature: Union[Literal["adaptive"], float] = "adaptive",
         bounding_box_size=None,
         num_samples=1,
     ):

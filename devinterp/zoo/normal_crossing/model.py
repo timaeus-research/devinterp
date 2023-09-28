@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 # Define the neural network
 class PolyModel(nn.Module):
     def __init__(self, powers):

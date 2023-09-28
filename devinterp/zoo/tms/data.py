@@ -64,7 +64,7 @@ class SyntheticDataset(Dataset, ABC):
         elif isinstance(self.sparsity, int):
             mask = torch.zeros((self.num_samples, self.num_features))
             for i in range(self.num_samples):
-                indices = torch.randperm(self.num_features)[:self.sparsity]
+                indices = torch.randperm(self.num_features)[: self.sparsity]
                 mask[i, indices] = 1
 
             return mask

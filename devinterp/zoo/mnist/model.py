@@ -1,5 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
+
+
 # Define the neural network
 class MNISTNet(nn.Module):
     def __init__(
