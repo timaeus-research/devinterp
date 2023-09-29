@@ -35,7 +35,7 @@ def sample_single_chain(
     optimizer_kwargs = optimizer_kwargs or {}
     optimizer = sampling_method(
         model.parameters(), **optimizer_kwargs
-    )  # Replace with your actual optimizer kwargs
+    ) 
 
     if seed is not None:
         torch.manual_seed(seed)
@@ -149,14 +149,11 @@ def sample(
     results = []
 
     if cores > 1:
-        if str(device) == "cpu":
-            ctx = get_context("spawn")
-            with ctx.Pool(cores) as pool:
-                results = pool.map(
-                    _sample_single_chain, [get_args(i) for i in range(num_chains)]
-                )
-        else:
-            raise NotImplementedError("Cannot currently use multiprocessing with GPU")
+        ctx = get_context("spawn")
+        with ctx.Pool(cores) as pool:
+            results = pool.map(
+                _sample_single_chain, [get_args(i) for i in range(num_chains)]
+            )
     else:
         for i in range(num_chains):
             results.append(_sample_single_chain(get_args(i)))
