@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+
+[metadata]
+name = "devinterp"
+version = "0.0.0"
+description = "A library for doing research on developmental interpretability"
+# license = "LICENSE"  # Uncomment if you have a license
+long_description = "file: README.md"
+
+[options]
+packages = find:
+install_requires = [
+    # list dependencies here, e.g., "numpy>=1.0"
+]
+extras_require.dev = [
+    "pytest",
+    "mypy",
+    "pytest-cov",
+    "moto[ec2,s3,all]"
+]
+requires-python = ">=3.9" # Currently. Planning to support 3.8+.
+
+[options.packages.find]
+include = ["devinterp", "devinterp.*"]
+
+[project.urls]
+Homepage = "https://github.com/timaeus-research/devinterp"
