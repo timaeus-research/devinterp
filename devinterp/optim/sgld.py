@@ -38,6 +38,7 @@ class SGLD(torch.optim.Optimizer):
     :param weight_decay: L2 regularization term, applied as weight decay (default: 0)
     :param elasticity: Strength of the force pulling weights back to their initial values (default: 0)
     :param temperature: Temperature. (default: 1)
+    :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
     :param num_samples: Number of samples to average over (default: 1)
 
     Example:
@@ -52,36 +53,63 @@ class SGLD(torch.optim.Optimizer):
         posterior.
     """
 
-    def __init__(self, params, lr=1e-3, noise_level=1., weight_decay=0., elasticity=0., temperature: Union[Literal['adaptive'], float]=1., num_samples=1):
-        defaults = dict(lr=lr, noise_level=noise_level, weight_decay=weight_decay, elasticity=elasticity, temperature=temperature, num_samples=num_samples)
+    def __init__(
+        self,
+        params,
+        lr=1e-3,
+        noise_level=1.0,
+        weight_decay=0.0,
+        elasticity=0.0,
+        temperature: Union[Literal["adaptive"], float] = 'adaptive',
+        bounding_box_size=None,
+        num_samples=1,
+    ):
+        defaults = dict(
+            lr=lr,
+            noise_level=noise_level,
+            weight_decay=weight_decay,
+            elasticity=elasticity,
+            temperature=temperature,
+            bounding_box_size=bounding_box_size,
+            num_samples=num_samples,
+        )
         super(SGLD, self).__init__(params, defaults)
 
         # Save the initial parameters if the elasticity term is set
         for group in self.param_groups:
-            if group['elasticity'] != 0:
-                for p in group['params']:
+            if group["elasticity"] != 0 or group["bounding_box_size"] != 0:
+                for p in group["params"]:
                     param_state = self.state[p]
-                    param_state['initial_param'] = torch.clone(p.data).detach()
-            if group['temperature'] == "adaptive":  # TODO: Better name
-                group['temperature'] = np.log(group["num_samples"])
+                    param_state["initial_param"] = p.data.clone().detach()
+            if group["temperature"] == "adaptive":  # TODO: Better name
+                group["temperature"] = np.log(group["num_samples"])
 
     def step(self, closure=None):
         for group in self.param_groups:
-            for p in group['params']:
+            for p in group["params"]:
                 if p.grad is None:
                     continue
+                param_state = self.state[p]
+                dw = p.grad.data * group["num_samples"] / group["temperature"]
 
-                dw = p.grad.data * group["num_samples"] / group['temperature']
+                if group["weight_decay"] != 0:
+                    dw.add_(p.data, alpha=group["weight_decay"])
 
-                if group['weight_decay'] != 0:
-                    dw.add_(p.data, alpha=group['weight_decay'])
+                if group["elasticity"] != 0:
+                    initial_param = self.state[p]["initial_param"]
+                    dw.add_((p.data - initial_param), alpha=group["elasticity"])
 
-                if group['elasticity'] != 0:
-                    initial_param = self.state[p]['initial_param']
-                    dw.add_((p.data - initial_param), alpha=group['elasticity'])
-
-                p.data.add_(dw, alpha = -0.5 * group['lr'])
+                p.data.add_(dw, alpha=-0.5 * group["lr"])
 
                 # Add Gaussian noise
-                noise = torch.normal(mean=0., std=group['noise_level'], size=dw.size(), device=dw.device)
-                p.data.add_(noise, alpha=group['lr'] ** 0.5)
+                noise = torch.normal(
+                    mean=0.0, std=group["noise_level"], size=dw.size(), device=dw.device
+                )
+                p.data.add_(noise, alpha=group["lr"] ** 0.5)
+                # Rebound if exceeded bounding box size
+                if group["bounding_box_size"]:
+                    torch.clamp_(
+                        p.data,
+                        min=param_state["initial_param"] - group["bounding_box_size"],
+                        max=param_state["initial_param"] + group["bounding_box_size"],
+                    )
