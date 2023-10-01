@@ -1,6 +1,7 @@
+import warnings
+
 import numpy as np
 import torch
-import warnings
 
 
 class RBF(torch.nn.Module):
@@ -24,7 +25,7 @@ class RBF(torch.nn.Module):
         else:
             sigma = self.sigma
 
-        gamma = 1.0 / (1e-8 + 2 * sigma**2)
+        gamma = 1.0 / (1e-8 + 2 * sigma ** 2)
         K_XY = (-gamma * dnorm2).exp()
 
         return K_XY
@@ -36,13 +37,11 @@ class SVGD(torch.optim.Optimizer):
         defaults = dict(lr=lr)
         super(SVGD, self).__init__(params, defaults)
         self.K = K  # Kernel function
-        warnings.warn(
-            "This class is currently experimenntal and does not estimate RLCT correctly."
-        )
+        warnings.warn("This class is currently experimenntal and does not estimate RLCT correctly.")
 
     def step(self):
         for group in self.param_groups:
-            for X in group["params"]:  # Here, X are the particles
+            for X in group['params']:  # Here, X are the particles
                 with torch.no_grad():
                     if X.grad is None:
                         continue

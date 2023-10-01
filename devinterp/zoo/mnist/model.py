@@ -27,4 +27,5 @@ class MNISTNet(nn.Module):
         for layer in self.layers[:-1]:
             x = self.activation(layer(x))
         x = self.layers[-1](x)
+
         return x

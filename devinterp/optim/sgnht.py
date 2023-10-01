@@ -36,8 +36,11 @@ class SGNHT(torch.optim.Optimizer):
             for p in group["params"]:
                 param_state = self.state[p]
                 param_state["momentum"] = np.sqrt(lr) * torch.randn_like(p.data)
-                if group["bounding_box_size"] != 0:
+
+                if group['bounding_box_size'] != 0:
                     param_state["initial_param"] = p.data.clone().detach()
+
+    
 
     def step(self, closure=None):
         """

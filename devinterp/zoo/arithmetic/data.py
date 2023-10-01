@@ -1,16 +1,19 @@
 # Copied from [openai's implementation](https://github.com/openai/grok/blob/main/grok/data.py)
-from typing import  Literal, Optional,  Tuple 
+import json
+import math
+import warnings
+from copy import deepcopy
+from typing import (Dict, List, Literal, Optional, Protocol, Tuple, TypedDict,
+                    Union)
 
+import numpy as np
 import torch
 from pydantic import BaseModel
-from torch import Tensor
-from torch.utils.data import Dataset
+from torch import LongTensor, Tensor
+from torch.utils.data import DataLoader, Dataset, Subset, TensorDataset
 
-from devinterp.zoo.arithmetic.utils import (
-    is_prime,
-    modular_division,
-    modular_exponentiation,
-)
+from devinterp.zoo.arithmetic.utils import (is_prime, modular_division,
+                                            modular_exponentiation)
 
 DEFAULT_MODULUS = 97
 DEFAULT_DATA_DIR = "data"
