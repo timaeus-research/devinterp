@@ -110,10 +110,10 @@ def plot_learning_coeff_trace(trace: pd.DataFrame, **kwargs):
     import matplotlib.pyplot as plt
 
     for chain, df in trace.groupby("chain"):
-        plt.plot(df.index, df["loss"], label=f"Chain {chain}", **kwargs)
+        plt.plot(df["step"], df["loss"], label=f"Chain {chain}", **kwargs)
 
     plt.xlabel("Step")
-    plt.ylabel(r"$\hat\lambda$")
+    plt.ylabel(r"$L_n(w)$")
     plt.title("Learning Coefficient Trace")
     plt.legend()
     plt.show()
