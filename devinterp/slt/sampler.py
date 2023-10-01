@@ -1,12 +1,13 @@
 import itertools
+import warnings
 from copy import deepcopy
-from typing import Callable, Dict, List, Literal, Optional, Union
+from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
 import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from torch.multiprocessing import Pool, cpu_count
+from torch.multiprocessing import cpu_count, get_context
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -20,7 +21,7 @@ def sample_single_chain(
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
-    sampling_method: torch.optim.Optimizer = SGLD,
+    sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
@@ -35,7 +36,7 @@ def sample_single_chain(
     optimizer_kwargs = optimizer_kwargs or {}
     optimizer = sampling_method(
         model.parameters(), **optimizer_kwargs
-    )  # Replace with your actual optimizer kwargs
+    ) 
 
     if seed is not None:
         torch.manual_seed(seed)
@@ -44,14 +45,14 @@ def sample_single_chain(
 
     local_draws = pd.DataFrame(
         index=range(num_draws),
-        columns=["chain", "loss"] + (["model_weights"] if return_weights else []),
+        columns=["chain", "step", "loss"] + (["model_weights"] if return_weights else []),
     )
 
     iterator = zip(range(num_steps), itertools.cycle(loader))
 
     if pbar:
         iterator = tqdm(
-            iterator, desc=f"Chain {chain}", total=num_steps, disable=not verbose
+            iterator, desc=f"Chain {chain}", total=num_steps, disable=not verbose  # TODO: Redundant
         )
 
     model.train()
@@ -67,6 +68,7 @@ def sample_single_chain(
 
         if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
             draw_idx = (i - num_burnin_steps) // num_steps_bw_draws
+            local_draws.loc[draw_idx, "step"] = i
             local_draws.loc[draw_idx, "chain"] = chain
             local_draws.loc[draw_idx, "loss"] = loss.detach().item()
             if return_weights:
@@ -85,7 +87,7 @@ def sample(
     model: torch.nn.Module,
     loader: DataLoader,
     criterion: Callable,
-    sampling_method: torch.optim.Optimizer = SGLD,
+    sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
     num_chains: int = 10,
@@ -149,13 +151,11 @@ def sample(
     results = []
 
     if cores > 1:
-        if str(device) == "cpu":
-            with Pool(cores) as pool:
-                results = pool.map(
-                    _sample_single_chain, [get_args(i) for i in range(num_chains)]
-                )
-        else:
-            raise NotImplementedError("Cannot currently use multiprocessing with GPU")
+        ctx = get_context("spawn")
+        with ctx.Pool(cores) as pool:
+            results = pool.map(
+                _sample_single_chain, [get_args(i) for i in range(num_chains)]
+            )
     else:
         for i in range(num_chains):
             results.append(_sample_single_chain(get_args(i)))
@@ -168,7 +168,7 @@ def estimate_rlct(
     model: torch.nn.Module,
     loader: DataLoader,
     criterion: Callable,
-    sampling_method: torch.optim.Optimizer = SGLD,
+    sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
     num_chains: int = 10,
@@ -180,6 +180,7 @@ def estimate_rlct(
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
 ) -> float:
+    warnings.warn("Deprecated. Use `devinterp.slt.learning_coeff.estimate_learning_coeff` instead.")
     trace = sample(
         model=model,
         loader=loader,
@@ -196,6 +197,7 @@ def estimate_rlct(
         device=device,
         verbose=verbose,
     )
+
     baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
     avg_loss = trace.groupby("chain")["loss"].mean().mean()
     num_samples = len(loader.dataset)

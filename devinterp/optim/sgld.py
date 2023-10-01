@@ -38,6 +38,7 @@ class SGLD(torch.optim.Optimizer):
     :param weight_decay: L2 regularization term, applied as weight decay (default: 0)
     :param elasticity: Strength of the force pulling weights back to their initial values (default: 0)
     :param temperature: Temperature. (default: 1)
+    :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
     :param num_samples: Number of samples to average over (default: 1)
 
     Example:
@@ -106,7 +107,7 @@ class SGLD(torch.optim.Optimizer):
                 )
                 p.data.add_(noise, alpha=group["lr"] ** 0.5)
                 # Rebound if exceeded bounding box size
-                if group["bounding_box_size"] is not None:
+                if group["bounding_box_size"]:
                     torch.clamp_(
                         p.data,
                         min=param_state["initial_param"] - group["bounding_box_size"],

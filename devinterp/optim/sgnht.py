@@ -10,14 +10,14 @@ class SGNHT(torch.optim.Optimizer):
         diffusion_factor=0.01,
         bounding_box_size=None,
         num_samples=1,
-        batch_size=None,
     ):
         """
         Initialize the SGNHT Optimizer.
 
         :param params: Iterable of parameters to optimize or dicts defining parameter groups
         :param lr: Learning rate (required)
-        :param diffusion factor: The diffusion factor (default: 0.01)
+        :param diffusion_factor: The diffusion factor of the thermostat (default: 0.01)
+        :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
         :param num_samples: Number of samples to average over (default: 1)
         """
         defaults = dict(
@@ -25,7 +25,6 @@ class SGNHT(torch.optim.Optimizer):
             diffusion_factor=0.01,
             bounding_box_size=bounding_box_size,
             num_samples=num_samples,
-            batch_size=batch_size,
         )
         super(SGNHT, self).__init__(params, defaults)
 
@@ -37,7 +36,10 @@ class SGNHT(torch.optim.Optimizer):
             for p in group["params"]:
                 param_state = self.state[p]
                 param_state["momentum"] = np.sqrt(lr) * torch.randn_like(p.data)
-                param_state["initial_param"] = p.data.clone().detach()
+                if group['bounding_box_size'] != 0:
+                    param_state["initial_param"] = p.data.clone().detach()
+
+    
 
     def step(self, closure=None):
         """
@@ -80,14 +82,7 @@ class SGNHT(torch.optim.Optimizer):
                     group_energy_size += momentum.numel()
 
                     # Rebound if exceeded bounding box size
-                    if group["bounding_box_size"] is not None:
-                        torch.clamp_(
-                            p.data,
-                            min=param_state["initial_param"]
-                            - group["bounding_box_size"],
-                            max=param_state["initial_param"]
-                            + group["bounding_box_size"],
-                        )
+                    if group["bounding_box_size"]:
                         reflection_coefs = (
                             (
                                 abs(p.data - param_state["initial_param"])
@@ -95,8 +90,15 @@ class SGNHT(torch.optim.Optimizer):
                             )
                             * 2
                         ) - 1
+                        torch.clamp_(
+                            p.data,
+                            min=param_state["initial_param"]
+                            - group["bounding_box_size"],
+                            max=param_state["initial_param"]
+                            + group["bounding_box_size"],
+                        )
                         momentum.mul_(reflection_coefs)
 
                 # Update thermostat based on average kinetic energy
                 d_thermostat = (group_energy_sum / group_energy_size) - group["lr"]
-                group["thermostat"].add_(d_thermostat)
+                group["thermostat"].add_(d_thermostat.to(group["thermostat"].device))
