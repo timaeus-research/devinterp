@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import torch
 
@@ -16,6 +18,7 @@ class BADODAB(torch.optim.Optimizer):
         """
         defaults = dict(lr=lr, diffusion_factor=diffusion_factor, bounding_box_size=bounding_box_size, num_samples=num_samples, batch_size=batch_size)
         super(BADODAB, self).__init__(params, defaults)
+        warnings.warn("This feature is currently experimental.")
 
         # Initialize momentum/thermostat for each parameter
         for group in self.param_groups:
