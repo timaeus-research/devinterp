@@ -167,5 +167,3 @@ cython_debug/
 
 **/.DS_Store
 **/.vscode/**
-**/data/**
-**/checkpoints/**
