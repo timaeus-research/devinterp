@@ -10,7 +10,7 @@ DevInterp is a WIP Python library for conducting research on developmental inter
 
 ## Getting Started
 
-To see DevInterp in action, check out our [normal crossing demo notebook](https://www.github.com/timaeus/devinterp/demos/normal_crossing.ipynb), which applies two RLCT estimation techniques to a simple potential. Next, [the MNIST demo notebook](https://www.github.com/timaeus/devinterp/demos/mnist.ipynb) is small scale reproduction of Lau et al. (2023).
+To see DevInterp in action, check out our [normal crossing demo notebook](https://www.github.com/timaeus/devinterp/examples/normal_crossing.ipynb), which applies two RLCT estimation techniques to a simple potential. Next, [the MNIST demo notebook](https://www.github.com/timaeus/devinterp/examples/mnist.ipynb) is small scale reproduction of Lau et al. (2023).
 
 ### Testing
 
