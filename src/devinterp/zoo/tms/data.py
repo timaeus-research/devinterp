@@ -3,7 +3,7 @@ Adapted from [TMS-zoo](https://github.com/JakeMendel/TMS-zoo)
 """
 
 from abc import ABC
-from typing import Optional, Union
+from typing import Union
 
 import torch
 from torch.utils.data import Dataset

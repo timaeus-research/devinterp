@@ -1,14 +1,9 @@
-import itertools
-from copy import deepcopy
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
 import numpy as np
 import pandas as pd
 import torch
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.sampler import sample

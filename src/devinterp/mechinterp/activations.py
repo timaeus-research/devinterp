@@ -1,12 +1,7 @@
 from contextlib import contextmanager
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable
 
 import torch
-from devinfra.utils.iterables import prepend_dict
-from torch import nn
-from torch.nn import functional as F
-from torchvision import transforms
-from tqdm import tqdm
 
 Transform = Callable[[torch.Tensor], torch.Tensor]
 

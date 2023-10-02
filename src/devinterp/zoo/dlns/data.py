@@ -1,7 +1,6 @@
 from typing import Union
 
 import torch
-import torch.nn as nn
 from torch.utils.data import Dataset
 
 from devinterp.zoo.dlns.model import DLN
