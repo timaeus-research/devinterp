@@ -1,7 +1,3 @@
-# DevInterp
-
-![DevInterp](assets/devinterp_logo.png)
-
 ## A WIP Python Library for Developmental Interpretability Research
 
 DevInterp is a WIP Python library for conducting research on developmental interpretability, a novel AI safety research agenda rooted in Singular Learning Theory (SLT). DevInterp proposes tools for detecting, locating, and ultimately _controlling_ the development of structure over training.
