@@ -151,9 +151,7 @@ def sample(
     if cores > 1:
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
-            results = pool.map(
-                _sample_single_chain, [get_args(i) for i in range(num_chains)]
-            )
+            results = pool.map(_sample_single_chain, [get_args(i) for i in range(num_chains)])
     else:
         for i in range(num_chains):
             results.append(_sample_single_chain(get_args(i)))
@@ -178,7 +176,9 @@ def estimate_rlct(
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
 ) -> float:
-    warnings.warn("estimate_rlct is deprecated. Use `devinterp.slt.estimate_learning_coeff` instead.")
+    warnings.warn(
+        "estimate_rlct is deprecated. Use `devinterp.slt.estimate_learning_coeff` instead."
+    )
     trace = sample(
         model=model,
         loader=loader,

@@ -64,15 +64,11 @@ class ToyAutoencoder(nn.Module):
 
         # If unit weights is set, normalize weights
         if self.unit_weights:
-            self.embedding.weight.data = F.normalize(
-                self.embedding.weight.data, p=2, dim=0
-            )
+            self.embedding.weight.data = F.normalize(self.embedding.weight.data, p=2, dim=0)
 
         # Tie the weights of embedding and unembedding layers
         if tied:
-            self.unembedding.weight = torch.nn.Parameter(
-                self.embedding.weight.transpose(0, 1)
-            )
+            self.unembedding.weight = torch.nn.Parameter(self.embedding.weight.transpose(0, 1))
 
         # Set learnable scale factor
         if self.learnable_scale_factor:
@@ -86,9 +82,7 @@ class ToyAutoencoder(nn.Module):
         """
         # Apply the same steps for weights as done during initialization
         if self.unit_weights:
-            self.embedding.weight.data = F.normalize(
-                self.embedding.weight.data, p=2, dim=0
-            )
+            self.embedding.weight.data = F.normalize(self.embedding.weight.data, p=2, dim=0)
         if self.standard_magnitude:
             avg_norm = torch.norm(self.embedding.weight.data, p=2, dim=0).mean()
             self.embedding.weight.data = (

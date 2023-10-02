@@ -4,11 +4,10 @@ from typing import Literal, Optional, Tuple
 
 import torch
 from pydantic import BaseModel
-from torch import  Tensor
+from torch import Tensor
 from torch.utils.data import Dataset
 
-from devinterp.zoo.arithmetic.utils import (is_prime, modular_division,
-                                            modular_exponentiation)
+from devinterp.zoo.arithmetic.utils import is_prime, modular_division, modular_exponentiation
 
 DEFAULT_MODULUS = 97
 DEFAULT_DATA_DIR = "data"
@@ -86,11 +85,7 @@ class ModularArithmetic(Dataset):
                 raise ValueError(f"Unknown operator {operator}")
 
         data = torch.tensor(
-            [
-                (i, j, config.modulus)
-                for i in range(config.modulus)
-                for j in range(config.modulus)
-            ],
+            [(i, j, config.modulus) for i in range(config.modulus) for j in range(config.modulus)],
             dtype=torch.long,
         )
         labels = torch.tensor(
@@ -154,9 +149,7 @@ class ModularArithmetic(Dataset):
 
         raw_config = ModularArithmeticConfig(**config_dict)
 
-        return ModularArithmetic.generate(raw_config).split(
-            split=config.split, seed=config.seed
-        )
+        return ModularArithmetic.generate(raw_config).split(split=config.split, seed=config.seed)
 
     def __getitem__(self, index: int) -> Tuple[Tensor, Tensor]:
         """

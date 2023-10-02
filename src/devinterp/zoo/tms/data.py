@@ -33,9 +33,7 @@ class SyntheticDataset(Dataset, ABC):
                         Otherwise, the features are weighted by `importance ** (1 + i)`, where `i` is the index of the feature.
         """
         self.num_samples = num_samples  # The number of samples in the dataset
-        self.num_features = (
-            num_features  # The size of the feature vector for each sample
-        )
+        self.num_features = num_features  # The size of the feature vector for each sample
         self.sparsity = sparsity
         # self.importance = importance
         self.data = self.generate_data()  # Generate the synthetic data
@@ -64,7 +62,7 @@ class SyntheticDataset(Dataset, ABC):
         elif isinstance(self.sparsity, int):
             mask = torch.zeros((self.num_samples, self.num_features))
             for i in range(self.num_samples):
-                indices = torch.randperm(self.num_features)[:self.sparsity]
+                indices = torch.randperm(self.num_features)[: self.sparsity]
                 mask[i, indices] = 1
 
             return mask

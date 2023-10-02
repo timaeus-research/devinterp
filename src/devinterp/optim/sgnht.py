@@ -37,10 +37,8 @@ class SGNHT(torch.optim.Optimizer):
                 param_state = self.state[p]
                 param_state["momentum"] = np.sqrt(lr) * torch.randn_like(p.data)
 
-                if group['bounding_box_size'] != 0:
+                if group["bounding_box_size"] != 0:
                     param_state["initial_param"] = p.data.clone().detach()
-
-    
 
     def step(self, closure=None):
         """
@@ -70,9 +68,7 @@ class SGNHT(torch.optim.Optimizer):
                     noise = torch.normal(
                         mean=0.0, std=1.0, size=momentum.size(), device=momentum.device
                     )
-                    momentum.add_(
-                        noise * ((group["lr"] * 2 * group["diffusion_factor"]) ** 0.5)
-                    )
+                    momentum.add_(noise * ((group["lr"] * 2 * group["diffusion_factor"]) ** 0.5))
 
                     # Update position
                     p.data.add_(momentum)
@@ -93,10 +89,8 @@ class SGNHT(torch.optim.Optimizer):
                         ) - 1
                         torch.clamp_(
                             p.data,
-                            min=param_state["initial_param"]
-                            - group["bounding_box_size"],
-                            max=param_state["initial_param"]
-                            + group["bounding_box_size"],
+                            min=param_state["initial_param"] - group["bounding_box_size"],
+                            max=param_state["initial_param"] + group["bounding_box_size"],
                         )
                         momentum.mul_(reflection_coefs)
 

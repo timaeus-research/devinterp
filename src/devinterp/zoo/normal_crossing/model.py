@@ -14,5 +14,5 @@ class PolyModel(nn.Module):
     def forward(self, x):
         multiplied = torch.prod(self.weights**self.powers)
         x = x * multiplied
-       
+
         return x

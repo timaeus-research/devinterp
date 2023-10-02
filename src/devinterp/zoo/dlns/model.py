@@ -35,9 +35,7 @@ class DLN(nn.Module):
         return f"DLN({self.dims})"
 
     @classmethod
-    def make_rectangular(
-        cls, input_dim: int, output_dim: int, L: int, w: int, gamma: float
-    ):
+    def make_rectangular(cls, input_dim: int, output_dim: int, L: int, w: int, gamma: float):
         """
         Make a rectangular DLN with `L` layers and constant hidden width `w`.
 
@@ -46,9 +44,7 @@ class DLN(nn.Module):
         The weights are initialized from a normal distribution with variance`w ** (-gamma)`.
         """
         init_variance = w ** (-gamma)
-        return cls(
-            [input_dim] + [w] * (L - 1) + [output_dim], init_variance=init_variance
-        )
+        return cls([input_dim] + [w] * (L - 1) + [output_dim], init_variance=init_variance)
 
     def to_matrix(self):
         """Return the collapsed matrix representation of the DLN."""
@@ -71,10 +67,7 @@ class DLN(nn.Module):
 
     def ranks(self, **kwargs):
         """Return the ranks of the individual layers of the DLN."""
-        return [
-            torch.linalg.matrix_rank(l.weight.data.to("cpu"), **kwargs)
-            for l in self.linears
-        ]
+        return [torch.linalg.matrix_rank(l.weight.data.to("cpu"), **kwargs) for l in self.linears]
 
     def norm(self, p: Union[int, float, str] = 2):
         """Return the nuclear norm of the DLN."""

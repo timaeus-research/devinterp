@@ -57,18 +57,10 @@ class Attention(nn.Module):
 
     def __init__(self, d_model, num_heads, d_head, num_ctx):
         super().__init__()
-        self.W_K = nn.Parameter(
-            torch.randn(num_heads, d_head, d_model) / np.sqrt(d_model)
-        )
-        self.W_Q = nn.Parameter(
-            torch.randn(num_heads, d_head, d_model) / np.sqrt(d_model)
-        )
-        self.W_V = nn.Parameter(
-            torch.randn(num_heads, d_head, d_model) / np.sqrt(d_model)
-        )
-        self.W_O = nn.Parameter(
-            torch.randn(d_model, d_head * num_heads) / np.sqrt(d_model)
-        )
+        self.W_K = nn.Parameter(torch.randn(num_heads, d_head, d_model) / np.sqrt(d_model))
+        self.W_Q = nn.Parameter(torch.randn(num_heads, d_head, d_model) / np.sqrt(d_model))
+        self.W_V = nn.Parameter(torch.randn(num_heads, d_head, d_model) / np.sqrt(d_model))
+        self.W_O = nn.Parameter(torch.randn(d_model, d_head * num_heads) / np.sqrt(d_model))
         self.register_buffer("mask", torch.tril(torch.ones((num_ctx, num_ctx))))
         self.d_head = d_head
 

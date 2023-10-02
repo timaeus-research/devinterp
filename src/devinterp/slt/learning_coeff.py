@@ -80,7 +80,7 @@ def estimate_learning_coeff_with_summary(
         device=device,
         verbose=verbose,
     )
-    
+
     baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
     num_samples = len(loader.dataset)
     avg_losses = trace.groupby("chain")["loss"].mean()
@@ -97,7 +97,7 @@ def estimate_learning_coeff_with_summary(
         "mean": avg_loss.item(),
         "std": std_loss.item(),
         **{f"chain_{i}": results[i].item() for i in range(num_chains)},
-        "trace": trace
+        "trace": trace,
     }
 
 
