@@ -178,7 +178,7 @@ def estimate_rlct(
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
 ) -> float:
-    warnings.warn("Deprecated. Use `devinterp.slt.learning_coeff.estimate_learning_coeff` instead.")
+    warnings.warn("estimate_rlct is deprecated. Use `devinterp.slt.estimate_learning_coeff` instead.")
     trace = sample(
         model=model,
         loader=loader,
