@@ -52,11 +52,8 @@ learning_coeff_summary = estimate_learning_coeff_with_summary(model, trainloader
 
 - Estimate the learning coefficient.
   - Supported optimizers: 
-    - [`SGHMC`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/sghmc.py)
     - [`SGLD`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/sgld.py)
     - [`SGNHT`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/sgnht.py)
-    - [`SVGD`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/svgd.py)
-
 
 ## Contributing
 
