@@ -27,11 +27,11 @@ pip install devinterp
 To see DevInterp in action, check out our example notebooks:
 
 
-- [Introduction](https://www.github.com/timaeus-research/devinterp/examples/introduction.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/introduction.ipynb)
-- [Normal Crossing Demo](https://www.github.com/timaeus-research/devinterp/examples/normal_crossing.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/normal_crossing.ipynb)
-- [MNIST Demo](https://www.github.com/timaeus-research/devinterp/examples/mnist.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/mnist.ipynb)
-- [Deep Linear Networks](https://www.github.com/timaeus-research/devinterp/examples/dlns.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/dlns.ipynb)
-- [Toy Models of Superposition](https://www.github.com/timaeus-research/devinterp/examples/tms.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/tms.ipynb)
+- [Introduction](https://www.github.com/timaeus-research/devinterp/blob/main/examples/introduction.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/introduction.ipynb)
+- [Normal Crossing Demo](https://www.github.com/timaeus-research/devinterp/blob/main/examples/normal_crossing.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/normal_crossing.ipynb)
+- [MNIST Demo](https://www.github.com/timaeus-research/devinterp/blob/main/examples/mnist.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/mnist.ipynb)
+- [Deep Linear Networks](https://www.github.com/timaeus-research/devinterp/blob/main/examples/dlns.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/dlns.ipynb)
+- [Toy Models of Superposition](https://www.github.com/timaeus-research/devinterp/blob/main/examples/tms.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/tms.ipynb)
 
 
 ### Minimal Example
@@ -52,8 +52,8 @@ learning_coeff_summary = estimate_learning_coeff_with_summary(model, trainloader
 
 - Estimate the learning coefficient.
   - Supported optimizers: 
-    - [`SGLD`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/sgld.py)
-    - [`SGNHT`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/sgnht.py)
+    - [`SGLD`](https://www.github.com/timaeus-research/devinterp/blob/main/src/devinterp/optim/sgld.py)
+    - [`SGNHT`](https://www.github.com/timaeus-research/devinterp/blob/main/src/devinterp/optim/sgnht.py)
 
 ## Contributing
 
