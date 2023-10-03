@@ -27,11 +27,11 @@ pip install devinterp
 To see DevInterp in action, check out our example notebooks:
 
 
-- [Introduction](https://www.github.com/timaeus/devinterp/examples/introduction.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/introduction.ipynb)
-- [Normal Crossing Demo](https://www.github.com/timaeus/devinterp/examples/normal_crossing.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/normal_crossing.ipynb)
-- [MNIST Demo](https://www.github.com/timaeus/devinterp/examples/mnist.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/mnist.ipynb)
-- [Deep Linear Networks](https://www.github.com/timaeus/devinterp/examples/dlns.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/dlns.ipynb)
-- [Toy Models of Superposition](https://www.github.com/timaeus/devinterp/examples/tms.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/tms.ipynb)
+- [Introduction](https://www.github.com/timaeus-research/devinterp/examples/introduction.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/introduction.ipynb)
+- [Normal Crossing Demo](https://www.github.com/timaeus-research/devinterp/examples/normal_crossing.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/normal_crossing.ipynb)
+- [MNIST Demo](https://www.github.com/timaeus-research/devinterp/examples/mnist.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/mnist.ipynb)
+- [Deep Linear Networks](https://www.github.com/timaeus-research/devinterp/examples/dlns.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/dlns.ipynb)
+- [Toy Models of Superposition](https://www.github.com/timaeus-research/devinterp/examples/tms.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/tms.ipynb)
 
 
 ### Minimal Example
@@ -41,13 +41,22 @@ from devinterp.slt import estimate_learning_coeff_with_summary
 from devinterp.optim import SGLD
 
 # Assuming you have a PyTorch Module and DataLoader
-learning_coeff = estimate_learning_coeff_with_summary(model, trainloader, ...)
+learning_coeff = estimate_learning_coeff(model, trainloader, ...)
+
+# If you want to see mean, std, and learning coeff estimate per chain
+learning_coeff_summary = estimate_learning_coeff_with_summary(model, trainloader, ...)
+
 ```
 
 ## Features
 
 - Estimate the learning coefficient.
-  - Supported optimizers: `SGHMC`, `SGLD`, `SGNHT`, `SVGD`
+  - Supported optimizers: 
+    - [`SGHMC`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/sghmc.py)
+    - [`SGLD`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/sgld.py)
+    - [`SGNHT`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/sgnht.py)
+    - [`SVGD`](https://www.github.com/timaeus-research/devinterp/src/devinterp/optim/svgd.py)
+
 
 ## Contributing
 
