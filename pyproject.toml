@@ -14,6 +14,7 @@ classifiers = [
     # "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
@@ -24,6 +25,7 @@ dev = [
     "pytest-cov",
     "moto[ec2,s3,all]"
 ]
+
 
 [project.urls]
 "Homepage" = "https://github.com/timaeus-research/devinterp"
