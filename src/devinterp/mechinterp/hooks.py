@@ -1,5 +1,5 @@
 import textwrap
-from typing import Iterator, Tuple, Union
+from typing import Iterator, List, Tuple, Union
 
 import torch
 from torch import nn
@@ -17,28 +17,93 @@ def prepend_dict(d: dict, prefix: str, delimiter="."):
     return {get_key(k): v for k, v in d.items()}
 
 
-def hook(module: nn.Module):
+def hook(module: nn.Module, *paths: str):
     """Recursively wraps PyTorch modules in Hooked, HookedList, or HookedSequential classes.
+
+    This exposes a `run_with_cache()` method inspired by TransformerLens's HookedTransformer.
+    Unlike TransformerLens, this works with any PyTorch module right out of the box.
     
     Args:
         module (nn.Module): The module to be wrapped.
+        paths (str): Paths to the children modules to be wrapped and whose activations will be returned.
+            If empty, all children will be wrapped and all internal activations will be returned.
+
+    Examples:
         
     Returns:
         Hooked, HookedList, or HookedSequential: Wrapped module.
     """
+    if len(paths) == 0:  # Default to hooking all children
+        return _hook(module)
+    
+    module = Hooked(module)
+    for path in paths:
+        components = path.split(".")
+        _hook_recursive(module, components)
+        
+    return module
+
+
+def _hook(module: nn.Module):
+    """Recursively wraps PyTorch modules in Hooked, HookedList, or HookedSequential classes."""
+    if isinstance(module, (Hooked, HookedList, HookedSequential)):
+        for n, c in module.named_children():
+            setattr(module, n, _hook(c))
+        return module
     if isinstance(module, nn.ModuleList):
-        return HookedList([hook(c) for c in module])
+        return HookedList([_hook(c) for c in module])
     elif isinstance(module, nn.Sequential):
-        return HookedSequential(*[hook(c) for c in module.children()])
+        return HookedSequential(*[_hook(c) for c in module.children()])
     else:
         module = Hooked(module)
 
         for n, c in module.named_children():
-            setattr(module, n, hook(c))
+            setattr(module, n, _hook(c))
         
         return module
     
 
+def _hook_recursive(module: nn.Module, components: List[str]):
+    # Base case
+    if len(components) == 0:
+        if isinstance(module, (Hooked, HookedList, HookedSequential)):
+            return module
+        elif isinstance(module, nn.ModuleList):
+            return HookedList(module)
+        elif isinstance(module, nn.Sequential):
+            return HookedSequential(*module.children())
+        else:
+            return Hooked(module)
+
+    # Recursive case
+    head, *tail = components
+
+    if not isinstance(module, (Hooked, HookedList, HookedSequential)):
+        if isinstance(module, (nn.ModuleList, nn.Sequential)):
+            children = list(module.children())
+
+            if head == "*":  # Allow wildcards to hook all children
+                children = [_hook_recursive(c, tail) for c in children]
+            else:
+                head = int(head)
+                children[head] = _hook_recursive(children[head], tail)
+
+            if isinstance(module, nn.ModuleList):
+                module = HookedList(children)
+            elif isinstance(module, nn.Sequential):
+                module = HookedSequential(*children)
+
+            return module
+        else:
+            module = Hooked(module)   
+    
+    # If the current module is already Hooked, we may still need to further hook its children.
+    next_module = _hook_recursive(getattr(module, head), tail)
+    setattr(module, head, next_module)
+
+    return module    
+   
+   
 class Hooked(nn.Module):
     def __init__(self, module: nn.Module):
         """Wraps a PyTorch module to cache its output during forward pass.
