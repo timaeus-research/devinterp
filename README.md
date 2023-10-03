@@ -27,11 +27,11 @@ pip install devinterp
 To see DevInterp in action, check out our example notebooks:
 
 
-- [Introduction](https://www.github.com/timaeus-research/devinterp/examples/introduction.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/introduction.ipynb)
-- [Normal Crossing Demo](https://www.github.com/timaeus-research/devinterp/examples/normal_crossing.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/normal_crossing.ipynb)
-- [MNIST Demo](https://www.github.com/timaeus-research/devinterp/examples/mnist.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/mnist.ipynb)
-- [Deep Linear Networks](https://www.github.com/timaeus-research/devinterp/examples/dlns.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/dlns.ipynb)
-- [Toy Models of Superposition](https://www.github.com/timaeus-research/devinterp/examples/tms.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/add/colab/examples/tms.ipynb)
+- [Introduction](https://www.github.com/timaeus-research/devinterp/examples/introduction.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/introduction.ipynb)
+- [Normal Crossing Demo](https://www.github.com/timaeus-research/devinterp/examples/normal_crossing.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/normal_crossing.ipynb)
+- [MNIST Demo](https://www.github.com/timaeus-research/devinterp/examples/mnist.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/mnist.ipynb)
+- [Deep Linear Networks](https://www.github.com/timaeus-research/devinterp/examples/dlns.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/dlns.ipynb)
+- [Toy Models of Superposition](https://www.github.com/timaeus-research/devinterp/examples/tms.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/examples/tms.ipynb)
 
 
 ### Minimal Example
