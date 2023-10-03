@@ -37,7 +37,7 @@ To see DevInterp in action, check out our example notebooks:
 ### Minimal Example
 
 ```python
-from devinterp.slt import estimate_learning_coeff_with_summary
+from devinterp.slt import estimate_learning_coeff, estimate_learning_coeff_with_summary
 from devinterp.optim import SGLD
 
 # Assuming you have a PyTorch Module and DataLoader
