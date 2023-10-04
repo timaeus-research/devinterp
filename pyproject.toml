@@ -3,14 +3,17 @@ requires = ["setuptools>=61.0.0", "wheel"]
 
 [project]
 name = "devinterp"
-version = "0.0.1"
+version = "0.0.2"
 description = "A library for doing research on developmental interpretability"
 # license = "LICENSE"
 readme = "README.md"
-requires-python = ">=3.9" # probably >=3.8 in the future
+requires-python = ">=3.8"
 dynamic = ["dependencies"]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     # "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]

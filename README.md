@@ -20,7 +20,7 @@ To install `devinterp`, simply run:
 pip install devinterp
 ```
 
-**Requirements**: Python 3.9 or higher.
+**Requirements**: Python 3.8 or higher.
 
 ## Getting Started
 
