@@ -28,7 +28,7 @@ def sample_single_chain(
     pbar: bool = False,
     verbose=True,
     device: torch.device = torch.device("cpu"),
-    return_weights=False,
+    callbacks: List[Callable] = [],
 ):
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
@@ -43,7 +43,7 @@ def sample_single_chain(
 
     local_draws = pd.DataFrame(
         index=range(num_draws),
-        columns=["chain", "step", "loss"] + (["model_weights"] if return_weights else []),
+        columns=["chain", "step", "loss"],
     )
 
     iterator = zip(range(num_steps), itertools.cycle(loader))
@@ -69,10 +69,9 @@ def sample_single_chain(
             local_draws.loc[draw_idx, "step"] = i
             local_draws.loc[draw_idx, "chain"] = chain
             local_draws.loc[draw_idx, "loss"] = loss.detach().item()
-            if return_weights:
-                local_draws.loc[draw_idx, "model_weights"] = (
-                    model.state_dict()["weights"].clone().detach()
-                )
+
+            for callback in callbacks:
+                callback(model)
 
     return local_draws
 
@@ -96,7 +95,7 @@ def sample(
     pbar: bool = True,
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
-    return_weights: bool = False,
+    callbacks: List[Callable] = [],    
 ):
     """
     Sample model weights using a given optimizer, supporting multiple chains.
@@ -143,7 +142,7 @@ def sample(
             pbar=pbar,
             device=device,
             verbose=verbose,
-            return_weights=return_weights,
+            callbacks=callbacks
         )
 
     results = []
@@ -157,6 +156,11 @@ def sample(
             results.append(_sample_single_chain(get_args(i)))
 
     results_df = pd.concat(results, ignore_index=True)
+
+    for callback in callbacks:
+        if hasattr(callback, "finalize"):
+            callback.finalize()
+
     return results_df
 
 
@@ -175,6 +179,7 @@ def estimate_rlct(
     pbar: bool = True,
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
+    callbacks: List[Callable] = [],
 ) -> float:
     warnings.warn(
         "estimate_rlct is deprecated. Use `devinterp.slt.estimate_learning_coeff` instead."
@@ -194,6 +199,7 @@ def estimate_rlct(
         pbar=pbar,
         device=device,
         verbose=verbose,
+        callbacks=callbacks
     )
 
     baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]

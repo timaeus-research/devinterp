@@ -121,7 +121,6 @@ class WithinHeadCovarianceAccumulator:
         for l, accessor in enumerate(self.accessors):
             heads = accessor(model)
 
-            # print(attn.shape, self.first_moment.shape, self.second_moment.shape)
             for h, _head in enumerate(heads):
                 head = _head.flatten()
                 self.first_moment[l, h] += head
@@ -158,7 +157,6 @@ class WithinHeadCovarianceAccumulator:
         cov = self.to_matrix().detach().cpu().numpy()
         results = {}
 
-        # Restructure the eigenvectors to be in the shape of the attention layer
         evals = np.zeros((self.num_evals, self.num_layers, self.num_heads))
         evecs = np.zeros((self.num_evals, self.num_layers, self.num_heads, self.num_weights_per_head))
 

@@ -23,7 +23,6 @@ class ToyAutoencoder(nn.Module):
         hidden_bias: bool = False,
         nonlinearity: Callable = F.relu,
         unit_weights: bool = False,
-        learnable_scale_factor: bool = False,
         standard_magnitude: bool = False,
         initial_scale_factor: float = 1.0,
         initial_bias: Optional[torch.Tensor] = None,
@@ -38,7 +37,6 @@ class ToyAutoencoder(nn.Module):
         self.tied = tied
         self.final_bias = final_bias
         self.unit_weights = unit_weights
-        self.learnable_scale_factor = learnable_scale_factor
         self.standard_magnitude = standard_magnitude
 
         # Define the input layer (embedding)
@@ -70,19 +68,15 @@ class ToyAutoencoder(nn.Module):
         if tied:
             self.unembedding.weight = torch.nn.Parameter(self.embedding.weight.transpose(0, 1))
 
-        # Set learnable scale factor
-        if self.learnable_scale_factor:
-            self.scale_factor = nn.Parameter(torch.tensor(initial_scale_factor))
-        else:
-            self.scale_factor = initial_scale_factor
 
-    def forward(self, x: torch.Tensor, hooked: bool = False):
+    def forward(self, x: torch.Tensor):
         """
         Forward pass through the network
         """
         # Apply the same steps for weights as done during initialization
         if self.unit_weights:
             self.embedding.weight.data = F.normalize(self.embedding.weight.data, p=2, dim=0)
+
         if self.standard_magnitude:
             avg_norm = torch.norm(self.embedding.weight.data, p=2, dim=0).mean()
             self.embedding.weight.data = (
@@ -92,17 +86,8 @@ class ToyAutoencoder(nn.Module):
         if self.tied:
             self.unembedding.weight.data = self.embedding.weight.data.transpose(0, 1)
 
-        # In case we want to track the activations
-        if hooked:
-            activations = {}
-            activations["res_pre"] = self.embedding(x)
-            activations["unembed_pre"] = self.unembedding(activations["res_pre"])
-            activations["output"] = self.scale_factor * self.nonlinearity(
-                activations["unembed_pre"]
-            )
-            return activations["output"], activations
-        else:
-            x = self.embedding(x)
-            x = self.unembedding(x)
-            x = self.nonlinearity(x)
-            return self.scale_factor * x
+        x = self.embedding(x)
+        x = self.unembedding(x)
+        x = self.nonlinearity(x)
+
+        return x

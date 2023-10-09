@@ -24,6 +24,7 @@ def estimate_learning_coeff(
     pbar: bool = True,
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
+    callbacks: List[Callable] = [],
 ) -> float:
     trace = sample(
         model=model,
@@ -40,6 +41,7 @@ def estimate_learning_coeff(
         pbar=pbar,
         device=device,
         verbose=verbose,
+        callbacks=callbacks,
     )
     baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
     avg_loss = trace.groupby("chain")["loss"].mean().mean()
@@ -63,6 +65,7 @@ def estimate_learning_coeff_with_summary(
     pbar: bool = True,
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
+    callbacks: List[Callable] = [],
 ) -> dict:
     trace = sample(
         model=model,
@@ -79,6 +82,7 @@ def estimate_learning_coeff_with_summary(
         pbar=pbar,
         device=device,
         verbose=verbose,
+        callbacks=callbacks,
     )
 
     baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
