@@ -1,5 +1,5 @@
 import textwrap
-from typing import Iterator, List, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 
 import torch
 from torch import nn
@@ -105,6 +105,26 @@ def _hook_recursive(module: nn.Module, components: List[str]):
     return module
 
 
+def run_with_hook(module: nn.Module, *args, paths: Optional[List[str]]=None, **kwargs):
+    """
+    Run once with a hook and return the activations of the specified paths.
+
+    Examples:
+        >>> run_with_hook(transformer, x, "blocks.0.attn")
+        { "blocks.0.attn": torch.Tensor(...) }
+
+    Note: On its own `hook()` would return not just "blocks.0.attn" but also "blocks.0" and "blocks". 
+    `run_with_hook()` returns exclusively the `paths`.
+    """
+    paths = paths or []
+    output, activations = hook(module, *paths).run_with_cache(*args, **kwargs)
+
+    if "" in paths:
+        activations[""] = output
+
+    return {k: v for k, v in activations.items() if k in paths}
+
+
 class Hooked(nn.Module):
     def __init__(self, module: nn.Module):
         """Wraps a PyTorch module to cache its output during forward pass.
@@ -119,7 +139,7 @@ class Hooked(nn.Module):
         self._forward = type(module).forward
         self.output = None
 
-    def collect_cache(self):
+    def collect_cache(self) -> Dict[str, Union[torch.Tensor, None]]:
         """Collects cached outputs from the current module and its immediate children.
 
         Returns:
@@ -138,7 +158,7 @@ class Hooked(nn.Module):
         self.output = self._forward(self, *args, **kwargs)
         return self.output
 
-    def run_with_cache(self, *args, **kwargs):
+    def run_with_cache(self, *args, **kwargs) -> Tuple[torch.Tensor, Dict[str, Union[torch.Tensor, None]]]:
         """Runs the forward pass and collects cached outputs.
 
         Inspired by TransformerLens's HookedTransformer.
