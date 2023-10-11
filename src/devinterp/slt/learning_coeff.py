@@ -42,8 +42,10 @@ def estimate_learning_coeff(
         verbose=verbose,
     )
     baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
-    avg_loss = trace.groupby("chain")["loss"].mean().mean()
+    avg_loss = trace["loss"].mean()
     num_samples = len(loader.dataset)
+
+    print(baseline_loss, avg_loss, num_samples)
 
     return (avg_loss - baseline_loss) * num_samples / np.log(num_samples)
 

@@ -119,10 +119,7 @@ def run_with_hook(module: nn.Module, *args, paths: Optional[List[str]]=None, **k
     paths = paths or []
     output, activations = hook(module, *paths).run_with_cache(*args, **kwargs)
 
-    if "" in paths:
-        activations[""] = output
-
-    return {k: v for k, v in activations.items() if k in paths}
+    return output, {k: v for k, v in activations.items() if k in paths}
 
 
 class Hooked(nn.Module):
