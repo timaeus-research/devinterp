@@ -1,3 +1,4 @@
+import inspect
 import itertools
 import warnings
 from copy import deepcopy
@@ -14,6 +15,17 @@ from tqdm import tqdm
 from devinterp.optim.sgld import SGLD
 
 
+def call_with(func: Callable, **kwargs):
+    """Check the func annotation and call with only the necessary kwargs."""
+    sig = inspect.signature(func)
+    
+    # Filter out the kwargs that are not in the function's signature
+    filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+    
+    # Call the function with the filtered kwargs
+    return func(**filtered_kwargs)
+
+
 def sample_single_chain(
     ref_model: nn.Module,
     loader: DataLoader,
@@ -25,7 +37,6 @@ def sample_single_chain(
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
-    pbar: bool = False,
     verbose=True,
     device: torch.device = torch.device("cpu"),
     callbacks: List[Callable] = [],
@@ -40,22 +51,9 @@ def sample_single_chain(
         torch.manual_seed(seed)
 
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
-
-    local_draws = pd.DataFrame(
-        index=range(num_draws),
-        columns=["chain", "step", "loss"],
-    )
-
-    iterator = zip(range(num_steps), itertools.cycle(loader))
-
-    if pbar:
-        iterator = tqdm(
-            iterator, desc=f"Chain {chain}", total=num_steps, disable=not verbose  # TODO: Redundant
-        )
-
     model.train()
 
-    for i, (xs, ys) in iterator:
+    for i, (xs, ys) in  tqdm(zip(range(num_steps), itertools.cycle(loader)), desc=f"Chain {chain}", total=num_steps, disable=not verbose):
         optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
@@ -65,16 +63,17 @@ def sample_single_chain(
         optimizer.step()
 
         if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
-            draw_idx = (i - num_burnin_steps) // num_steps_bw_draws
-            local_draws.loc[draw_idx, "step"] = i
-            local_draws.loc[draw_idx, "chain"] = chain
-            local_draws.loc[draw_idx, "loss"] = loss.detach().item()
+            draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
+            loss = loss.item()
 
-            for callback in callbacks:
-                callback(model)
+            with torch.no_grad():
+                for callback in callbacks:
+                    call_with(callback, **locals())  # TODO: Cursed. Find a better way. 
 
-    return local_draws
 
+    for callback in callbacks:
+        if hasattr(callback, "finalize"):
+            callback.finalize()
 
 def _sample_single_chain(kwargs):
     return sample_single_chain(**kwargs)
@@ -145,65 +144,17 @@ def sample(
             callbacks=callbacks
         )
 
-    results = []
 
     if cores > 1:
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
-            results = pool.map(_sample_single_chain, [get_args(i) for i in range(num_chains)])
+            pool.map(_sample_single_chain, [get_args(i) for i in range(num_chains)])
     else:
         for i in range(num_chains):
-            results.append(_sample_single_chain(get_args(i)))
-
-    results_df = pd.concat(results, ignore_index=True)
+            _sample_single_chain(get_args(i))
 
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
 
-    return results_df
 
-
-def estimate_rlct(
-    model: torch.nn.Module,
-    loader: DataLoader,
-    criterion: Callable,
-    sampling_method: Type[torch.optim.Optimizer] = SGLD,
-    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
-    num_draws: int = 100,
-    num_chains: int = 10,
-    num_burnin_steps: int = 0,
-    num_steps_bw_draws: int = 1,
-    cores: int = 1,
-    seed: Optional[Union[int, List[int]]] = None,
-    pbar: bool = True,
-    device: torch.device = torch.device("cpu"),
-    verbose: bool = True,
-    callbacks: List[Callable] = [],
-) -> float:
-    warnings.warn(
-        "estimate_rlct is deprecated. Use `devinterp.slt.estimate_learning_coeff` instead."
-    )
-    trace = sample(
-        model=model,
-        loader=loader,
-        criterion=criterion,
-        sampling_method=sampling_method,
-        optimizer_kwargs=optimizer_kwargs,
-        num_draws=num_draws,
-        num_chains=num_chains,
-        num_burnin_steps=num_burnin_steps,
-        num_steps_bw_draws=num_steps_bw_draws,
-        cores=cores,
-        seed=seed,
-        pbar=pbar,
-        device=device,
-        verbose=verbose,
-        callbacks=callbacks
-    )
-
-    baseline_loss = trace.loc[trace["chain"] == 0, "loss"].iloc[0]
-    avg_loss = trace.groupby("chain")["loss"].mean().mean()
-    num_samples = len(loader.dataset)
-
-    return (avg_loss - baseline_loss) * num_samples / np.log(num_samples)
