@@ -192,7 +192,7 @@ class BetweenLayerCovarianceAccumulator:
     A CovarianceAccumulator to compute covariance between arbitrary layers.
     For use with `estimate`.
     """
-    def __init__(self, model, pairs: Dict[str, Tuple[str, str]], device = "cpu", num_evals=3, **accessors: Dict[str, LayerWeightsAccessor]):
+    def __init__(self, model, pairs: Dict[str, Tuple[str, str]], device = "cpu", num_evals=3, **accessors: LayerWeightsAccessor):
         self.num_layers = len(accessors)
         self.accessors = accessors
         self.pairs = pairs
