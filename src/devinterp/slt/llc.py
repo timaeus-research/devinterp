@@ -139,11 +139,14 @@ def estimate_learning_coeff_with_summary(
     callbacks: List[Callable] = [],
     online: bool = False,
 ) -> dict:
+    
     if online:
-        callbacks.append(OnlineLLCEstimator(num_chains, num_draws, len(loader.dataset), device=device))
+        llc_estimator = OnlineLLCEstimator(num_chains, num_draws, len(loader.dataset), device=device)
     else:
-        callbacks.append(LLCEstimator(num_chains, num_draws, len(loader.dataset), device=device))
+        llc_estimator = LLCEstimator(num_chains, num_draws, len(loader.dataset), device=device)
 
+    callbacks = [llc_estimator, *callbacks]
+    
     sample(
         model=model,
         loader=loader,
