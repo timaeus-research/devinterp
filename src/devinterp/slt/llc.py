@@ -8,10 +8,11 @@ import torch
 from torch.utils.data import DataLoader
 
 from devinterp.optim.sgld import SGLD
+from devinterp.slt.estimators import Estimator
 from devinterp.slt.sampler import sample
 
 
-class LLCEstimator:
+class LLCEstimator(Estimator):
     def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
         self.num_chains = num_chains
         self.num_draws = num_draws
@@ -23,18 +24,6 @@ class LLCEstimator:
         self.llc_std = torch.tensor(0., dtype=torch.float32).to(device)
 
         self.device = device
-
-    def share_memory_(self):
-        if self.device == "mps":
-            warnings.warn("Cannot share memory with MPS device.")
-            return self
-
-        self.n.share_memory_()
-        self.llc_per_chain.share_memory_()
-        self.llc_mean.share_memory_()
-        self.llc_std.share_memory_()
-
-        return self
 
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss 
@@ -61,7 +50,7 @@ class LLCEstimator:
         self.update(chain, draw, loss)
 
 
-class OnlineLLCEstimator:
+class OnlineLLCEstimator(Estimator):
     def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
         self.num_chains = num_chains
         self.num_draws = num_draws
@@ -75,18 +64,6 @@ class OnlineLLCEstimator:
         self.llc_stds = torch.tensor(num_chains, dtype=torch.float32).to(device)
 
         self.device = device
-
-    def share_memory_(self):
-        if self.device == "mps":
-            warnings.warn("Cannot share memory with MPS device.")
-            return self
-
-        self.n.share_memory_()
-        self.llc_per_chain.share_memory_()
-        self.llc_means.share_memory_()
-        self.llc_stds.share_memory_()
-
-        return self
 
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss 
@@ -146,7 +123,7 @@ def estimate_learning_coeff_with_summary(
         llc_estimator = LLCEstimator(num_chains, num_draws, len(loader.dataset), device=device)
 
     callbacks = [llc_estimator, *callbacks]
-    
+
     sample(
         model=model,
         loader=loader,
