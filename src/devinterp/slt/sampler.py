@@ -160,6 +160,115 @@ def sample(
     return results_df
 
 
+def sample_baseline_single_chain(
+    ref_model: nn.Module,
+    loader: DataLoader,
+    criterion: Callable,
+    num_baseline_draws=100,
+    chain: int = 0,
+    seed: Optional[int] = None,
+    pbar: bool = False,
+    verbose=True,
+    device: torch.device = torch.device("cpu"),
+):
+
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    local_draws = pd.DataFrame(
+        index=range(num_baseline_draws),
+        columns=["chain", "step", "loss"],
+    )
+
+    iterator = zip(range(num_baseline_draws), itertools.cycle(loader))
+
+    if pbar:
+        iterator = tqdm(
+            iterator, desc=f"Chain {chain}", total=num_baseline_draws, disable=not verbose  # TODO: Redundant
+        )
+
+    ref_model.eval()
+    with torch.no_grad():
+        for i, (xs, ys) in iterator:
+            xs, ys = xs.to(device), ys.to(device)
+            y_preds = ref_model(xs)
+            loss = criterion(y_preds, ys)
+
+            local_draws.loc[i, "step"] = i
+            local_draws.loc[i, "chain"] = chain
+            local_draws.loc[i, "loss"] = loss.detach().item()
+
+    return local_draws
+
+def _sample_baseline_single_chain(kwargs):
+    return sample_baseline_single_chain(**kwargs)
+
+def sample_baseline(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    criterion: Callable,
+    num_chains: int = 10,
+    num_baseline_draws: int = 100,
+    cores: int = 1,
+    seed: Optional[Union[int, List[int]]] = None,
+    pbar: bool = True,
+    device: torch.device = torch.device("cpu"),
+    verbose: bool = True,
+):
+    """
+    Sample loss at fixed weights, supporting multiple chains.
+
+    Parameters:
+        model (torch.nn.Module): The neural network model.
+        loader (DataLoader): DataLoader for input data.
+        criterion (torch.nn.Module): Loss function.
+        num_chains (int): Number of chains to run.
+        num_baseline_draws (int): Number of samples to draw.
+        cores (Optional[int]): Number of cores for parallel execution.
+        seed (Optional[Union[int, List[int]]]): Random seed(s) for sampling.
+        progressbar (bool): Whether to display a progress bar.
+    """
+    if cores is None:
+        cores = min(4, cpu_count())
+
+    if seed is not None:
+        if isinstance(seed, int):
+            seeds = [seed + i for i in range(num_chains)]
+        elif len(seed) != num_chains:
+            raise ValueError("Length of seed list must match number of chains")
+        else:
+            seeds = seed
+    else:
+        seeds = [None] * num_chains
+
+    def get_args(i):
+        return dict(
+            chain=i,
+            seed=seeds[i],
+            ref_model=model,
+            loader=loader,
+            criterion=criterion,
+            num_baseline_draws=num_baseline_draws,
+            pbar=pbar,
+            device=device,
+            verbose=verbose,
+        )
+
+    results = []
+
+    if cores > 1:
+        ctx = get_context("spawn")
+        with ctx.Pool(cores) as pool:
+            results = pool.map(_sample_baseline_single_chain, [get_args(i) for i in range(num_chains)])
+    else:
+        for i in range(num_chains):
+            results.append(_sample_baseline_single_chain(get_args(i)))
+
+    results_df = pd.concat(results, ignore_index=True)
+    return results_df
+
+
+
 def estimate_rlct(
     model: torch.nn.Module,
     loader: DataLoader,
