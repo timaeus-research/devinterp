@@ -1,18 +1,15 @@
-import inspect
-import warnings
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
 from devinterp.optim.sgld import SGLD
-from devinterp.slt.estimators import Estimator
+from devinterp.slt.callback import ChainCallback
 from devinterp.slt.sampler import sample
 
 
-class LLCEstimator(Estimator):
+class LLCEstimator(ChainCallback):
     def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
         self.num_chains = num_chains
         self.num_draws = num_draws
@@ -50,7 +47,7 @@ class LLCEstimator(Estimator):
         self.update(chain, draw, loss)
 
 
-class OnlineLLCEstimator(Estimator):
+class OnlineLLCEstimator(ChainCallback):
     def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
         self.num_chains = num_chains
         self.num_draws = num_draws
@@ -59,11 +56,11 @@ class OnlineLLCEstimator(Estimator):
         self.llcs = np.zeros((num_chains, num_draws), dtype=torch.float32)
 
         self.n = torch.tensor(n, dtype=torch.float32).to(device)
-        self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
-        self.llc_means = torch.tensor(num_chains, dtype=torch.float32).to(device)
-        self.llc_stds = torch.tensor(num_chains, dtype=torch.float32).to(device)
+        self.llc_means = torch.tensor(num_draws, dtype=torch.float32).to(device)
+        self.llc_stds = torch.tensor(num_draws, dtype=torch.float32).to(device)
 
         self.device = device
+        self.finalized = False
 
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss 
@@ -86,6 +83,7 @@ class OnlineLLCEstimator(Estimator):
     def finalize(self):
         self.llc_means = self.llcs.mean(axis=0)
         self.llc_stds = self.llcs.std(axis=0)
+        self.finalized = True
 
     def sample(self):
         return {

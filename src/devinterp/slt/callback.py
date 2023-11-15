@@ -1,7 +1,7 @@
 import warnings
 
 
-class Estimator:
+class ChainCallback:
     def __init__(self, device="cpu"):
         self.device = device
     
