@@ -1,7 +1,7 @@
 import warnings
 
 
-class Estimator:
+class SamplerCallback:
     def __init__(self, device="cpu"):
         self.device = device
     
