@@ -1,63 +1,55 @@
 import numpy as np
 
 from devinterp.slt.callback import ChainCallback
-from devinterp.slt.llc import OnlineLLCEstimator
 
-class TraceStatistics(ChainCallback):
-    """Derivative callback of OnlineLLCEstimator that computes mean/std statistics of the loss and llc traces.
-
+class OnlineTraceStatistics(ChainCallback):
+    """Derivative callback that computes mean/std statistics of a specified trace online. Must
+    be called after the base callback has been called at each draw.
     Parameters:
-        online_llc_estimator (OnlineLLCEstimator): Base callback that computes the llc and loss traces.
+        base_callback (ChainCallback): Base callback that computes original trace metric online.
     """
-    def __init__(self, online_llc_estimator: OnlineLLCEstimator):
-        self.estimator = online_llc_estimator
+    def __init__(self, base_callback: ChainCallback, attribute: str):
+        self.base_callback = base_callback
+        self.validate_base_callback()
 
-        self.num_chains = online_llc_estimator.num_chains
-        self.num_draws = online_llc_estimator.num_draws
+        self.attribute = attribute
 
-        self.llc_mean_by_chain = np.zeros(self.num_chains, dtype=np.float32)
-        self.llc_std_by_chain = np.zeros(self.num_chains, dtype=np.float32)
+        self.num_chains = base_callback.num_chains
+        self.num_draws = base_callback.num_draws
 
-        self.llc_mean_by_draw = np.zeros(self.num_draws, dtype=np.float32)
-        self.llc_std_by_draw = np.zeros(self.num_draws, dtype=np.float32)
+        self.mean_by_chain = np.zeros((self.num_chains, self.num_draws), dtype=np.float32)
+        self.std_by_chain = np.zeros((self.num_chains, self.num_draws), dtype=np.float32)
 
-        self.loss_mean_by_chain = np.zeros(self.num_chains, dtype=np.float32)
-        self.loss_std_by_chain = np.zeros(self.num_chains, dtype=np.float32)
+        self.mean_by_draw = np.zeros(self.num_draws, dtype=np.float32)
+        self.std_by_draw = np.zeros(self.num_draws, dtype=np.float32)
 
-        self.loss_mean_by_draw = np.zeros(self.num_draws, dtype=np.float32)
-        self.loss_std_by_draw = np.zeros(self.num_draws, dtype=np.float32)
-
-    def finalize(self):
-        if not self.esimator.finalized:
-            raise RuntimeError("Cannot finalize TraceStatistics before OnlineLLCEstimator, " +
-                               "ensure TraceStatistics is passed later in the list of callbacks.")
-        
-        llcs = self.estimator.llcs.cpu().numpy()
-        losses = self.estimator.losses.cpu().numpy()
-
-        self.llc_mean_by_chain = llcs.mean(axis=1)
-        self.llc_std_by_chain = llcs.std(axis=1)
-
-        self.llc_mean_by_draw = llcs.mean(axis=0)
-        self.llc_std_by_draw = llcs.std(axis=0)
-
-        self.loss_mean_by_chain = losses.mean(axis=1)
-        self.loss_std_by_chain = losses.std(axis=1)
-
-        self.loss_mean_by_draw = losses.mean(axis=0)
-        self.loss_std_by_draw = losses.std(axis=0)
+    def validate_base_callback(self):
+        if not hasattr(self.base_callback, self.attribute):
+            raise ValueError(f"Base callback must have attribute {self.attribute}")
+        if not hasattr(self.base_callback, "num_chains"):
+            raise ValueError("Base callback must have attribute num_chains")
+        if not hasattr(self.base_callback, "num_draws"):
+            raise ValueError("Base callback must have attribute num_draws")
 
     def sample(self):
         return {
-            'llc/chain/mean': self.llc_mean_by_chain,
-            'llc/chain/std': self.llc_std_by_chain,
-            'llc/draw/mean': self.llc_mean_by_draw,
-            'llc/draw/std': self.llc_std_by_draw,
-            'loss/chain/mean': self.loss_mean_by_chain,
-            'loss/chain/std': self.loss_std_by_chain,
-            'loss/draw/mean': self.loss_mean_by_draw,
-            'loss/draw/std': self.loss_std_by_draw,
+            f'{self.attribute}/chain/mean': self.mean_by_chain,
+            f'{self.attribute}/chain/std': self.std_by_chain,
+            f'{self.attribute}/draw/mean': self.mean_by_draw,
+            f'{self.attribute}/draw/std': self.std_by_draw,
+        }
+    
+    def sample_at_draw(self, draw=-1):
+        return {
+            f'{self.attribute}/chain/mean': self.mean_by_chain[:, draw],
+            f'{self.attribute}/chain/std': self.std_by_chain[:, draw],
+            f'{self.attribute}/draw/mean': self.mean_by_draw[draw],
+            f'{self.attribute}/draw/std': self.std_by_draw[draw],
         }
 
-    def __call__(self):
-        pass
+    def __call__(self, draw: int):
+        attribute = getattr(self.base_callback, self.attribute)
+        self.mean_by_chain[:, draw] = attribute[:, :draw+1].mean(axis=1)
+        self.std_by_chain[:, draw] = attribute[:, :draw+1].std(axis=1)
+        self.mean_by_draw[draw] = attribute[:, draw].mean()
+        self.std_by_draw[draw] = attribute[:, draw].std()

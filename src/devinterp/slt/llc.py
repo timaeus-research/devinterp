@@ -60,7 +60,6 @@ class OnlineLLCEstimator(ChainCallback):
         self.llc_stds = torch.tensor(num_draws, dtype=torch.float32).to(device)
 
         self.device = device
-        self.finalized = False
 
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss 
@@ -83,7 +82,6 @@ class OnlineLLCEstimator(ChainCallback):
     def finalize(self):
         self.llc_means = self.llcs.mean(axis=0)
         self.llc_stds = self.llcs.std(axis=0)
-        self.finalized = True
 
     def sample(self):
         return {
