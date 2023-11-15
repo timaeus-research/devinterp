@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+from torch.nn.utils import parameters_to_vector
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.estimators import Estimator
@@ -62,7 +63,6 @@ class OnlineLLCEstimator(Estimator):
         self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
         self.llc_means = torch.tensor(num_chains, dtype=torch.float32).to(device)
         self.llc_stds = torch.tensor(num_chains, dtype=torch.float32).to(device)
-
         self.device = device
 
     def update(self, chain: int, draw: int, loss: float):
@@ -98,6 +98,35 @@ class OnlineLLCEstimator(Estimator):
     def __call__(self, chain: int, draw: int, loss: float):
         self.update(chain, draw, loss)
 
+class WeightDistance(Estimator):
+    def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
+        self.num_chains = num_chains
+        self.num_draws = num_draws
+        self.wds = torch.tensor(num_chains, dtype=torch.float32).to(device)
+        self.device = device
+        self.starting_weights = parameters_to_vector(self.ref_model.parameters)  # TODO fix resulting race condition
+
+    def update(self, chain: int, draw: int, weights: float):
+        t = draw + 1
+        prev_wd = self.wds[chain, draw - 1]
+        with torch.no_grad():
+            self.wds[chain, draw] = (1 / t) * (
+                (t - 1) * prev_wd + (self.parameters_to_vector(self.model.parameters) - self.starting_weights).pow(2).sum().sqrt()
+            )
+
+    def finalize(self):
+        self.wd_means = self.wds.mean(axis=0)
+        self.wd_stds = self.wds.std(axis=0)
+
+    def sample(self):
+        return {
+            "wd/means": self.wds.cpu().numpy(),
+            "wd/stds": self.wds.cpu().numpy(),
+            "wd/trace": self.wds,
+        }
+    
+    def __call__(self, chain: int, draw: int, weights: float):
+        self.update(chain, draw, weights)
 
 def estimate_learning_coeff_with_summary(
     model: torch.nn.Module,
