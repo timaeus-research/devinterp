@@ -17,7 +17,8 @@ from devinterp.optim.sgld import SGLD
 def sample_single_chain(
     ref_model: nn.Module,
     loader: DataLoader,
-    criterion: Callable,
+    criterion: Optional[Callable] = None,
+    custom_forward_pass: Optional[Callable] = None,
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
@@ -30,6 +31,9 @@ def sample_single_chain(
     device: torch.device = torch.device("cpu"),
     return_weights=False,
 ):
+    if criterion is None and custom_forward_pass is None:
+        raise ValueError("Either criterion or custom_forward_pass must be provided")
+    
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
@@ -55,11 +59,14 @@ def sample_single_chain(
 
     model.train()
 
-    for i, (xs, ys) in iterator:
+    for i, data_row in iterator:
         optimizer.zero_grad()
-        xs, ys = xs.to(device), ys.to(device)
-        y_preds = model(xs)
-        loss = criterion(y_preds, ys)
+        if custom_forward_pass is None:
+            xs, ys = xs.to(device), ys.to(device)
+            y_preds = model(xs)
+            loss = criterion(y_preds, ys)
+        else:
+            loss = custom_forward_pass(model, data_row, device)
 
         loss.backward()
         optimizer.step()
@@ -84,7 +91,8 @@ def _sample_single_chain(kwargs):
 def sample(
     model: torch.nn.Module,
     loader: DataLoader,
-    criterion: Callable,
+    criterion: Optional[Callable] = None,
+    custom_forward_pass: Optional[Callable] = None,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
@@ -105,7 +113,8 @@ def sample(
         model (torch.nn.Module): The neural network model.
         step (Literal['sgld']): The name of the optimizer to use to step.
         loader (DataLoader): DataLoader for input data.
-        criterion (torch.nn.Module): Loss function.
+        criterion (Optional[Callable]): Loss function to use.
+        custom_forward_pass (Optional[Callable]): Custom forward pass function.
         num_draws (int): Number of samples to draw.
         num_chains (int): Number of chains to run.
         num_burnin_steps (int): Number of burn-in steps before sampling.
@@ -135,6 +144,7 @@ def sample(
             ref_model=model,
             loader=loader,
             criterion=criterion,
+            custom_forward_pass=custom_forward_pass,
             num_draws=num_draws,
             num_burnin_steps=num_burnin_steps,
             num_steps_bw_draws=num_steps_bw_draws,
@@ -163,7 +173,8 @@ def sample(
 def estimate_rlct(
     model: torch.nn.Module,
     loader: DataLoader,
-    criterion: Callable,
+    criterion: Optional[Callable] = None,
+    custom_forward_pass: Optional[Callable] = None,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
@@ -183,6 +194,7 @@ def estimate_rlct(
         model=model,
         loader=loader,
         criterion=criterion,
+        custom_forward_pass=custom_forward_pass,
         sampling_method=sampling_method,
         optimizer_kwargs=optimizer_kwargs,
         num_draws=num_draws,
