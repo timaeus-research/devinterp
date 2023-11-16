@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from devinterp.optim.sgld import SGLD
+from devinterp.slt.callback import validate_callbacks
 
 
 def call_with(func: Callable, **kwargs):
@@ -124,6 +125,8 @@ def sample(
             seeds = seed
     else:
         seeds = [None] * num_chains
+
+    validate_callbacks(callbacks)
 
     def get_args(i):
         return dict(
