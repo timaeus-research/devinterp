@@ -5,8 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from devinterp.optim.sgld import \
-    SGLD  # Make sure to import your SGLD optimizer
+from devinterp.optim.sgld import SGLD  
 
 
 def test_SGLD_vs_SGD():
