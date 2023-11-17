@@ -99,19 +99,19 @@ class OnlineLLCEstimator(Estimator):
         self.update(chain, draw, loss)
 
 class WeightDistance(Estimator):
-    def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
+    def __init__(self, num_chains: int, num_draws: int, ref_model: torch.nn.Module, device="cpu"):
         self.num_chains = num_chains
         self.num_draws = num_draws
-        self.wds = torch.tensor(num_chains, dtype=torch.float32).to(device)
+        self.wds = np.zeros((num_chains, num_draws), dtype=np.float32)
         self.device = device
-        self.starting_weights = parameters_to_vector(self.ref_model.parameters)  # TODO fix resulting race condition
+        self.starting_weights = parameters_to_vector(ref_model.weights())
 
-    def update(self, chain: int, draw: int, weights: float):
+    def update(self, chain: int, draw: int, model: float):
         t = draw + 1
         prev_wd = self.wds[chain, draw - 1]
         with torch.no_grad():
             self.wds[chain, draw] = (1 / t) * (
-                (t - 1) * prev_wd + (self.parameters_to_vector(self.model.parameters) - self.starting_weights).pow(2).sum().sqrt()
+                (t - 1) * prev_wd + (parameters_to_vector(model.weights()) - self.starting_weights).pow(2).sum().sqrt().cpu().detach()
             )
 
     def finalize(self):
@@ -125,8 +125,27 @@ class WeightDistance(Estimator):
             "wd/trace": self.wds,
         }
     
-    def __call__(self, chain: int, draw: int, weights: float):
-        self.update(chain, draw, weights)
+    def __call__(self, chain: int, draw: int, model):
+        self.update(chain, draw, model)
+
+class Weights(Estimator):
+    def __init__(self, num_chains: int, num_draws: int, model, device="cpu"):
+        self.num_chains = num_chains
+        self.num_draws = num_draws
+        self.ws = np.zeros((num_chains, num_draws, len(parameters_to_vector(model.weights))), dtype=np.float32)
+        self.device = device
+
+    def update(self, chain: int, draw: int, model):
+        self.ws[chain, draw] = parameters_to_vector(model.weights).cpu().detach()
+
+    def sample(self):
+        return {
+            "ws/trace": self.ws,
+        }
+    
+    def __call__(self, chain: int, draw: int, model):
+        self.update(chain, draw, model)
+
 
 def estimate_learning_coeff_with_summary(
     model: torch.nn.Module,
