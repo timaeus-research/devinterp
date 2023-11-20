@@ -165,7 +165,6 @@ def estimate_learning_coeff(
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
     callbacks: List[Callable] = [],
-    online: bool = False,
 ) -> float:
     return estimate_learning_coeff_with_summary(
         model=model,
@@ -182,5 +181,5 @@ def estimate_learning_coeff(
         device=device,
         verbose=verbose,
         callbacks=callbacks,
-        online=online,
+        online=False,
     )["llc/mean"]

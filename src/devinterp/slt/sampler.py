@@ -71,10 +71,6 @@ def sample_single_chain(
                     call_with(callback, **locals())  # TODO: Cursed. Find a better way. 
 
 
-    for callback in callbacks:
-        if hasattr(callback, "finalize"):
-            callback.finalize()
-
 def _sample_single_chain(kwargs):
     return sample_single_chain(**kwargs)
 
@@ -91,7 +87,6 @@ def sample(
     num_steps_bw_draws: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    pbar: bool = True,
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
     callbacks: List[Callable] = [],    
@@ -138,7 +133,6 @@ def sample(
             num_steps_bw_draws=num_steps_bw_draws,
             sampling_method=sampling_method,
             optimizer_kwargs=optimizer_kwargs,
-            pbar=pbar,
             device=device,
             verbose=verbose,
             callbacks=callbacks
