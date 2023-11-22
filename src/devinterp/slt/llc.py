@@ -52,43 +52,41 @@ class OnlineLLCEstimator(ChainCallback):
         self.num_chains = num_chains
         self.num_draws = num_draws
 
-        self.losses = np.zeros((num_chains, num_draws), dtype=torch.float32)
-        self.llcs = np.zeros((num_chains, num_draws), dtype=torch.float32)
+        self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
+        self.llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
 
         self.n = torch.tensor(n, dtype=torch.float32).to(device)
-        self.llc_means = torch.tensor(num_draws, dtype=torch.float32).to(device)
-        self.llc_stds = torch.tensor(num_draws, dtype=torch.float32).to(device)
+        self.llc_means = torch.zeros(num_draws, dtype=torch.float32).to(device)
+        self.llc_stds = torch.zeros(num_draws, dtype=torch.float32).to(device)
 
         self.device = device
 
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss 
+        init_loss = self.losses[chain, 0]
 
         if draw == 0:  # TODO: We can probably drop this and it still works (but harder to read)
-            self.llcs[0, draw] = 0.
+            self.llcs[chain, draw] = 0.
         else:
             t = draw + 1
             prev_llc = self.llcs[chain, draw - 1]
+            # print(chain, draw, prev_llc, self.n, loss, init_loss, loss - init_loss)
 
             with torch.no_grad():
                 self.llcs[chain, draw] = (1 / t) * (
-                    (t - 1) * prev_llc + (self.n / self.n.log()) * (loss - self.init_loss)
+                    (t - 1) * prev_llc + (self.n / self.n.log()) * (loss - init_loss)
                 )
 
-    @property
-    def init_loss(self):
-        return self.losses[0, 0]
-
     def finalize(self):
-        self.llc_means = self.llcs.mean(axis=0)
-        self.llc_stds = self.llcs.std(axis=0)
+        self.llc_means = self.llcs.mean(dim=0)
+        self.llc_stds = self.llcs.std(dim=0)
 
     def sample(self):
         return {
-            "llc/means": self.llc_means.cpu().numpy(),
-            "llc/stds": self.llc_stds.cpu().numpy(),
-            "llc/trace": self.llcs,
-            "loss/trace": self.losses
+            "llc/means": self.llc_means.detach().cpu().numpy(),
+            "llc/stds": self.llc_stds.detach().cpu().numpy(),
+            "llc/trace": self.llcs.detach().cpu().numpy(),
+            "loss/trace": self.losses.detach().cpu().numpy()
         }
     
     def __call__(self, chain: int, draw: int, loss: float):
