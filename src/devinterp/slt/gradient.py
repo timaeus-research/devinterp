@@ -31,13 +31,12 @@ class GradientDistribution(SamplerCallback):
         self.update(chain, draw, model)
     
     def update(self, chain: int, draw: int, model: nn.Module):
-        for _, layer in model.named_children():
-            for param_name, param in layer.named_parameters():
-                if self.param_names is not None and param_name not in self.param_names:
-                    continue
-                if param.grad is None:
-                    raise ValueError(f"GradientDistribution callback requires gradients to be computed first")
-                self._update_param_bins(chain, draw, param_name, param.grad.detach().flatten())
+        for param_name, param in model.named_parameters():
+            if self.param_names is not None and param_name not in self.param_names:
+                continue
+            if param.grad is None:
+                raise ValueError(f"GradientDistribution callback requires gradients to be computed first")
+            self._update_param_bins(chain, draw, param_name, param.grad.detach().flatten())
 
     def _update_param_bins(self, chain: int, draw: int, param_name: str, grads: torch.Tensor):
         # init bins, estimating a good bin size using the first draw of the first params
@@ -97,7 +96,7 @@ class GradientDistribution(SamplerCallback):
 
     def sample(self):
         return {
-            "gradient/distributions": self.grad_dists.cpu().numpy(),
+            "gradient/distributions": self.grad_dists,
         }
 
     def plot(self, param_name: str, color='blue', plot_zero=True, chain: int = None):
