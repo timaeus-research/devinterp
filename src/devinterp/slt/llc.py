@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
-from torch.nn.utils import parameters_to_vector
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.estimators import Estimator
@@ -97,54 +96,6 @@ class OnlineLLCEstimator(Estimator):
     
     def __call__(self, chain: int, draw: int, loss: float):
         self.update(chain, draw, loss)
-
-class WeightDistance(Estimator):
-    def __init__(self, num_chains: int, num_draws: int, ref_model: torch.nn.Module, device="cpu"):
-        self.num_chains = num_chains
-        self.num_draws = num_draws
-        self.wds = np.zeros((num_chains, num_draws), dtype=np.float32)
-        self.device = device
-        self.starting_weights = parameters_to_vector(ref_model.weights())
-
-    def update(self, chain: int, draw: int, model: float):
-        t = draw + 1
-        prev_wd = self.wds[chain, draw - 1]
-        with torch.no_grad():
-            self.wds[chain, draw] = (1 / t) * (
-                (t - 1) * prev_wd + (parameters_to_vector(model.weights()) - self.starting_weights).pow(2).sum().sqrt().cpu().detach()
-            )
-
-    def finalize(self):
-        self.wd_means = self.wds.mean(axis=0)
-        self.wd_stds = self.wds.std(axis=0)
-
-    def sample(self):
-        return {
-            "wd/means": self.wds.cpu().numpy(),
-            "wd/stds": self.wds.cpu().numpy(),
-            "wd/trace": self.wds,
-        }
-    
-    def __call__(self, chain: int, draw: int, model):
-        self.update(chain, draw, model)
-
-class Weights(Estimator):
-    def __init__(self, num_chains: int, num_draws: int, model, device="cpu"):
-        self.num_chains = num_chains
-        self.num_draws = num_draws
-        self.ws = np.zeros((num_chains, num_draws, len(parameters_to_vector(model.weights))), dtype=np.float32)
-        self.device = device
-
-    def update(self, chain: int, draw: int, model):
-        self.ws[chain, draw] = parameters_to_vector(model.weights).cpu().detach()
-
-    def sample(self):
-        return {
-            "ws/trace": self.ws,
-        }
-    
-    def __call__(self, chain: int, draw: int, model):
-        self.update(chain, draw, model)
 
 
 def estimate_learning_coeff_with_summary(
