@@ -137,7 +137,6 @@ def sample(
             callbacks=callbacks
         )
 
-
     if cores > 1:
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
