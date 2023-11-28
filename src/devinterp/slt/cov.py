@@ -5,11 +5,11 @@ import torch
 from scipy.sparse.linalg import eigsh
 from torch import nn
 
-from devinterp.slt.estimators import Estimator
+from devinterp.slt.callback import SamplerCallback
 
 WeightAccessor = Callable[[nn.Module], torch.Tensor]
 
-class CovarianceAccumulator(Estimator):
+class CovarianceAccumulator(SamplerCallback):
     """
     A callback to iteratively compute and store the covariance matrix of model weights.
     For use with `estimate`. 
