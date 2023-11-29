@@ -19,6 +19,7 @@ class LLCEstimator(SamplerCallback):
         self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
         self.llc_mean = torch.tensor(0., dtype=torch.float32).to(device)
         self.llc_std = torch.tensor(0., dtype=torch.float32).to(device)
+        
         self.device = device
 
     def update(self, chain: int, draw: int, loss: float):
@@ -55,7 +56,6 @@ class OnlineLLCEstimator(SamplerCallback):
         self.llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
 
         self.n = torch.tensor(n, dtype=torch.float32).to(device)
-
         self.llc_means = torch.tensor(num_draws, dtype=torch.float32).to(device)
         self.llc_stds = torch.tensor(num_draws, dtype=torch.float32).to(device)
 
