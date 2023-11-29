@@ -19,7 +19,7 @@ class LLCEstimator(SamplerCallback):
         self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
         self.llc_mean = torch.tensor(0., dtype=torch.float32).to(device)
         self.llc_std = torch.tensor(0., dtype=torch.float32).to(device)
-        
+
         self.device = device
 
     def update(self, chain: int, draw: int, loss: float):
