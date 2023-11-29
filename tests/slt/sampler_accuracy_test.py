@@ -9,35 +9,11 @@ from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
 from devinterp.slt.llc import LLCEstimator
-
-
-class Polynomial(nn.Module):
-    def __init__(self, powers=[1, 1]):
-        super(Polynomial, self).__init__()
-        self.powers = torch.tensor(powers)
-        self.weights = nn.Parameter(
-            torch.tensor(
-                torch.zeros_like(self.powers, dtype=torch.float32), requires_grad=True
-            )
-        )
-
-    def forward(self, x):
-        return x * torch.prod(self.weights**self.powers)
-
-
-class LinePlusDot(nn.Module):
-    def __init__(self, dim=2):
-        super(LinePlusDot, self).__init__()
-        self.weights = nn.Parameter(
-            torch.zeros(dim, dtype=torch.float32), requires_grad=True
-        )
-
-    def forward(self, x):
-        return x * (self.weights[0] - 1) * (torch.sum(self.weights**2) ** 2)
+from devinterp.zoo.test_utils import *
 
 
 @pytest.fixture
-def generated_linedot_normalcrossing_dataset():
+def generated_normalcrossing_dataset():
     torch.manual_seed(42)
     np.random.seed(42)
     sigma = 0.25
@@ -45,6 +21,20 @@ def generated_linedot_normalcrossing_dataset():
     batch_size = num_train_samples
     x = torch.normal(0, 2, size=(num_train_samples,))
     y = sigma * torch.normal(0, 1, size=(num_train_samples,))
+    train_data = TensorDataset(x, y)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    return train_loader, train_data, x, y
+
+
+# not a fixture as we're generating data for several m, n combinations
+# and I couldn't figure out how to fit that into the fixture mold
+def generated_rrr_dataset(m, n):
+    torch.manual_seed(42)
+    np.random.seed(42)
+    num_samples = 1000
+    batch_size = num_samples
+    x = torch.randn(num_samples, m)
+    y = torch.randn(num_samples, n)
     train_data = TensorDataset(x, y)
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     return train_loader, train_data, x, y
@@ -65,12 +55,12 @@ TRUE_LCS_PER_POWER = {
 
 @pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
 @pytest.mark.parametrize("powers, true_lc", TRUE_LCS_PER_POWER)
-def test_accuracy_linedot_normalcrossing(
-    generated_linedot_normalcrossing_dataset, sampling_method, powers, true_lc
+def test_accuracy_normalcrossing(
+    generated_normalcrossing_dataset, sampling_method, powers, true_lc
 ):
     seed = 42
     model = Polynomial(powers)
-    train_loader, train_data, _, _ = generated_linedot_normalcrossing_dataset
+    train_loader, train_data, _, _ = generated_normalcrossing_dataset
     criterion = F.mse_loss
     lr = 0.0001
     num_chains = 10
@@ -101,35 +91,26 @@ def test_accuracy_linedot_normalcrossing(
     ), f"LLC mean {llc_mean:.3f} +- {2*llc_std_dev:.3f} does not contain true value {true_lc:.3f} for powers {powers} using {sampling_method}"
 
 
-def generated_rrr_dataset(m, n):
-    torch.manual_seed(42)
-    np.random.seed(42)
-    num_samples = 1000
-    batch_size = num_samples
-    x = torch.randn(num_samples, m)
-    y = torch.randn(num_samples, n)
-    train_data = TensorDataset(x, y)
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-    return train_loader, train_data, x, y
-
-
-class ReducedRankRegressor(nn.Module):
-    def __init__(self, m, h, n):
-        super(ReducedRankRegressor, self).__init__()
-        self.fc1 = nn.Linear(m, h, bias=False)
-        self.fc2 = nn.Linear(h, n, bias=False)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        return self.fc2(x)
-
-
 @pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
 @pytest.mark.parametrize(
-    "m,h,n", [(5, 3, 5), (5, 4, 5), (4, 3, 8), (8, 3, 4), (3, 8, 4)]
+    "m,h,n",
+    [
+        (5, 3, 5),  # case 1, odd
+        (2, 1, 2),  # case 1, odd
+        (5, 4, 5),  # case 1, even
+        (3, 2, 3),  # case 1, even
+        (4, 3, 8),  # case 2
+        (2, 1, 4),  # case 2
+        (8, 3, 4),  # case 3
+        (4, 1, 2),  # case 3
+        (3, 8, 4),  # case 4
+        (1, 4, 2),  # case 4
+    ],
 )
 def test_accuracy_rrr(sampling_method, m, h, n):
-    # see "The Generalization Error of Reduced Rank Regression in Bayesian Estimation, M. Aoyagi & S. Watanabe, 2004.
+    # see "The Generalization Error of Reduced Rank Regression in Bayesian Estimation", M. Aoyagi & S. Watanabe, 2004.
+    # Note: RRR is kind of an odd fit for pytorch, being a two-layer no-bias linear model.
+    # We train this model long enough to (hopefully) not end up in a local min
     torch.manual_seed(42)
     np.random.seed(42)
     criterion = F.mse_loss
@@ -138,20 +119,15 @@ def test_accuracy_rrr(sampling_method, m, h, n):
     m = x.size(1)
     n = y.size(1)
     model = ReducedRankRegressor(m, h, n)
-    case_1_even = (m + h + n) % 2 == 0
-    case_1_odd = (m + h + n) % 2 == 1
-    case_2 = m + h < n
-    case_3 = n + h < m
-    case_4 = m + n < h
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-    num_chains = 10
-    num_draws = 1_000
-    for _ in range(2500):
+    for _ in range(5000):
         optimizer.zero_grad()
         outputs = model(x)
         loss = criterion(outputs, y)
         loss.backward()
         optimizer.step()
+    num_chains = 10
+    num_draws = 1_000
     llc_estimator = LLCEstimator(
         num_chains=num_chains, num_draws=num_draws, n=len(train_data)
     )
@@ -173,6 +149,11 @@ def test_accuracy_rrr(sampling_method, m, h, n):
     )
     llc_mean = llc_estimator.sample()["llc/mean"]
     llc_std_dev = llc_estimator.sample()["llc/std"]
+    case_1_even = (m + h + n) % 2 == 0
+    case_1_odd = (m + h + n) % 2 == 1
+    case_2 = m + h < n
+    case_3 = n + h < m
+    case_4 = m + n < h
     if case_2:
         case = "2"
         true_lc = m * h / 2

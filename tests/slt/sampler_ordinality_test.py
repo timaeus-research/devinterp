@@ -9,31 +9,7 @@ from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
 from devinterp.slt.llc import LLCEstimator
-
-
-class Polynomial(nn.Module):
-    def __init__(self, powers=[1, 1]):
-        super(Polynomial, self).__init__()
-        self.powers = torch.tensor(powers)
-        self.weights = nn.Parameter(
-            torch.tensor(
-                torch.zeros_like(self.powers, dtype=torch.float32), requires_grad=True
-            )
-        )
-
-    def forward(self, x):
-        return x * torch.prod(self.weights**self.powers)
-
-
-class LinePlusDot(nn.Module):
-    def __init__(self, dim=2):
-        super(LinePlusDot, self).__init__()
-        self.weights = nn.Parameter(
-            torch.zeros(dim, dtype=torch.float32), requires_grad=True
-        )
-
-    def forward(self, x):
-        return x * (self.weights[0] - 1) * (torch.sum(self.weights**2) ** 2)
+from devinterp.zoo.test_utils import *
 
 
 @pytest.fixture
@@ -53,7 +29,9 @@ def generated_linedot_normalcrossing_dataset():
 @pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
 @pytest.mark.parametrize("model", [Polynomial])
 @pytest.mark.parametrize("dim", [2, 10, 100])
-def test_ordinality_linedot_normal_crossing(generated_linedot_normalcrossing_dataset, sampling_method, model, dim):
+def test_ordinality_linedot_normal_crossing(
+    generated_linedot_normalcrossing_dataset, sampling_method, model, dim
+):
     seed = 42
     if model == Polynomial:
         model = model([2 for _ in range(dim)])
@@ -61,7 +39,9 @@ def test_ordinality_linedot_normal_crossing(generated_linedot_normalcrossing_dat
         model = model(dim)
     train_loader, train_data, _, _ = generated_linedot_normalcrossing_dataset
     criterion = F.mse_loss
-    lr = 0.0001 / dim
+    lr = (
+        0.0001 / dim
+    )  # to account for smaller steps in higher D. might not work well for SGNHT?
     num_chains = 5
     num_draws = 1_000
     llcs = []
@@ -82,7 +62,7 @@ def test_ordinality_linedot_normal_crossing(generated_linedot_normalcrossing_dat
             criterion=criterion,
             optimizer_kwargs=dict(
                 lr=lr,
-                bounding_box_size=0.5,
+                bounding_box_size=0.5,  # to prevent accidental movement from [1, 0, ...] to origin
                 num_samples=len(train_data),
             ),
             sampling_method=sampling_method,
@@ -96,5 +76,3 @@ def test_ordinality_linedot_normal_crossing(generated_linedot_normalcrossing_dat
     assert (
         np.diff(llcs) >= 0
     ).all(), f"Ordinality not preserved for sampler {sampling_method} on {dim}-d {model}: llcs {llcs} are not in ascending order."
-
-
