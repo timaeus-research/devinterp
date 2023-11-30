@@ -1,5 +1,6 @@
 from typing import List
 import math
+from matplotlib.collections import PatchCollection
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import torch
@@ -109,8 +110,8 @@ class GradientDistribution(SamplerCallback):
         def get_color_alpha(count):
             if count == 0:
                 return torch.tensor(0).to(self.device)
-            min_alpha = 0.05
-            max_alpha = 0.6
+            min_alpha = 0.35
+            max_alpha = 0.85
             return (count / max_count) * (max_alpha - min_alpha) + min_alpha
         
         def build_rect(count, bin_min, bin_max, draw):
@@ -121,6 +122,7 @@ class GradientDistribution(SamplerCallback):
             return plt.Rectangle(pos, width, height, color=color, alpha=alpha.cpu().numpy().item(), linewidth=0)
         
         _, ax = plt.subplots()
+        patches = []
         for draw in range(self.num_draws):
             for pos in range(self.num_bins):
                 bin_min = self.min_grad + pos * self.bin_size
@@ -129,8 +131,11 @@ class GradientDistribution(SamplerCallback):
                     count = grad_dist[:, draw, pos].sum()
                 else:
                     count = grad_dist[chain, draw, pos]
-                rect = build_rect(count, bin_min, bin_max, draw)
-                ax.add_patch(rect)
+                if count != 0:
+                    rect = build_rect(count, bin_min, bin_max, draw)
+                    patches.append(rect)
+        patches = PatchCollection(patches, match_original=True)
+        ax.add_collection(patches)
 
         # note that these y min/max values are relative to *all* gradients, not just the ones for this param
         y_min = self.min_grad
@@ -145,7 +150,7 @@ class GradientDistribution(SamplerCallback):
         if plot_zero:
             plt.axhline(color='black', linestyle=':', linewidth=1)
 
-        plt.xlabel('SGLD steps')
+        plt.xlabel('Sampler steps')
         plt.ylabel('gradient distribution')
-        plt.title(f'Distribution of {param_name} gradients at each SGLD step')
+        plt.title(f'Distribution of {param_name} gradients at each sampler step')
         plt.show()
