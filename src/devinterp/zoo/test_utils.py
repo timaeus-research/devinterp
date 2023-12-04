@@ -1,9 +1,5 @@
-import numpy as np
-import pytest
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
 
 class Polynomial(nn.Module):
     def __init__(self, powers=[1, 1]):
