@@ -27,7 +27,7 @@ def generated_normalcrossing_dataset():
 # @pytest.mark.parametrize("batch_sizes", [[1, 10, 100, 1000]])
 # @pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
 # @pytest.mark.parametrize("model", [Polynomial])
-def test_accuracy_normalcrossing(batch_sizes, sampling_method, model):
+def test_batch_size_convergence(batch_sizes, sampling_method, model):
     seed = 42
     model = model([2, 2])
     criterion = F.mse_loss
