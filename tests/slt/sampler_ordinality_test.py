@@ -3,7 +3,7 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import TensorDataset
+from torch.utils.data import TensorDataset, DataLoader
 
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
@@ -17,11 +17,12 @@ def generated_linedot_normalcrossing_dataset():
     torch.manual_seed(42)
     np.random.seed(42)
     sigma = 0.25
-    num_train_samples = 1000
-    x = torch.normal(0, 2, size=(num_train_samples,))
-    y = sigma * torch.normal(0, 1, size=(num_train_samples,))
+    num_samples = 1000
+    x = torch.normal(0, 2, size=(num_samples,))
+    y = sigma * torch.normal(0, 1, size=(num_samples,))
     train_data = TensorDataset(x, y)
-    return train_data, x, y
+    train_dataloader = DataLoader(train_data, batch_size=num_samples, shuffle=True)
+    return train_dataloader, train_data, x, y
 
 
 @pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
@@ -31,11 +32,12 @@ def test_ordinality_linedot_normal_crossing(
     generated_linedot_normalcrossing_dataset, sampling_method, model, dim
 ):
     seed = 42
+    torch.manual_seed(seed)
     if model == Polynomial:
         model = model([2 for _ in range(dim)])
     else:
         model = model(dim)
-    train_data, _, _ = generated_linedot_normalcrossing_dataset
+    train_dataloader, train_data, _, _ = generated_linedot_normalcrossing_dataset
     criterion = F.mse_loss
     lr = (
         0.0001 / dim
@@ -56,7 +58,7 @@ def test_ordinality_linedot_normal_crossing(
         )
         sample(
             model,
-            train_data,
+            train_dataloader,
             criterion=criterion,
             optimizer_kwargs=dict(
                 lr=lr,
@@ -68,7 +70,6 @@ def test_ordinality_linedot_normal_crossing(
             num_draws=num_draws,
             callbacks=[llc_estimator],
             verbose=False,
-            seed=seed,
         )
         llcs += [llc_estimator.sample()["llc/mean"]]
     assert (
