@@ -77,7 +77,7 @@ class OnlineLLCEstimator(SamplerCallback):
 
     @property
     def init_loss(self):
-        return self.losses[0, 0]
+        return self.losses[:, 0].mean()
 
     def finalize(self):
         self.llc_means = self.llcs.mean(axis=0)
@@ -114,9 +114,9 @@ def estimate_learning_coeff_with_summary(
 ) -> dict:
     
     if online:
-        llc_estimator = OnlineLLCEstimator(num_chains, num_draws, len(loader.dataset), device=device)
+        llc_estimator = OnlineLLCEstimator(num_chains, num_draws, optimizer_kwargs['num_samples'], device=device)
     else:
-        llc_estimator = LLCEstimator(num_chains, num_draws, len(loader.dataset), device=device)
+        llc_estimator = LLCEstimator(num_chains, num_draws, optimizer_kwargs['num_samples'], device=device)
 
     callbacks = [llc_estimator, *callbacks]
 
