@@ -73,7 +73,7 @@ def test_accuracy_normalcrossing(batch_sizes, sampling_method, model):
     ), f"mean {overall_mean}, std_dev_of_means {std_dev_of_means}, {means}, {stds}"
 
 
-for batch_sizes in [[1, 10, 100, 1000]]:
-    for sampling_method in [SGLD]:
-        for model in [Polynomial]:
-            test_accuracy_normalcrossing(batch_sizes, sampling_method, model)
+# for batch_sizes in [[1, 10, 100, 1000]]:
+#     for sampling_method in [SGLD]:
+#         for model in [Polynomial]:
+#             test_accuracy_normalcrossing(batch_sizes, sampling_method, model)
