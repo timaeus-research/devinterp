@@ -61,7 +61,7 @@ class CovarianceAccumulator(Estimator):
         return self.second_moment - torch.outer(self.first_moment, self.first_moment)
 
     def to_eigen(self, include_matrix=False):
-        """Convert the covariance matrix to pairs of eigenvalues and vectors."""
+        """Convert moments to a covariance matrix and compute the eigenvalues and eigenvectors."""
         cov = self.to_matrix().detach().cpu().numpy()
         eigvals, eigvecs = eigsh(cov, k=self.num_eigvals, which='LM')
 
