@@ -20,9 +20,9 @@ class CovarianceAccumulator(Estimator):
         second_moment (torch.Tensor): Second moment of weights.
         num_draws (int): Number of draws made to accumulate moments.
         accessors (List[WeightAccessor]): Functions to access model weights.
-        num_evals (int): Number of eigenvalues to compute.
+        num_eigvals (int): Number of eigenvalues to compute.
     """
-    def __init__(self, num_weights: int, accessors: List[WeightAccessor], device = "cpu", num_evals=3):
+    def __init__(self, num_weights: int, accessors: List[WeightAccessor], device = "cpu", num_eigvals=3):
         """
         Initialize the accumulator.
         """        
@@ -31,7 +31,7 @@ class CovarianceAccumulator(Estimator):
         self.second_moment = torch.zeros(num_weights, num_weights, device=device)
         self.num_draws = 0
         self.accessors = accessors
-        self.num_evals = num_evals
+        self.num_eigvals = num_eigvals
         self.is_finished = False
 
     def accumulate(self, model: nn.Module):
@@ -63,11 +63,11 @@ class CovarianceAccumulator(Estimator):
     def to_eigen(self, include_matrix=False):
         """Convert the covariance matrix to pairs of eigenvalues and vectors."""
         cov = self.to_matrix().detach().cpu().numpy()
-        evals, evecs = eigsh(cov, k=self.num_evals, which='LM')
+        eigvals, eigvecs = eigsh(cov, k=self.num_eigvals, which='LM')
 
         results = {
-            "evals": evals,
-            "evecs": evecs
+            "eigvals": eigvals,
+            "eigvecs": eigvecs
         }
 
         if include_matrix:
@@ -97,7 +97,7 @@ class WithinHeadCovarianceAccumulator:
         num_weights_per_layer (int): The number of weights per layer.
         num_weights (int): The total number of weights.
     """
-    def __init__(self, num_heads: int, num_weights_per_head: int, accessors: List[AttentionHeadWeightsAccessor], device = "cpu", num_evals=3):
+    def __init__(self, num_heads: int, num_weights_per_head: int, accessors: List[AttentionHeadWeightsAccessor], device = "cpu", num_eigvals=3):
         self.num_layers = len(accessors)
         self.num_heads = num_heads
         self.num_weights_per_head = num_weights_per_head
@@ -106,7 +106,7 @@ class WithinHeadCovarianceAccumulator:
         self.second_moment = torch.zeros(self.num_layers, num_heads, self.num_weights_per_head, self.num_weights_per_head, device=device)
         self.num_draws = 0
         self.accessors = accessors
-        self.num_evals = num_evals
+        self.num_eigvals = num_eigvals
         self.is_finished = False
 
     @property
@@ -162,21 +162,21 @@ class WithinHeadCovarianceAccumulator:
         cov = self.to_matrix().detach().cpu().numpy()
         results = {}
 
-        evals = np.zeros((self.num_evals, self.num_layers, self.num_heads))
-        evecs = np.zeros((self.num_evals, self.num_layers, self.num_heads, self.num_weights_per_head))
+        eigvals = np.zeros((self.num_eigvals, self.num_layers, self.num_heads))
+        eigvecs = np.zeros((self.num_eigvals, self.num_layers, self.num_heads, self.num_weights_per_head))
 
         for l in range(self.num_layers):
             for h in range(self.num_heads):
                 head_cov = cov[l, h]
-                head_evals, head_evecs = eigsh(head_cov, k=self.num_evals, which='LM')
+                head_evals, head_evecs = eigsh(head_cov, k=self.num_eigvals, which='LM')
 
-                for i in  range(self.num_evals):
-                    evecs[i,l,h,:] = head_evecs[:, i].reshape((self.num_weights_per_head,))
-                    evals[i,l,h] = head_evals[i]
+                for i in  range(self.num_eigvals):
+                    eigvecs[i,l,h,:] = head_evecs[:, i].reshape((self.num_weights_per_head,))
+                    eigvals[i,l,h] = head_evals[i]
 
         results.update({
-            "evecs": evecs,
-            "evals": evals
+            "eigvecs": eigvecs,
+            "eigvals": eigvals
         })
 
         if include_matrix:
@@ -198,7 +198,7 @@ class BetweenLayerCovarianceAccumulator:
     A CovarianceAccumulator to compute covariance between arbitrary layers.
     For use with `estimate`.
     """
-    def __init__(self, model, pairs: Dict[str, Tuple[str, str]], device = "cpu", num_evals=3, **accessors: LayerWeightsAccessor):
+    def __init__(self, model, pairs: Dict[str, Tuple[str, str]], device = "cpu", num_eigvals=3, **accessors: LayerWeightsAccessor):
         self.num_layers = len(accessors)
         self.accessors = accessors
         self.pairs = pairs
@@ -206,7 +206,7 @@ class BetweenLayerCovarianceAccumulator:
         self.first_moments = {name: torch.zeros(num_weights, device=device) for name, num_weights in self.num_weights_per_layer.items()}
         self.second_moments = {pair_name: torch.zeros(self.num_weights_per_layer[name1], self.num_weights_per_layer[name2], device=device) for pair_name, (name1, name2) in pairs.items()}
         self.num_draws = 0
-        self.num_evals = num_evals
+        self.num_eigvals = num_eigvals
         self.is_finished = False
         self.device = device
 
@@ -267,17 +267,17 @@ class BetweenLayerCovarianceAccumulator:
         results = {}
 
         for name, cov in covariances.items():
-            # TODO: U, s, Vt = svds(cov, k=self.num_evals, which='LM')
-            evals, evecs = eigsh(cov, k=self.num_evals, which='LM')
+            # TODO: U, s, Vt = svds(cov, k=self.num_eigvals, which='LM')
+            eigvals, eigvecs = eigsh(cov, k=self.num_eigvals, which='LM')
 
             # Reverse the order of the eigenvalues and vectors
-            evals = evals[::-1]
-            evecs = evecs[:, ::-1]
+            eigvals = eigvals[::-1]
+            eigvecs = eigvecs[:, ::-1]
 
             results.update({
                 name: {
-                    "evecs": evecs,
-                    "evals": evals
+                    "eigvecs": eigvecs,
+                    "eigvals": eigvals
                 }
             })
 
