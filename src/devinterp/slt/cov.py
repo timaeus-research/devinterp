@@ -5,11 +5,11 @@ import torch
 from scipy.sparse.linalg import eigsh
 from torch import nn
 
-from devinterp.slt.estimators import Estimator
+from devinterp.slt.callback import SamplerCallback
 
 WeightAccessor = Callable[[nn.Module], torch.Tensor]
 
-class CovarianceAccumulator(Estimator):
+class CovarianceAccumulator(SamplerCallback):
     """
     A callback to iteratively compute and store the covariance matrix of model weights.
     For use with `estimate`. 
@@ -74,7 +74,10 @@ class CovarianceAccumulator(Estimator):
             results["matrix"] = cov
 
         return results
-    
+
+    def sample(self):
+        return self.to_eigen(include_matrix=True)
+        
     def __call__(self, model):
         self.accumulate(model)
 
@@ -180,6 +183,9 @@ class WithinHeadCovarianceAccumulator:
             results["matrix"] = cov
 
         return results
+    
+    def sample(self):
+        return self.to_eigen(include_matrix=True)
 
     def __call__(self, model):
         self.accumulate(model)
@@ -261,6 +267,7 @@ class BetweenLayerCovarianceAccumulator:
         results = {}
 
         for name, cov in covariances.items():
+            # TODO: U, s, Vt = svds(cov, k=self.num_evals, which='LM')
             evals, evecs = eigsh(cov, k=self.num_evals, which='LM')
 
             # Reverse the order of the eigenvalues and vectors
@@ -279,5 +286,8 @@ class BetweenLayerCovarianceAccumulator:
 
         return results
 
+    def sample(self):
+        return self.to_eigens(include_matrix=True)
+    
     def __call__(self, model):
         self.accumulate(model)

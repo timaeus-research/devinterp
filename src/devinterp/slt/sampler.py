@@ -1,6 +1,5 @@
 import inspect
 import itertools
-import warnings
 from copy import deepcopy
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
@@ -13,6 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from devinterp.optim.sgld import SGLD
+from devinterp.slt.callback import validate_callbacks
 
 
 def call_with(func: Callable, **kwargs):
@@ -68,12 +68,8 @@ def sample_single_chain(
 
             with torch.no_grad():
                 for callback in callbacks:
-                    call_with(callback, **locals())  # TODO: Cursed. Find a better way. 
+                    call_with(callback, **locals())  # TODO: Cursed. This is the way. 
 
-
-    for callback in callbacks:
-        if hasattr(callback, "finalize"):
-            callback.finalize()
 
 def _sample_single_chain(kwargs):
     return sample_single_chain(**kwargs)
@@ -91,7 +87,6 @@ def sample(
     num_steps_bw_draws: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    pbar: bool = True,
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
     callbacks: List[Callable] = [],    
@@ -126,6 +121,8 @@ def sample(
     else:
         seeds = [None] * num_chains
 
+    validate_callbacks(callbacks)
+
     def get_args(i):
         return dict(
             chain=i,
@@ -138,12 +135,10 @@ def sample(
             num_steps_bw_draws=num_steps_bw_draws,
             sampling_method=sampling_method,
             optimizer_kwargs=optimizer_kwargs,
-            pbar=pbar,
             device=device,
             verbose=verbose,
             callbacks=callbacks
         )
-
 
     if cores > 1:
         ctx = get_context("spawn")

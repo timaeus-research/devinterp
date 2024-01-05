@@ -63,6 +63,7 @@ class SGLD(torch.optim.Optimizer):
         temperature: Union[Literal["adaptive"], float] = "adaptive",
         bounding_box_size=None,
         num_samples=1,
+        save_noise=False,
     ):
         defaults = dict(
             lr=lr,
@@ -74,6 +75,8 @@ class SGLD(torch.optim.Optimizer):
             num_samples=num_samples,
         )
         super(SGLD, self).__init__(params, defaults)
+        self.save_noise = save_noise
+        self.noise = None
 
         # Save the initial parameters if the elasticity term is set
         for group in self.param_groups:
@@ -85,6 +88,7 @@ class SGLD(torch.optim.Optimizer):
                 group["temperature"] = np.log(group["num_samples"])
 
     def step(self, closure=None):
+        self.noise = []
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -105,7 +109,10 @@ class SGLD(torch.optim.Optimizer):
                 noise = torch.normal(
                     mean=0.0, std=group["noise_level"], size=dw.size(), device=dw.device
                 )
+                if self.save_noise:
+                    self.noise.append(noise)
                 p.data.add_(noise, alpha=group["lr"] ** 0.5)
+                
                 # Rebound if exceeded bounding box size
                 if group["bounding_box_size"]:
                     torch.clamp_(
