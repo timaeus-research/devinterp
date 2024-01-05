@@ -2,10 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_trace(trace, y_axis, x_axis='step', title=None, plot_mean=True, plot_std=True, fig_size=(12, 9)):
+def plot_trace(trace, y_axis, x_axis='step', title=None, plot_mean=True, plot_std=True, fig_size=(12, 9), true_lc = None):
     num_chains, num_draws = trace.shape
     sgld_step = list(range(num_draws))
-
+    if true_lc:
+        plt.axhline(y=true_lc, color='r', linestyle='dashed')
     # trace
     for i in range(num_chains):
         draws = trace[i]
