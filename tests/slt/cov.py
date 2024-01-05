@@ -62,11 +62,11 @@ def test_covariance_accumulator_with_known_cov(dummy_model, known_accessor, cov_
     assert np.allclose(cov_matrix, cov_matrix, atol=1e-1)  # Tolerance due to finite sample
 
     # Test the eigenvalues
-    eigvals, eigvecs = np.linalg.eig(cov_matrix)
+    evals, evecs = np.linalg.eig(cov_matrix)
     eigenspectrum = acc.to_eigen(include_matrix=True)
 
-    assert np.allclose(eigvals, eigenspectrum['eigvals'], atol=1e-1)
-    assert np.allclose(np.abs(eigvecs), np.abs(eigenspectrum['eigvecs']), atol=1e-1)
+    assert np.allclose(evals, eigenspectrum['evals'], atol=1e-1)
+    assert np.allclose(np.abs(evecs), np.abs(eigenspectrum['evecs']), atol=1e-1)
 
 
 def test_reset_functionality(dummy_model, known_accessor):

@@ -106,6 +106,7 @@ class SGLD(torch.optim.Optimizer):
                     mean=0.0, std=group["noise_level"], size=dw.size(), device=dw.device
                 )
                 p.data.add_(noise, alpha=group["lr"] ** 0.5)
+                
                 # Rebound if exceeded bounding box size
                 if group["bounding_box_size"]:
                     torch.clamp_(

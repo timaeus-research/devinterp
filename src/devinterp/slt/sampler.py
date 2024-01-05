@@ -1,6 +1,5 @@
 import inspect
 import itertools
-import warnings
 from copy import deepcopy
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
@@ -68,7 +67,7 @@ def sample_single_chain(
 
             with torch.no_grad():
                 for callback in callbacks:
-                    call_with(callback, **locals())  # TODO: Cursed. Find a better way. 
+                    call_with(callback, **locals())  # TODO: Cursed. This is the way. 
 
 
 def _sample_single_chain(kwargs):
@@ -137,7 +136,6 @@ def sample(
             verbose=verbose,
             callbacks=callbacks
         )
-
 
     if cores > 1:
         ctx = get_context("spawn")
