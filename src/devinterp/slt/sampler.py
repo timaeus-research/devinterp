@@ -71,10 +71,6 @@ def sample_single_chain(
                     call_with(callback, **locals())  # TODO: Cursed. This is the way. 
 
 
-    for callback in callbacks:
-        if hasattr(callback, "finalize"):
-            callback.finalize()
-
 def _sample_single_chain(kwargs):
     return sample_single_chain(**kwargs)
 
@@ -143,7 +139,6 @@ def sample(
             verbose=verbose,
             callbacks=callbacks
         )
-
 
     if cores > 1:
         ctx = get_context("spawn")

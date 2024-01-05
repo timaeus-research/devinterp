@@ -47,6 +47,7 @@ class LLCEstimator(SamplerCallback):
         self.update(chain, draw, loss)
 
 
+
 class OnlineLLCEstimator(SamplerCallback):
     def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
         self.num_chains = num_chains
@@ -56,6 +57,7 @@ class OnlineLLCEstimator(SamplerCallback):
         self.llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
 
         self.n = torch.tensor(n, dtype=torch.float32).to(device)
+
         self.llc_means = torch.tensor(num_draws, dtype=torch.float32).to(device)
         self.llc_stds = torch.tensor(num_draws, dtype=torch.float32).to(device)
 
@@ -63,25 +65,28 @@ class OnlineLLCEstimator(SamplerCallback):
 
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss 
+        init_loss = self.losses[chain, 0]
 
         if draw == 0:  # TODO: We can probably drop this and it still works (but harder to read)
-            self.llcs[0, draw] = 0.
+            self.llcs[chain, draw] = 0.
         else:
             t = draw + 1
             prev_llc = self.llcs[chain, draw - 1]
+            # print(chain, draw, prev_llc, self.n, loss, init_loss, loss - init_loss)
 
             with torch.no_grad():
                 self.llcs[chain, draw] = (1 / t) * (
-                    (t - 1) * prev_llc + (self.n / self.n.log()) * (loss - self.init_loss)
+                    (t - 1) * prev_llc + (self.n / self.n.log()) * (loss - init_loss)
                 )
+
 
     @property
     def init_loss(self):
         return self.losses[:, 0].mean()
 
     def finalize(self):
-        self.llc_means = self.llcs.mean(axis=0)
-        self.llc_stds = self.llcs.std(axis=0)
+        self.llc_means = self.llcs.mean(dim=0)
+        self.llc_stds = self.llcs.std(dim=0)
 
     def sample(self):
         return {
@@ -161,7 +166,6 @@ def estimate_learning_coeff(
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
     callbacks: List[Callable] = [],
-    online: bool = False,
 ) -> float:
     return estimate_learning_coeff_with_summary(
         model=model,
@@ -178,5 +182,5 @@ def estimate_learning_coeff(
         device=device,
         verbose=verbose,
         callbacks=callbacks,
-        online=online,
+        online=False,
     )["llc/mean"]
