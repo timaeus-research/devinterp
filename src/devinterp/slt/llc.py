@@ -5,15 +5,15 @@ import torch
 from torch.utils.data import DataLoader
 
 from devinterp.optim.sgld import SGLD
-from devinterp.slt.callback import ChainCallback
+from devinterp.slt.callback import SamplerCallback
 from devinterp.slt.sampler import sample
 
 
-class LLCEstimator(ChainCallback):
+class LLCEstimator(SamplerCallback):
     def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
         self.num_chains = num_chains
         self.num_draws = num_draws
-        self.losses = np.zeros((num_chains, num_draws), dtype=np.float32)
+        self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
 
         self.n = torch.tensor(n, dtype=torch.float32).to(device)
         self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
@@ -31,23 +31,24 @@ class LLCEstimator(ChainCallback):
 
     def finalize(self):
         avg_losses = self.losses.mean(axis=1)
-        self.llc_per_chain = (self.n / self.n.log()).detach().cpu().numpy() * (avg_losses - self.init_loss)
+        self.llc_per_chain = (self.n / self.n.log()) * (avg_losses - self.init_loss)
         self.llc_mean = self.llc_per_chain.mean()
         self.llc_std = self.llc_per_chain.std()
         
     def sample(self):
         return {
-            "llc/mean": self.llc_mean.item(),
-            "llc/std": self.llc_std.item(),
-            **{f"llc-chain/{i}": self.llc_per_chain[i].item() for i in range(self.num_chains)},
-            "loss/trace": self.losses,
+            "llc/mean": self.llc_mean.cpu().numpy().item(),
+            "llc/std": self.llc_std.cpu().numpy().item(),
+            **{f"llc-chain/{i}": self.llc_per_chain[i].cpu().numpy().item() for i in range(self.num_chains)},
+            "loss/trace": self.losses.cpu().numpy(),
         }
     
     def __call__(self, chain: int, draw: int, loss: float):
         self.update(chain, draw, loss)
 
 
-class OnlineLLCEstimator(ChainCallback):
+
+class OnlineLLCEstimator(SamplerCallback):
     def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
         self.num_chains = num_chains
         self.num_draws = num_draws
@@ -56,8 +57,9 @@ class OnlineLLCEstimator(ChainCallback):
         self.llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
 
         self.n = torch.tensor(n, dtype=torch.float32).to(device)
-        self.llc_means = torch.zeros(num_draws, dtype=torch.float32).to(device)
-        self.llc_stds = torch.zeros(num_draws, dtype=torch.float32).to(device)
+
+        self.llc_means = torch.tensor(num_draws, dtype=torch.float32).to(device)
+        self.llc_stds = torch.tensor(num_draws, dtype=torch.float32).to(device)
 
         self.device = device
 
@@ -77,16 +79,21 @@ class OnlineLLCEstimator(ChainCallback):
                     (t - 1) * prev_llc + (self.n / self.n.log()) * (loss - init_loss)
                 )
 
+
+    @property
+    def init_loss(self):
+        return self.losses[:, 0].mean()
+
     def finalize(self):
         self.llc_means = self.llcs.mean(dim=0)
         self.llc_stds = self.llcs.std(dim=0)
 
     def sample(self):
         return {
-            "llc/means": self.llc_means.detach().cpu().numpy(),
-            "llc/stds": self.llc_stds.detach().cpu().numpy(),
-            "llc/trace": self.llcs.detach().cpu().numpy(),
-            "loss/trace": self.losses.detach().cpu().numpy()
+            "llc/means": self.llc_means.cpu().numpy(),
+            "llc/stds": self.llc_stds.cpu().numpy(),
+            "llc/trace": self.llcs.cpu().numpy(),
+            "loss/trace": self.losses.cpu().numpy()
         }
     
     def __call__(self, chain: int, draw: int, loss: float):
@@ -112,9 +119,9 @@ def estimate_learning_coeff_with_summary(
 ) -> dict:
     
     if online:
-        llc_estimator = OnlineLLCEstimator(num_chains, num_draws, len(loader.dataset), device=device)
+        llc_estimator = OnlineLLCEstimator(num_chains, num_draws, optimizer_kwargs['num_samples'], device=device)
     else:
-        llc_estimator = LLCEstimator(num_chains, num_draws, len(loader.dataset), device=device)
+        llc_estimator = LLCEstimator(num_chains, num_draws, optimizer_kwargs['num_samples'], device=device)
 
     callbacks = [llc_estimator, *callbacks]
 
