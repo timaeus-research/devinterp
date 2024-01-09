@@ -62,7 +62,7 @@ class GradientDistribution(SamplerCallback):
             self.grad_dists[param_name][chain, draw, bin_idx] += 1
     
     def _init_bins(self, grads: torch.Tensor):
-        _, bin_ends = torch.histogram(grads, bins=self.min_bins)
+        _, bin_ends = torch.histogram(grads.to('cpu'), bins=self.min_bins)
         self.bin_size = bin_ends[1] - bin_ends[0]
         self.num_bins = self.min_bins
         self.min_grad = bin_ends[0]
