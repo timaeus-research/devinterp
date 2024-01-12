@@ -10,6 +10,7 @@ class SGNHT(torch.optim.Optimizer):
         diffusion_factor=0.01,
         bounding_box_size=None,
         num_samples=1,
+        frozen_indices=None,
     ):
         """
         Initialize the SGNHT Optimizer.
@@ -25,6 +26,7 @@ class SGNHT(torch.optim.Optimizer):
             diffusion_factor=0.01,
             bounding_box_size=bounding_box_size,
             num_samples=num_samples,
+            frozen_indices=frozen_indices,
         )
         super(SGNHT, self).__init__(params, defaults)
 
@@ -48,11 +50,9 @@ class SGNHT(torch.optim.Optimizer):
             for group in self.param_groups:
                 group_energy_sum = 0.0
                 group_energy_size = 0
-
                 for p in group["params"]:
                     if p.grad is None:
                         continue
-
                     param_state = self.state[p]
                     momentum = param_state["momentum"]
 
@@ -68,7 +68,12 @@ class SGNHT(torch.optim.Optimizer):
                     noise = torch.normal(
                         mean=0.0, std=1.0, size=momentum.size(), device=momentum.device
                     )
-                    momentum.add_(noise * ((group["lr"] * 2 * group["diffusion_factor"]) ** 0.5))
+                    momentum.add_(
+                        noise * ((group["lr"] * 2 * group["diffusion_factor"]) ** 0.5)
+                    )
+
+                    if group["frozen_indices"] is not None:
+                        momentum = momentum * group["frozen_indices"]
 
                     # Update position
                     p.data.add_(momentum)
@@ -89,11 +94,12 @@ class SGNHT(torch.optim.Optimizer):
                         ) - 1
                         torch.clamp_(
                             p.data,
-                            min=param_state["initial_param"] - group["bounding_box_size"],
-                            max=param_state["initial_param"] + group["bounding_box_size"],
+                            min=param_state["initial_param"]
+                            - group["bounding_box_size"],
+                            max=param_state["initial_param"]
+                            + group["bounding_box_size"],
                         )
                         momentum.mul_(reflection_coefs)
-
                 # Update thermostat based on average kinetic energy
                 d_thermostat = (group_energy_sum / group_energy_size) - group["lr"]
                 group["thermostat"].add_(d_thermostat.to(group["thermostat"].device))

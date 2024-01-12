@@ -18,10 +18,10 @@ from devinterp.slt.callback import validate_callbacks
 def call_with(func: Callable, **kwargs):
     """Check the func annotation and call with only the necessary kwargs."""
     sig = inspect.signature(func)
-    
+
     # Filter out the kwargs that are not in the function's signature
     filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
-    
+
     # Call the function with the filtered kwargs
     return func(**filtered_kwargs)
 
@@ -30,30 +30,48 @@ def sample_single_chain(
     ref_model: nn.Module,
     loader: DataLoader,
     criterion: Callable,
-    num_draws=100,
-    num_burnin_steps=0,
-    num_steps_bw_draws=1,
+    num_draws: int = 100,
+    num_burnin_steps: int = 0,
+    num_steps_bw_draws: int = 1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
-    verbose=True,
+    verbose: bool = True,
     device: torch.device = torch.device("cpu"),
+    frozen_indices_per_model_param: Optional[dict] = None,
     callbacks: List[Callable] = [],
 ):
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
     optimizer_kwargs = optimizer_kwargs or {}
-    optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
+    if frozen_indices_per_model_param:
+        optimizer = sampling_method(
+            [
+                {
+                    "params": [(getattr(model, param_name))],
+                    "frozen_indices": indices.to(device),
+                }
+                for (param_name, indices) in frozen_indices_per_model_param.items()
+            ],
+            **optimizer_kwargs,
+        )
 
+    else:
+        optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
     if seed is not None:
         torch.manual_seed(seed)
 
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
     model.train()
 
-    for i, (xs, ys) in  tqdm(zip(range(num_steps), itertools.cycle(loader)), desc=f"Chain {chain}", total=num_steps, disable=not verbose):
+    for i, (xs, ys) in tqdm(
+        zip(range(num_steps), itertools.cycle(loader)),
+        desc=f"Chain {chain}",
+        total=num_steps,
+        disable=not verbose,
+    ):
         optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
@@ -68,7 +86,7 @@ def sample_single_chain(
 
             with torch.no_grad():
                 for callback in callbacks:
-                    call_with(callback, **locals())  # TODO: Cursed. This is the way. 
+                    call_with(callback, **locals())  # TODO: Cursed. This is the way.
 
 
 def _sample_single_chain(kwargs):
@@ -89,7 +107,8 @@ def sample(
     seed: Optional[Union[int, List[int]]] = None,
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[Callable] = [],    
+    callbacks: List[Callable] = [],
+    frozen_indices_per_model_param: Optional[dict] = None,
 ):
     """
     Sample model weights using a given optimizer, supporting multiple chains.
@@ -137,7 +156,8 @@ def sample(
             optimizer_kwargs=optimizer_kwargs,
             device=device,
             verbose=verbose,
-            callbacks=callbacks
+            callbacks=callbacks,
+            frozen_indices_per_model_param=frozen_indices_per_model_param,
         )
 
     if cores > 1:
@@ -151,5 +171,3 @@ def sample(
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
-
-
