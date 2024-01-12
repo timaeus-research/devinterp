@@ -64,7 +64,7 @@ class SGLD(torch.optim.Optimizer):
         bounding_box_size=None,
         num_samples=1,
         save_noise=False,
-        frozen_indices=None,
+        optimize_over=None,
     ):
         defaults = dict(
             lr=lr,
@@ -74,7 +74,7 @@ class SGLD(torch.optim.Optimizer):
             temperature=temperature,
             bounding_box_size=bounding_box_size,
             num_samples=num_samples,
-            frozen_indices=frozen_indices,
+            optimize_over=optimize_over,
         )
         super(SGLD, self).__init__(params, defaults)
         self.save_noise = save_noise
@@ -112,13 +112,13 @@ class SGLD(torch.optim.Optimizer):
                 if self.save_noise:
                     self.noise.append(noise)
 
-                if group["frozen_indices"] is not None:
-                    dw = dw * group["frozen_indices"]
-                    noise = noise * group["frozen_indices"]
+                if group["optimize_over"] is not None:
+                    dw = dw * group["optimize_over"]
+                    noise = noise * group["optimize_over"]
 
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
                 p.data.add_(noise, alpha=group["lr"] ** 0.5)
-
+                print(p)
                 # Rebound if exceeded bounding box size
                 if group["bounding_box_size"]:
                     torch.clamp_(

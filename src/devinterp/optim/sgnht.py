@@ -10,7 +10,7 @@ class SGNHT(torch.optim.Optimizer):
         diffusion_factor=0.01,
         bounding_box_size=None,
         num_samples=1,
-        frozen_indices=None,
+        optimize_over=None,
     ):
         """
         Initialize the SGNHT Optimizer.
@@ -26,7 +26,7 @@ class SGNHT(torch.optim.Optimizer):
             diffusion_factor=0.01,
             bounding_box_size=bounding_box_size,
             num_samples=num_samples,
-            frozen_indices=frozen_indices,
+            optimize_over=optimize_over,
         )
         super(SGNHT, self).__init__(params, defaults)
 
@@ -72,8 +72,8 @@ class SGNHT(torch.optim.Optimizer):
                         noise * ((group["lr"] * 2 * group["diffusion_factor"]) ** 0.5)
                     )
 
-                    if group["frozen_indices"] is not None:
-                        momentum = momentum * group["frozen_indices"]
+                    if group["optimize_over"] is not None:
+                        momentum = momentum * group["optimize_over"]
 
                     # Update position
                     p.data.add_(momentum)

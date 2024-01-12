@@ -39,27 +39,27 @@ def sample_single_chain(
     seed: Optional[int] = None,
     verbose: bool = True,
     device: torch.device = torch.device("cpu"),
-    frozen_indices_per_model_param: Optional[dict] = None,
+    optimize_over_per_model_param: Optional[dict] = None,
     callbacks: List[Callable] = [],
 ):
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
     optimizer_kwargs = optimizer_kwargs or {}
-    if frozen_indices_per_model_param:
+    if optimize_over_per_model_param:
         optimizer = sampling_method(
             [
                 {
                     "params": [(getattr(model, param_name))],
-                    "frozen_indices": indices.to(device),
+                    "optimize_over": boolean_mask.to(device),
                 }
-                for (param_name, indices) in frozen_indices_per_model_param.items()
+                for (param_name, boolean_mask) in optimize_over_per_model_param.items()
             ],
             **optimizer_kwargs,
         )
-
     else:
         optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
+    
     if seed is not None:
         torch.manual_seed(seed)
 
@@ -108,7 +108,7 @@ def sample(
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
     callbacks: List[Callable] = [],
-    frozen_indices_per_model_param: Optional[dict] = None,
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
 ):
     """
     Sample model weights using a given optimizer, supporting multiple chains.
@@ -157,7 +157,7 @@ def sample(
             device=device,
             verbose=verbose,
             callbacks=callbacks,
-            frozen_indices_per_model_param=frozen_indices_per_model_param,
+            optimize_over_per_model_param=optimize_over_per_model_param,
         )
 
     if cores > 1:
