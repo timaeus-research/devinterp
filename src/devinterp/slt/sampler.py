@@ -78,6 +78,9 @@ def sample_single_chain(
         loss = criterion(y_preds, ys)
 
         loss.backward()
+        if optimize_over_per_model_param: # not sure this is needed tbh
+            for param_name, optimize_over in optimize_over_per_model_param.items():
+                getattr(model, param_name).grad = getattr(model, param_name).grad*optimize_over 
         optimizer.step()
 
         if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
