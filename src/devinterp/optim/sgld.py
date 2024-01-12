@@ -118,7 +118,6 @@ class SGLD(torch.optim.Optimizer):
 
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
                 p.data.add_(noise, alpha=group["lr"] ** 0.5)
-                print(p)
                 # Rebound if exceeded bounding box size
                 if group["bounding_box_size"]:
                     torch.clamp_(
