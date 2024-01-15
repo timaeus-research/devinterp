@@ -44,13 +44,12 @@ def sample_single_chain(
 ):
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
-
     optimizer_kwargs = optimizer_kwargs or {}
     if optimize_over_per_model_param:
         optimizer = sampling_method(
             [
                 {
-                    "params": [(getattr(model, param_name))],
+                    "params": getattr(model, param_name),
                     "optimize_over": boolean_mask.to(device),
                 }
                 for (param_name, boolean_mask) in optimize_over_per_model_param.items()
@@ -59,7 +58,7 @@ def sample_single_chain(
         )
     else:
         optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
-    
+
     if seed is not None:
         torch.manual_seed(seed)
 
@@ -78,9 +77,9 @@ def sample_single_chain(
         loss = criterion(y_preds, ys)
 
         loss.backward()
-        if optimize_over_per_model_param: # not sure this is needed tbh
-            for param_name, optimize_over in optimize_over_per_model_param.items():
-                getattr(model, param_name).grad = getattr(model, param_name).grad*optimize_over 
+        # if optimize_over_per_model_param: # not sure this is needed tbh
+        #     for param_name, optimize_over in optimize_over_per_model_param.items():
+        #         getattr(model, param_name).grad = getattr(model, param_name).grad*optimize_over
         optimizer.step()
 
         if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
