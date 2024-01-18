@@ -92,21 +92,25 @@ def sample(
     callbacks: List[Callable] = [],    
 ):
     """
-    Sample model weights using a given optimizer, supporting multiple chains.
+    Sample model weights using a given sampling_method, supporting multiple chains. 
+    See the example notebooks examples/diagnostics.ipynb and examples/sgld_calibration.ipynb for (respectively)
+    info on what callbacks to pass along and how to calibrate sampler/optimizer hyperparams.
 
     Parameters:
         model (torch.nn.Module): The neural network model.
-        step (Literal['sgld']): The name of the optimizer to use to step.
         loader (DataLoader): DataLoader for input data.
         criterion (torch.nn.Module): Loss function.
+        sampling_method (torch.optim.Optimizer): Sampling method to use (really a PyTorch optimizer).
+        optimizer_kwargs (Optional[Dict[str, Union[float, Literal['adaptive']]]]): Keyword arguments for the PyTorch optimizer (used as sampler here).
         num_draws (int): Number of samples to draw.
         num_chains (int): Number of chains to run.
         num_burnin_steps (int): Number of burn-in steps before sampling.
         num_steps_bw_draws (int): Number of steps between each draw.
         cores (Optional[int]): Number of cores for parallel execution.
         seed (Optional[Union[int, List[int]]]): Random seed(s) for sampling.
-        progressbar (bool): Whether to display a progress bar.
-        optimizer_kwargs (Optional[Dict[str, Union[float, Literal['adaptive']]]]): Keyword arguments for the optimizer.
+        device (torch.device): PyTorch Device
+        verbose (bool): whether to print sample chain progress
+        callbacks (List[Callable]): list of callbacks, each of type SamplerCallback
     """
     if cores is None:
         cores = min(4, cpu_count())

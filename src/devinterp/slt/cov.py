@@ -12,7 +12,7 @@ WeightAccessor = Callable[[nn.Module], torch.Tensor]
 class CovarianceAccumulator(SamplerCallback):
     """
     A callback to iteratively compute and store the covariance matrix of model weights.
-    For use with `estimate`. 
+    For use with `sample`. 
 
     Attributes:
         num_weights (int): Total number of weights.
@@ -87,7 +87,7 @@ AttentionHeadWeightsAccessor = Callable[[nn.Module], Tuple[torch.Tensor, ...]]
 class WithinHeadCovarianceAccumulator:
     """
     A CovarianceAccumulator to compute covariance within attention heads.
-    For use with `estimate`.
+    For use with `sample`.
 
     Attributes:
         num_heads (int): The number of attention heads.
