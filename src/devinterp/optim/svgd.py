@@ -37,7 +37,9 @@ class SVGD(torch.optim.Optimizer):
         defaults = dict(lr=lr)
         super(SVGD, self).__init__(params, defaults)
         self.K = K  # Kernel function
-        warnings.warn("This class is currently experimenntal and does not estimate RLCT correctly.")
+        warnings.warn(
+            "This class is currently experimenntal and does not estimate RLCT correctly."
+        )
 
     def step(self):
         for group in self.param_groups:

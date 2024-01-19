@@ -16,10 +16,10 @@ from devinterp.slt.callback import validate_callbacks, SamplerCallback
 def call_with(func: Callable, **kwargs):
     """Check the func annotation and call with only the necessary kwargs."""
     sig = inspect.signature(func)
-    
+
     # Filter out the kwargs that are not in the function's signature
     filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
-    
+
     # Call the function with the filtered kwargs
     return func(**filtered_kwargs)
 
@@ -51,7 +51,12 @@ def sample_single_chain(
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
     model.train()
 
-    for i, (xs, ys) in  tqdm(zip(range(num_steps), itertools.cycle(loader)), desc=f"Chain {chain}", total=num_steps, disable=not verbose):
+    for i, (xs, ys) in tqdm(
+        zip(range(num_steps), itertools.cycle(loader)),
+        desc=f"Chain {chain}",
+        total=num_steps,
+        disable=not verbose,
+    ):
         optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
@@ -66,7 +71,7 @@ def sample_single_chain(
 
             with torch.no_grad():
                 for callback in callbacks:
-                    call_with(callback, **locals())  # Cursed. This is the way. 
+                    call_with(callback, **locals())  # Cursed. This is the way.
 
 
 def _sample_single_chain(kwargs):
@@ -87,10 +92,10 @@ def sample(
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[SamplerCallback] = [],    
+    callbacks: List[SamplerCallback] = [],
 ):
     """
-    Sample model weights using a given sampling_method, supporting multiple chains. 
+    Sample model weights using a given sampling_method, supporting multiple chains.
     See the example notebooks examples/diagnostics.ipynb and examples/sgld_calibration.ipynb for (respectively)
     info on what callbacks to pass along and how to calibrate sampler/optimizer hyperparams.
 
@@ -139,7 +144,7 @@ def sample(
             optimizer_kwargs=optimizer_kwargs,
             device=device,
             verbose=verbose,
-            callbacks=callbacks
+            callbacks=callbacks,
         )
 
     if cores > 1:
@@ -153,5 +158,3 @@ def sample(
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
-
-

@@ -68,7 +68,9 @@ class SGLD(torch.optim.Optimizer):
         save_noise=False,
     ):
         if noise_level != 1.0:
-            warnings.warn('Warning: noise_level in SGLD is unequal to zero, are you intending to use SGD?')
+            warnings.warn(
+                "Warning: noise_level in SGLD is unequal to zero, are you intending to use SGD?"
+            )
         defaults = dict(
             lr=lr,
             noise_level=noise_level,
@@ -116,7 +118,7 @@ class SGLD(torch.optim.Optimizer):
                 if self.save_noise:
                     self.noise.append(noise)
                 p.data.add_(noise, alpha=group["lr"] ** 0.5)
-                
+
                 # Rebound if exceeded bounding box size
                 if group["bounding_box_size"]:
                     torch.clamp_(
