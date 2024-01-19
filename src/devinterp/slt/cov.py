@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple, Union
 
 import numpy as np
 import torch
@@ -15,12 +15,10 @@ class CovarianceAccumulator(SamplerCallback):
     A callback to iteratively compute and store the covariance matrix of model weights.
     For use with `sample`.
 
-    Attributes:
+    params:
         num_weights (int): Total number of weights.
-        first_moment (torch.Tensor): First moment of weights.
-        second_moment (torch.Tensor): Second moment of weights.
-        num_draws (int): Number of draws made to accumulate moments.
         accessors (List[WeightAccessor]): Functions to access model weights.
+        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
         num_evals (int): Number of eigenvalues to compute.
     """
 
@@ -28,8 +26,8 @@ class CovarianceAccumulator(SamplerCallback):
         self,
         num_weights: int,
         accessors: List[WeightAccessor],
-        device="cpu",
-        num_evals=3,
+        device: Union[torch.device, str] = "cpu",
+        num_evals: int = 3,
     ):
         """
         Initialize the accumulator.
@@ -97,13 +95,12 @@ class WithinHeadCovarianceAccumulator:
     A CovarianceAccumulator to compute covariance within attention heads.
     For use with `sample`.
 
-    Attributes:
+    params:
         num_heads (int): The number of attention heads.
         num_weights_per_head (int): The number of weights per attention head.
         accessors (List[AttentionHeadWeightsAccessor]): Functions to access attention head weights.
-        num_layers (int): The number of layers (= number of accessors).
-        num_weights_per_layer (int): The number of weights per layer.
-        num_weights (int): The total number of weights.
+        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+        num_evals (int): number of eigenvectors / eigenvalues to return.
     """
 
     def __init__(
@@ -111,8 +108,8 @@ class WithinHeadCovarianceAccumulator:
         num_heads: int,
         num_weights_per_head: int,
         accessors: List[AttentionHeadWeightsAccessor],
-        device="cpu",
-        num_evals=3,
+        device: Union[torch.device, str] = "cpu",
+        num_evals: int = 3,
     ):
         self.num_layers = len(accessors)
         self.num_heads = num_heads
@@ -223,14 +220,21 @@ class BetweenLayerCovarianceAccumulator:
     """
     A CovarianceAccumulator to compute covariance between arbitrary layers.
     For use with `estimate`.
+
+    params:
+        model (torch.nn.Module): The model to compute covariances on.
+        pairs (Dict[str, Tuple[str, str]]): Named pairs of layers to compute covariances on.
+        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+        num_evals (int): number of eigenvectors / eigenvalues to return.
+        accessors (List[AttentionHeadWeightsAccessor]): Functions to access attention head weights.
     """
 
     def __init__(
         self,
         model,
         pairs: Dict[str, Tuple[str, str]],
-        device="cpu",
-        num_evals=3,
+        device: Union[torch.device, str] = "cpu",
+        num_evals: int = 3,
         **accessors: LayerWeightsAccessor,
     ):
         self.num_layers = len(accessors)

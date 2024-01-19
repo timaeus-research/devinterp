@@ -1,4 +1,5 @@
-import numpy as np
+from typing import Union
+
 import torch
 import torch.nn as nn
 
@@ -10,7 +11,7 @@ class WeightNorm(SamplerCallback):
     """
     Callback for computing the norm of the weights over the sampling process.
 
-    Attributes:
+    params:
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
         p_norm (int): Order of the norm to be computed (e.g., 2 for Euclidean norm).
@@ -54,7 +55,7 @@ class GradientNorm(SamplerCallback):
     """
     Callback for computing the norm of the gradients of the optimizer / sampler.
 
-    Attributes:
+    params:
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
         p_norm (int): Order of the norm to be computed (e.g., 2 for Euclidean norm).
@@ -98,7 +99,7 @@ class NoiseNorm(SamplerCallback):
     """
     Callback for computing the norm of the noise added in the optimizer / sampler.
 
-    Attributes:
+    params:
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
         p_norm (int): Order of the norm to be computed (e.g., 2 for Euclidean norm).

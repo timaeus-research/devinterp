@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 import math
 from matplotlib.collections import PatchCollection
 import matplotlib.pyplot as plt
@@ -34,7 +34,7 @@ class GradientDistribution(SamplerCallback):
         num_draws: int,
         min_bins: int = 20,
         param_names: List[str] = None,
-        device="cpu",
+        device: Union[torch.device, str] = "cpu",
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws

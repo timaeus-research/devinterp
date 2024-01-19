@@ -1,6 +1,5 @@
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
@@ -17,7 +16,7 @@ class LLCEstimator(SamplerCallback):
     TODO
     $$
 
-    Attributes:
+    params:
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
         n (int): Number of samples used to calculate the LLC.
@@ -77,14 +76,20 @@ class OnlineLLCEstimator(SamplerCallback):
     Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.
     It calculates LLCs using the same formula as LLCEstimator, but continuously and including means and std across draws (as opposed to just across chains).
 
-    Attributes:
+    params:
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
         n (int): Number of samples used to calculate the LLC.
         device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
 
-    def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
+    def __init__(
+        self,
+        num_chains: int,
+        num_draws: int,
+        n: int,
+        device: Union[torch.device, str] = "cpu",
+    ):
         self.num_chains = num_chains
         self.num_draws = num_draws
 

@@ -1,4 +1,5 @@
-import numpy as np
+from typing import Union
+
 import torch
 
 from devinterp.slt.callback import SamplerCallback
@@ -12,7 +13,12 @@ class OnlineTraceStatistics(SamplerCallback):
         base_callback (ChainCallback): Base callback that computes original trace metric online.
     """
 
-    def __init__(self, base_callback: SamplerCallback, attribute: str, device="cpu"):
+    def __init__(
+        self,
+        base_callback: SamplerCallback,
+        attribute: str,
+        device: Union[torch.device, str] = "cpu",
+    ):
         self.base_callback = base_callback
         self.attribute = attribute
         self.validate_base_callback()
