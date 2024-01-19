@@ -9,7 +9,7 @@ from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
 from devinterp.slt.llc import LLCEstimator
-from devinterp.zoo.test_utils import *
+from devinterp.test_utils import *
 
 
 @pytest.fixture
