@@ -13,16 +13,15 @@ class GradientDistribution(SamplerCallback):
     """
     Callback for plotting the distribution of gradients as a function of draws.
 
-    param:
-        num_draws (int): Number of samples to draw (should be identical to param passed to sample())
-        num_chains (int): Number of chains to run (should be identical to param passed to sample())
-        grad_dists (dict): Stores the gradient distributions for each parameter.
-        min_bins (int): Minimum number of bins for histogram approximation.
-        param_names (List[str], optional): List of parameter names to track. If None, all parameters are tracked.
-        bin_size (torch.Tensor): Size of each bin in the histogram.
-        num_bins (torch.Tensor): Number of bins in the histogram.
-        min_grad (torch.Tensor): Minimum gradient value encountered.
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_draws: Number of samples to draw (should be identical to param passed to sample())
+    :param num_chains: Number of chains to run (should be identical to param passed to sample())
+    :param grad_dists: Stores the gradient distributions for each parameter.
+    :param min_bins: Minimum number of bins for histogram approximation.
+    :param param_names: List of parameter names to track. If None, all parameters are tracked.
+    :param bin_size: Size of each bin in the histogram.
+    :param num_bins: Number of bins in the histogram.
+    :param min_grad: Minimum gradient value encountered.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
 
     Raises:
         ValueError: If gradients are not computed before calling this callback.

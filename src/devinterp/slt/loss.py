@@ -10,8 +10,8 @@ class OnlineLossStatistics(SamplerCallback):
     """
     Derivative callback that computes various loss statistics for OnlineLLCEstimator. Must
     be called after the base OnlineLLCEstimator has been called at each draw.
-    Parameters:
-        base_callback (OnlineLLCEstimator): Base callback that computes original loss metric.
+
+    :param base_callback: Base callback that computes original loss metric.
     """
 
     def __init__(self, base_callback: OnlineLLCEstimator):

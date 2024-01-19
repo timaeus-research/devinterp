@@ -11,11 +11,10 @@ class WeightNorm(SamplerCallback):
     """
     Callback for computing the norm of the weights over the sampling process.
 
-    params:
-        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
-        num_chains (int): Number of chains to run. (should be identical to param passed to sample())
-        p_norm (int): Order of the norm to be computed (e.g., 2 for Euclidean norm).
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
+    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
+    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm).
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
 
     def __init__(
@@ -55,11 +54,10 @@ class GradientNorm(SamplerCallback):
     """
     Callback for computing the norm of the gradients of the optimizer / sampler.
 
-    params:
-        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
-        num_chains (int): Number of chains to run. (should be identical to param passed to sample())
-        p_norm (int): Order of the norm to be computed (e.g., 2 for Euclidean norm).
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
+    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
+    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm).
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
 
     def __init__(
@@ -99,11 +97,10 @@ class NoiseNorm(SamplerCallback):
     """
     Callback for computing the norm of the noise added in the optimizer / sampler.
 
-    params:
-        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
-        num_chains (int): Number of chains to run. (should be identical to param passed to sample())
-        p_norm (int): Order of the norm to be computed (e.g., 2 for Euclidean norm).
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
+    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
+    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm).
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
 
     def __init__(

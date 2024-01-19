@@ -16,11 +16,10 @@ class LLCEstimator(SamplerCallback):
     TODO
     $$
 
-    params:
-        num_chains (int): Number of chains to run. (should be identical to param passed to sample())
-        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
-        n (int): Number of samples used to calculate the LLC.
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_chains (int): Number of chains to run. (should be identical to param passed to sample())
+    :param num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
+    :param n (int): Number of samples used to calculate the LLC.
+    :param device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
 
     def __init__(
@@ -76,11 +75,10 @@ class OnlineLLCEstimator(SamplerCallback):
     Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.
     It calculates LLCs using the same formula as LLCEstimator, but continuously and including means and std across draws (as opposed to just across chains).
 
-    params:
-        num_chains (int): Number of chains to run. (should be identical to param passed to sample())
-        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
-        n (int): Number of samples used to calculate the LLC.
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
+    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
+    :param n: Number of samples used to calculate the LLC.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
 
     def __init__(

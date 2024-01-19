@@ -15,11 +15,10 @@ class CovarianceAccumulator(SamplerCallback):
     A callback to iteratively compute and store the covariance matrix of model weights.
     For use with `sample`.
 
-    params:
-        num_weights (int): Total number of weights.
-        accessors (List[WeightAccessor]): Functions to access model weights.
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
-        num_evals (int): Number of eigenvalues to compute.
+    :param num_weights: Total number of weights.
+    :param accessors: Functions to access model weights.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_evals: Number of eigenvalues to compute.
     """
 
     def __init__(
@@ -29,9 +28,6 @@ class CovarianceAccumulator(SamplerCallback):
         device: Union[torch.device, str] = "cpu",
         num_evals: int = 3,
     ):
-        """
-        Initialize the accumulator.
-        """
         self.num_weights = num_weights
         self.first_moment = torch.zeros(num_weights, device=device)
         self.second_moment = torch.zeros(num_weights, num_weights, device=device)
@@ -41,7 +37,7 @@ class CovarianceAccumulator(SamplerCallback):
         self.is_finished = False
 
     def accumulate(self, model: nn.Module):
-        """Accumulate moments from model weights."""
+        # Accumulate moments from model weights.
         assert not self.is_finished, "Cannot accumulate after finalizing."
 
         weights = torch.cat(
@@ -52,24 +48,22 @@ class CovarianceAccumulator(SamplerCallback):
         self.num_draws += 1
 
     def finalize(self):
-        """Finalize the moments by dividing by the number of draws."""
         self.first_moment /= self.num_draws
         self.second_moment /= self.num_draws
         self.is_finished = True
 
     def reset(self):
-        """Reset the accumulator."""
         self.first_moment.zero_()
         self.second_moment.zero_()
         self.num_draws = 0
         self.is_finished = False
 
     def to_matrix(self):
-        """Convert the moments to a covariance matrix."""
+        # Convert the moments to a covariance matrix.
         return self.second_moment - torch.outer(self.first_moment, self.first_moment)
 
     def to_eigen(self, include_matrix=False):
-        """Convert the covariance matrix to pairs of eigenvalues and vectors."""
+        # Convert the covariance matrix to pairs of eigenvalues and vectors.
         cov = self.to_matrix().detach().cpu().numpy()
         evals, evecs = eigsh(cov, k=self.num_evals, which="LM")
 
@@ -95,12 +89,11 @@ class WithinHeadCovarianceAccumulator:
     A CovarianceAccumulator to compute covariance within attention heads.
     For use with `sample`.
 
-    params:
-        num_heads (int): The number of attention heads.
-        num_weights_per_head (int): The number of weights per attention head.
-        accessors (List[AttentionHeadWeightsAccessor]): Functions to access attention head weights.
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
-        num_evals (int): number of eigenvectors / eigenvalues to return.
+    :param num_heads: The number of attention heads.
+    :param num_weights_per_head: The number of weights per attention head.
+    :param accessors: Functions to access attention head weights.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_evals: number of eigenvectors / eigenvalues to return.
     """
 
     def __init__(
@@ -132,16 +125,14 @@ class WithinHeadCovarianceAccumulator:
 
     @property
     def num_weights_per_layer(self):
-        """The number of weights per layer."""
         return self.num_heads * self.num_weights_per_head
 
     @property
     def num_weights(self):
-        """The total number of weights."""
         return self.num_layers * self.num_weights_per_layer
 
     def accumulate(self, model: nn.Module):
-        """Accumulate moments from model weights."""
+        # Accumulate moments from model weights.
         assert not self.is_finished, "Cannot accumulate after finalizing."
 
         for l, accessor in enumerate(self.accessors):
@@ -155,20 +146,18 @@ class WithinHeadCovarianceAccumulator:
         self.num_draws += 1
 
     def finalize(self):
-        """Finalize the moments by dividing by the number of draws."""
         self.first_moment /= self.num_draws
         self.second_moment /= self.num_draws
         self.is_finished = True
 
     def reset(self):
-        """Reset the accumulator."""
         self.first_moment.zero_()
         self.second_moment.zero_()
         self.num_draws = 0
         self.is_finished = False
 
     def to_matrix(self):
-        """Convert the moments to a covariance matrix."""
+        # Convert the moments to a covariance matrix.
         covariance = self.second_moment
 
         for l in range(self.num_layers):
@@ -179,7 +168,7 @@ class WithinHeadCovarianceAccumulator:
         return covariance
 
     def to_eigen(self, include_matrix=False):
-        """Convert the covariance matrix to pairs of eigenvalues and vectors."""
+        # Convert the covariance matrix to pairs of eigenvalues and vectors.
         cov = self.to_matrix().detach().cpu().numpy()
         results = {}
 
@@ -221,12 +210,11 @@ class BetweenLayerCovarianceAccumulator:
     A CovarianceAccumulator to compute covariance between arbitrary layers.
     For use with `estimate`.
 
-    params:
-        model (torch.nn.Module): The model to compute covariances on.
-        pairs (Dict[str, Tuple[str, str]]): Named pairs of layers to compute covariances on.
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
-        num_evals (int): number of eigenvectors / eigenvalues to return.
-        accessors (List[AttentionHeadWeightsAccessor]): Functions to access attention head weights.
+    :param model: The model to compute covariances on.
+    :param pairs: Named pairs of layers to compute covariances on.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_evals: number of eigenvectors / eigenvalues to return.
+    :param accessors: Functions to access attention head weights.
     """
 
     def __init__(
@@ -262,11 +250,10 @@ class BetweenLayerCovarianceAccumulator:
 
     @property
     def num_weights(self):
-        """The total number of weights."""
         return sum(self.num_weights_per_layer.values())
 
     def accumulate(self, model: nn.Module):
-        """Accumulate moments from model weights."""
+        # Accumulate moments from model weights.
         assert not self.is_finished, "Cannot accumulate after finalizing."
         weights = {
             name: accessor(model).flatten() for name, accessor in self.accessors.items()
@@ -283,7 +270,6 @@ class BetweenLayerCovarianceAccumulator:
         self.num_draws += 1
 
     def finalize(self):
-        """Finalize the moments by dividing by the number of draws."""
 
         for name in self.accessors:
             self.first_moments[name] /= self.num_draws
@@ -294,7 +280,6 @@ class BetweenLayerCovarianceAccumulator:
         self.is_finished = True
 
     def reset(self):
-        """Reset the accumulator."""
         for name in self.accessors:
             self.first_moments[name].zero_()
 
@@ -305,7 +290,7 @@ class BetweenLayerCovarianceAccumulator:
         self.is_finished = False
 
     def to_matrices(self):
-        """Convert the moments to a covariance matrix."""
+        # Convert the moments to a covariance matrix.
         covariances = {}
 
         for name, (layer1, layer2) in self.pairs.items():
@@ -318,7 +303,7 @@ class BetweenLayerCovarianceAccumulator:
         return covariances
 
     def to_eigens(self, include_matrix=False):
-        """Convert the covariance matrix to pairs of eigenvalues and vectors."""
+        # Convert the covariance matrix to pairs of eigenvalues and vectors.
         covariances = {
             k: v.detach().cpu().numpy() for k, v in self.to_matrices().items()
         }

@@ -99,21 +99,20 @@ def sample(
     See the example notebooks examples/diagnostics.ipynb and examples/sgld_calibration.ipynb for (respectively)
     info on what callbacks to pass along and how to calibrate sampler/optimizer hyperparams.
 
-    Parameters:
-        model (torch.nn.Module): The neural network model.
-        loader (DataLoader): DataLoader for input data.
-        criterion (torch.nn.Module): Loss function.
-        sampling_method (torch.optim.Optimizer): Sampling method to use (really a PyTorch optimizer).
-        optimizer_kwargs (Optional[Dict[str, Union[float, Literal['adaptive']]]]): Keyword arguments for the PyTorch optimizer (used as sampler here).
-        num_draws (int): Number of samples to draw.
-        num_chains (int): Number of chains to run.
-        num_burnin_steps (int): Number of burn-in steps before sampling.
-        num_steps_bw_draws (int): Number of steps between each draw.
-        cores (Optional[int]): Number of cores for parallel execution.
-        seed (Optional[Union[int, List[int]]]): Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed.
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
-        verbose (bool): whether to print sample chain progress
-        callbacks (List[SamplerCallback]): list of callbacks, each of type SamplerCallback
+    :param model: The neural network model.
+    :param loader: DataLoader for input data.
+    :param criterion: Loss function.
+    :param sampling_method: Sampling method to use (really a PyTorch optimizer).
+    :param optimizer_kwargs: Keyword arguments for the PyTorch optimizer (used as sampler here).
+    :param num_draws: Number of samples to draw.
+    :param num_chains: Number of chains to run.
+    :param num_burnin_steps: Number of burn-in steps before sampling.
+    :param num_steps_bw_draws: Number of steps between each draw.
+    :param cores: Number of cores for parallel execution.
+    :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param verbose: whether to print sample chain progress
+    :param callbacks: list of callbacks, each of type SamplerCallback
     """
     if cores is None:
         cores = min(4, cpu_count())

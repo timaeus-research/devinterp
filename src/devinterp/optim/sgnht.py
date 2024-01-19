@@ -3,6 +3,30 @@ import torch
 
 
 class SGNHT(torch.optim.Optimizer):
+    r"""
+    Implement the Stochastic Gradient Nose Hoover Thermostat (SGNHT) Optimizer.
+    This optimizer blends SGD with an adaptive thermostat variable to control the magnitude of the injected noise,
+    maintaining the kinetic energy of the system.
+
+    It follows Ding et al.'s (2014) implementation.
+
+    The equations for the update are as follows:
+
+    $$\Delta w_t = \epsilon\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right) - \xi_t w_t \right) + \sqrt{2A} N(0, \epsilon)$$
+    $$\Delta\xi_{t} = \epsilon \left( \frac{1}{n} \|w_t\|^2 - 1 \right)$$
+
+    where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate,
+    $(\beta n)$ is the inverse temperature (we're in the tempered Bayes paradigm),
+    $n$ is the number of training samples, $m$ is the batch size,
+    $\xi_t$ is the thermostat variable at time $t$, $A$ is the diffusion factor,
+    and $N(0, A)$ represents Gaussian noise with mean 0 and variance $A$.
+
+    :param params: Iterable of parameters to optimize or dicts defining parameter groups (required)
+    :param lr: Learning rate
+    :param diffusion_factor: The diffusion factor of the thermostat (default: 0.01)
+    :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
+    :param num_samples: Number of samples to average over (default: 1)"""
+
     def __init__(
         self,
         params,
@@ -11,34 +35,6 @@ class SGNHT(torch.optim.Optimizer):
         bounding_box_size=None,
         num_samples=1,
     ):
-        r"""
-        Initialize the Stochastic Gradient Nose Hoover Thermostat (SGNHT) Optimizer.
-        This optimizer blends SGD with an adaptive thermostat variable to control the magnitude of the injected noise,
-        maintaining the kinetic energy of the system.
-
-        It follows Ding et al.'s (2014) implementation.
-
-        The equations for the update are as follows:
-
-        $$
-        \Delta w_t = \epsilon\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right) - \xi_t w_t \right) + \sqrt{2A} N(0, \epsilon)
-        $$
-        $$
-        \Delta\xi_{t} = \epsilon \left( \frac{1}{n} \| w_t \|^2 - 1 \right)
-        $$
-
-        where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate,
-        $(\beta n)$ is the inverse temperature (we're in the tempered Bayes paradigm),
-        $n$ is the number of training samples, $m$ is the batch size,
-        $\xi_t$ is the thermostat variable at time $t$, $A$ is the diffusion factor,
-        and $N(0, A)$ represents Gaussian noise with mean 0 and variance $A$.
-
-        :param params: Iterable of parameters to optimize or dicts defining parameter groups (required)
-        :param lr: Learning rate
-        :param diffusion_factor: The diffusion factor of the thermostat (default: 0.01)
-        :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
-        :param num_samples: Number of samples to average over (default: 1)
-        """
         defaults = dict(
             lr=lr,
             diffusion_factor=diffusion_factor,
@@ -60,9 +56,6 @@ class SGNHT(torch.optim.Optimizer):
                     param_state["initial_param"] = p.data.clone().detach()
 
     def step(self, closure=None):
-        """
-        Perform one step of SGNHT optimization.
-        """
         with torch.no_grad():
             for group in self.param_groups:
                 group_energy_sum = 0.0

@@ -7,10 +7,9 @@ from devinterp.slt.callback import SamplerCallback
 
 class OnlineTraceStatistics(SamplerCallback):
     """
-    Derivative callback that computes mean/std statistics of a specified trace online. Must
-    be called after the base callback has been called at each draw.
-    Parameters:
-        base_callback (ChainCallback): Base callback that computes original trace metric online.
+    Derivative callback that computes mean/std statistics of a specified trace online. Must be called after the base callback has been called at each draw.
+
+    :param base_callback: Base callback that computes original trace metric online.
     """
 
     def __init__(
