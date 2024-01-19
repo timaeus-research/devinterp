@@ -10,7 +10,20 @@ from devinterp.slt.sampler import sample
 
 
 class LLCEstimator(SamplerCallback):
-    def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
+    """
+    Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process. 
+    It calculates the LLC based on the average loss across draws for each chain:
+    $$
+    TODO
+    $$
+    
+    Attributes:
+        num_chains (int): Number of chains to run. (should be identical to param passed to sample())
+        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
+        n (int): Number of samples used to calculate the LLC.
+        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    """
+    def __init__(self, num_chains: int, num_draws: int, n: int, device: Union[torch.device, str]="cpu"):
         self.num_chains = num_chains
         self.num_draws = num_draws
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
@@ -49,6 +62,16 @@ class LLCEstimator(SamplerCallback):
 
 
 class OnlineLLCEstimator(SamplerCallback):
+    """
+    Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process. 
+    It calculates LLCs using the same formula as LLCEstimator, but continuously and including means and std across draws (as opposed to just across chains).
+
+    Attributes:
+        num_chains (int): Number of chains to run. (should be identical to param passed to sample())
+        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
+        n (int): Number of samples used to calculate the LLC.
+        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    """
     def __init__(self, num_chains: int, num_draws: int, n: int, device="cpu"):
         self.num_chains = num_chains
         self.num_draws = num_draws

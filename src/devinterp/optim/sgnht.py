@@ -16,7 +16,7 @@ class SGNHT(torch.optim.Optimizer):
         This optimizer blends SGD with an adaptive thermostat variable to control the magnitude of the injected noise,
         maintaining the kinetic energy of the system.
 
-        It follows (Ding et al.'s (2014) implementation.
+        It follows Ding et al.'s (2014) implementation.
 
         The equations for the update are as follows:
 
