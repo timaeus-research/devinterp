@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>devinterp.optim.sgld &#8212; devinterp 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=12dfc556" />
+    <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/custom.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for devinterp.optim.sgld</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+
+<div class="viewcode-block" id="SGLD">
+<a class="viewcode-back" href="../../../source/devinterp.optim.html#devinterp.optim.sgld.SGLD">[docs]</a>
+<span class="k">class</span> <span class="nc">SGLD</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Implements Stochastic Gradient Langevin Dynamics (SGLD) optimizer.</span>
+
+<span class="sd">    This optimizer blends Stochastic Gradient Descent (SGD) with Langevin Dynamics,</span>
+<span class="sd">    introducing Gaussian noise to the gradient updates. It can also include an</span>
+<span class="sd">    elasticity term that acts like a special form of weight decay.</span>
+
+<span class="sd">    It follows Lau et al.&#39;s (2023) implementation, which is a modification of</span>
+<span class="sd">    Welling and Teh (2011) that omits the learning rate schedule and introduces</span>
+<span class="sd">    an elasticity term that pulls the weights towards their initial values.</span>
+
+<span class="sd">    The equation for the update is as follows:</span>
+
+<span class="sd">    $$\Delta w_t = \frac{\epsilon}{2}\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right)+\gamma\left(w_0-w_t\right) - \lambda w_t\right) + N(0, \epsilon\sigma^2)$$</span>
+
+<span class="sd">    where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate,</span>
+<span class="sd">    $(\beta n)$ is the inverse temperature (we&#39;re in the tempered Bayes paradigm),</span>
+<span class="sd">    $n$ is the number of training samples, $m$ is the batch size, $\gamma$ is</span>
+<span class="sd">    the elasticity strength, $\lambda$ is the weight decay strength,</span>
+<span class="sd">    and $\sigma$ is the noise term.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; optimizer = SGLD(model.parameters(), lr=0.1, temperature=torch.log(n)/n)</span>
+<span class="sd">        &gt;&gt;&gt; optimizer.zero_grad()</span>
+<span class="sd">        &gt;&gt;&gt; loss_fn(model(input), target).backward()</span>
+<span class="sd">        &gt;&gt;&gt; optimizer.step()</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        - `elasticity` is unique to this implementation and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.</span>
+<span class="sd">        - `noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.</span>
+
+<span class="sd">    :param params: Iterable of parameters to optimize or dicts defining parameter groups (required)</span>
+<span class="sd">    :param lr: Learning rate</span>
+<span class="sd">    :param noise_level: Amount of Gaussian noise introduced into gradient updates (default: 1).</span>
+<span class="sd">    :param weight_decay: L2 regularization term, applied as weight decay (default: 0)</span>
+<span class="sd">    :param elasticity: Strength of the force pulling weights back to their initial values (default: 0)</span>
+<span class="sd">    :param temperature: Temperature, either as a float or &#39;adaptive&#39;(=np.log(num_samples)). (default: adaptive)</span>
+<span class="sd">    :param bounding_box_size: the size of the bounding box enclosing our trajectory</span>
+<span class="sd">    :param num_samples: Number of samples to average over (default: 1)</span>
+<span class="sd">    :param save_noise: whether to store the per-parameter noise during optimization (default: False)</span>
+
+
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">params</span><span class="p">,</span>
+        <span class="n">lr</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
+        <span class="n">noise_level</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">weight_decay</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">elasticity</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">temperature</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;adaptive&quot;</span><span class="p">],</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;adaptive&quot;</span><span class="p">,</span>
+        <span class="n">bounding_box_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">save_noise</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">noise_level</span> <span class="o">!=</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;Warning: noise_level in SGLD is unequal to zero, are you intending to use SGD?&quot;</span>
+            <span class="p">)</span>
+        <span class="n">defaults</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span>
+            <span class="n">noise_level</span><span class="o">=</span><span class="n">noise_level</span><span class="p">,</span>
+            <span class="n">weight_decay</span><span class="o">=</span><span class="n">weight_decay</span><span class="p">,</span>
+            <span class="n">elasticity</span><span class="o">=</span><span class="n">elasticity</span><span class="p">,</span>
+            <span class="n">temperature</span><span class="o">=</span><span class="n">temperature</span><span class="p">,</span>
+            <span class="n">bounding_box_size</span><span class="o">=</span><span class="n">bounding_box_size</span><span class="p">,</span>
+            <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">SGLD</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">defaults</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_noise</span> <span class="o">=</span> <span class="n">save_noise</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">noise</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Save the initial parameters if the elasticity term is set</span>
+        <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">param_groups</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;elasticity&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;bounding_box_size&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;params&quot;</span><span class="p">]:</span>
+                    <span class="n">param_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
+                    <span class="n">param_state</span><span class="p">[</span><span class="s2">&quot;initial_param&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;adaptive&quot;</span><span class="p">:</span>  <span class="c1"># TODO: Better name</span>
+                <span class="n">group</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;num_samples&quot;</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">closure</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">noise</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">param_groups</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;params&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">grad</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">param_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
+                <span class="n">dw</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">grad</span><span class="o">.</span><span class="n">data</span> <span class="o">*</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;num_samples&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;weight_decay&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">dw</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;weight_decay&quot;</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;elasticity&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">initial_param</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">[</span><span class="n">p</span><span class="p">][</span><span class="s2">&quot;initial_param&quot;</span><span class="p">]</span>
+                    <span class="n">dw</span><span class="o">.</span><span class="n">add_</span><span class="p">((</span><span class="n">p</span><span class="o">.</span><span class="n">data</span> <span class="o">-</span> <span class="n">initial_param</span><span class="p">),</span> <span class="n">alpha</span><span class="o">=</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;elasticity&quot;</span><span class="p">])</span>
+
+                <span class="n">p</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">dw</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;lr&quot;</span><span class="p">])</span>
+
+                <span class="c1"># Add Gaussian noise</span>
+                <span class="n">noise</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span>
+                    <span class="n">mean</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">std</span><span class="o">=</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;noise_level&quot;</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="n">dw</span><span class="o">.</span><span class="n">size</span><span class="p">(),</span> <span class="n">device</span><span class="o">=</span><span class="n">dw</span><span class="o">.</span><span class="n">device</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_noise</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">noise</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">noise</span><span class="p">)</span>
+                <span class="n">p</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">noise</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;lr&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mf">0.5</span><span class="p">)</span>
+
+                <span class="c1"># Rebound if exceeded bounding box size</span>
+                <span class="k">if</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;bounding_box_size&quot;</span><span class="p">]:</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">clamp_</span><span class="p">(</span>
+                        <span class="n">p</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+                        <span class="nb">min</span><span class="o">=</span><span class="n">param_state</span><span class="p">[</span><span class="s2">&quot;initial_param&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;bounding_box_size&quot;</span><span class="p">],</span>
+                        <span class="nb">max</span><span class="o">=</span><span class="n">param_state</span><span class="p">[</span><span class="s2">&quot;initial_param&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;bounding_box_size&quot;</span><span class="p">],</span>
+                    <span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">devinterp</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Hoogland et al..
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
