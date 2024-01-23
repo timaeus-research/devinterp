@@ -59,7 +59,7 @@ html_sidebars = {
         'donate.html',
     ]
 }
-html_static_path = ['_static']
+html_static_path = ['static']
 
 def run_apidoc(_):
     current_dir = os.path.abspath(os.path.dirname(__file__))
