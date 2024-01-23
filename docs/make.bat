@@ -25,6 +25,13 @@ if errorlevel 9009 (
 
 if "%1" == "" goto help
 
+if "%1" == "github" (
+    %SPHINXBUILD% -M html %SOURCEDIR% %BUILDDIR% %SPHINXOPTS%
+    robocopy %BUILDDIR%/html ../docs /E > nul
+    echo.Generated files copied to ../docs
+    goto end
+)
+
 %SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 goto end
 
