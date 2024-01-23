@@ -208,7 +208,7 @@ LayerWeightsAccessor = Callable[[nn.Module], torch.Tensor]
 class BetweenLayerCovarianceAccumulator:
     """
     A CovarianceAccumulator to compute covariance between arbitrary layers.
-    For use with `estimate`.
+    For use with `sample`.
 
     :param model: The model to compute covariances on.
     :param pairs: Named pairs of layers to compute covariances on.

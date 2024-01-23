@@ -10,7 +10,7 @@ import os
 import sys
 import subprocess
 
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('../'))
 
 project = 'devinterp'
 copyright = '2024, Hoogland et al.'
@@ -29,6 +29,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
     'sphinx.ext.mathjax',
+    'sphinx.ext.napoleon',
     'sphinx_math_dollar'
 ]
 
@@ -48,7 +49,16 @@ mathjax3_config = {
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'alabaster'
+html_theme = 'sphinx_rtd_theme'
+html_sidebars = {
+    '**': [
+        'about.html',
+        'navigation.html',
+        'relations.html',
+        'searchbox.html',
+        'donate.html',
+    ]
+}
 html_static_path = ['_static']
 
 def run_apidoc(_):

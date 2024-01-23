@@ -1,6 +1,11 @@
 devinterp.slt package
 =====================
 
+.. automodule:: devinterp.slt
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Submodules
 ----------
 
@@ -72,14 +77,6 @@ devinterp.slt.wbic module
 -------------------------
 
 .. automodule:: devinterp.slt.wbic
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: devinterp.slt
    :members:
    :undoc-members:
    :show-inheritance:

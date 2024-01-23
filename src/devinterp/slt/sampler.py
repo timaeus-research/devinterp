@@ -14,7 +14,7 @@ from devinterp.slt.callback import validate_callbacks, SamplerCallback
 
 
 def call_with(func: Callable, **kwargs):
-    """Check the func annotation and call with only the necessary kwargs."""
+    # Check the func annotation and call with only the necessary kwargs.
     sig = inspect.signature(func)
 
     # Filter out the kwargs that are not in the function's signature
@@ -95,9 +95,7 @@ def sample(
     callbacks: List[SamplerCallback] = [],
 ):
     """
-    Sample model weights using a given sampling_method, supporting multiple chains.
-    See the example notebooks examples/diagnostics.ipynb and examples/sgld_calibration.ipynb for (respectively)
-    info on what callbacks to pass along and how to calibrate sampler/optimizer hyperparams.
+    Sample model weights using a given sampling_method, supporting multiple chains/cores, and calculate the observables (loss, llc, etc.) for each callback passed along. After calling this function, the stats of interest live in the callback object.
 
     :param model: The neural network model.
     :param loader: DataLoader for input data.

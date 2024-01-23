@@ -34,14 +34,16 @@ To see DevInterp in action, check out our example notebooks:
 ### Minimal Example
 
 ```python
-from devinterp.slt import estimate_learning_coeff, estimate_learning_coeff_with_summary
+from devinterp.slt import sample, LLCEstimator
 from devinterp.optim import SGLD
 
 # Assuming you have a PyTorch Module and DataLoader
-learning_coeff = estimate_learning_coeff(model, trainloader, ...)
+llc_estimator = LLCEstimator(...)
+learning_coeff = sample(model, trainloader, ..., callbacks = [llc_estimator])
 
-# If you want to see mean, std, and learning coeff estimate per chain
-learning_coeff_summary = estimate_learning_coeff_with_summary(model, trainloader, ...)
+llc_mean = llc_estimator.sample()["llc/mean"]
+llc_std = llc_estimator.sample()["llc/std"]
+loss_mean = llc_estimator.sample()["loss/mean"]
 
 ```
 

@@ -9,17 +9,16 @@ from devinterp.slt.sampler import sample
 
 
 class LLCEstimator(SamplerCallback):
-    """
+    r"""
     Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process.
     It calculates the LLC based on the average loss across draws for each chain:
-    $$
-    TODO
-    $$
+    
+    $$LLC = \frac{n}{\log(n)} * (avg_loss - init_loss)$$
 
-    :param num_chains (int): Number of chains to run. (should be identical to param passed to sample())
-    :param num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
-    :param n (int): Number of samples used to calculate the LLC.
-    :param device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
+    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
+    :param n: Number of samples used to calculate the LLC.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
 
     def __init__(
