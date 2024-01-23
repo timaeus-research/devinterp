@@ -101,8 +101,12 @@ If this package was useful in your work, please cite it as:
       howpublished = {\url{https://github.com/timaeus-research/devinterp}},
    }
 
+Table of Contents
+=====================================
+
 .. toctree::
    :maxdepth: 4
 
+   self
    SLT Observables <devinterp.slt>
    Sampling Methods <devinterp.optim>
