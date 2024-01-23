@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>devinterp.slt package &mdash; devinterp 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=01f34227"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="_static/custom.js"></script>
+        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
+        <script>window.MathJax = {"tex": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="devinterp.optim package" href="devinterp.optim.html" />
+    <link rel="prev" title="Welcome to devinterp’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            devinterp
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">SLT Observables</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.slt.callback">devinterp.slt.callback module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.callback.SamplerCallback"><code class="docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.slt.cov">devinterp.slt.cov module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.cov.BetweenLayerCovarianceAccumulator"><code class="docutils literal notranslate"><span class="pre">BetweenLayerCovarianceAccumulator</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.cov.CovarianceAccumulator"><code class="docutils literal notranslate"><span class="pre">CovarianceAccumulator</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.cov.WithinHeadCovarianceAccumulator"><code class="docutils literal notranslate"><span class="pre">WithinHeadCovarianceAccumulator</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.slt.gradient">devinterp.slt.gradient module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.gradient.GradientDistribution"><code class="docutils literal notranslate"><span class="pre">GradientDistribution</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#devinterp.slt.gradient.GradientDistribution.plot"><code class="docutils literal notranslate"><span class="pre">GradientDistribution.plot()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.slt.llc">devinterp.slt.llc module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.llc.LLCEstimator"><code class="docutils literal notranslate"><span class="pre">LLCEstimator</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.llc.OnlineLLCEstimator"><code class="docutils literal notranslate"><span class="pre">OnlineLLCEstimator</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.slt.loss">devinterp.slt.loss module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.loss.OnlineLossStatistics"><code class="docutils literal notranslate"><span class="pre">OnlineLossStatistics</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.slt.norms">devinterp.slt.norms module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.norms.GradientNorm"><code class="docutils literal notranslate"><span class="pre">GradientNorm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.norms.NoiseNorm"><code class="docutils literal notranslate"><span class="pre">NoiseNorm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.norms.WeightNorm"><code class="docutils literal notranslate"><span class="pre">WeightNorm</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.slt.sampler">devinterp.slt.sampler module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.sampler.sample"><code class="docutils literal notranslate"><span class="pre">sample()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.slt.trace">devinterp.slt.trace module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.trace.OnlineTraceStatistics"><code class="docutils literal notranslate"><span class="pre">OnlineTraceStatistics</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.slt.wbic">devinterp.slt.wbic module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.slt.wbic.OnlineWBICEstimator"><code class="docutils literal notranslate"><span class="pre">OnlineWBICEstimator</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="devinterp.optim.html">Sampling Methods</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">devinterp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">devinterp.slt package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/devinterp.slt.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-devinterp.slt">
+<span id="devinterp-slt-package"></span><h1>devinterp.slt package<a class="headerlink" href="#module-devinterp.slt" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-devinterp.slt.callback">
+<span id="devinterp-slt-callback-module"></span><h2>devinterp.slt.callback module<a class="headerlink" href="#module-devinterp.slt.callback" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.callback.SamplerCallback">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.callback.</span></span><span class="sig-name descname"><span class="pre">SamplerCallback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/callback.html#SamplerCallback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.callback.SamplerCallback" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Base class for creating callbacks used in sample().</p>
+<p>Each instantiated callback gets its functions update(), finalize() and sample() called if those exist.</p>
+<p>update() happens at every (non burn-in) sample draw, finalize() happens after all draws are finished,
+and sample() is a helper function that allows access to whatever relevant parameters the callback has computed.</p>
+<p>For legibility, each callback can also access parameters in locals() when a class function is called.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-devinterp.slt.cov">
+<span id="devinterp-slt-cov-module"></span><h2>devinterp.slt.cov module<a class="headerlink" href="#module-devinterp.slt.cov" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.cov.BetweenLayerCovarianceAccumulator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.cov.</span></span><span class="sig-name descname"><span class="pre">BetweenLayerCovarianceAccumulator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pairs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_evals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">accessors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/cov.html#BetweenLayerCovarianceAccumulator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.cov.BetweenLayerCovarianceAccumulator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A CovarianceAccumulator to compute covariance between arbitrary layers.
+For use with <cite>sample</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> – The model to compute covariances on.</p></li>
+<li><p><strong>pairs</strong> – Named pairs of layers to compute covariances on.</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+<li><p><strong>num_evals</strong> – number of eigenvectors / eigenvalues to return.</p></li>
+<li><p><strong>accessors</strong> – Functions to access attention head weights.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.cov.CovarianceAccumulator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.cov.</span></span><span class="sig-name descname"><span class="pre">CovarianceAccumulator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_weights</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accessors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_evals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/cov.html#CovarianceAccumulator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.cov.CovarianceAccumulator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>A callback to iteratively compute and store the covariance matrix of model weights.
+For use with <cite>sample</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_weights</strong> – Total number of weights.</p></li>
+<li><p><strong>accessors</strong> – Functions to access model weights.</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+<li><p><strong>num_evals</strong> – Number of eigenvalues to compute.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.cov.WithinHeadCovarianceAccumulator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.cov.</span></span><span class="sig-name descname"><span class="pre">WithinHeadCovarianceAccumulator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_heads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_weights_per_head</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accessors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_evals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/cov.html#WithinHeadCovarianceAccumulator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.cov.WithinHeadCovarianceAccumulator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A CovarianceAccumulator to compute covariance within attention heads.
+For use with <cite>sample</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_heads</strong> – The number of attention heads.</p></li>
+<li><p><strong>num_weights_per_head</strong> – The number of weights per attention head.</p></li>
+<li><p><strong>accessors</strong> – Functions to access attention head weights.</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+<li><p><strong>num_evals</strong> – number of eigenvectors / eigenvalues to return.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-devinterp.slt.gradient">
+<span id="devinterp-slt-gradient-module"></span><h2>devinterp.slt.gradient module<a class="headerlink" href="#module-devinterp.slt.gradient" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.gradient.GradientDistribution">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.gradient.</span></span><span class="sig-name descname"><span class="pre">GradientDistribution</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_chains</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_draws</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_bins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/gradient.html#GradientDistribution"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.gradient.GradientDistribution" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>Callback for plotting the distribution of gradients as a function of draws.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_draws</strong> – Number of samples to draw (should be identical to param passed to sample())</p></li>
+<li><p><strong>num_chains</strong> – Number of chains to run (should be identical to param passed to sample())</p></li>
+<li><p><strong>grad_dists</strong> – Stores the gradient distributions for each parameter.</p></li>
+<li><p><strong>min_bins</strong> – Minimum number of bins for histogram approximation.</p></li>
+<li><p><strong>param_names</strong> – List of parameter names to track. If None, all parameters are tracked.</p></li>
+<li><p><strong>bin_size</strong> – Size of each bin in the histogram.</p></li>
+<li><p><strong>num_bins</strong> – Number of bins in the histogram.</p></li>
+<li><p><strong>min_grad</strong> – Minimum gradient value encountered.</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If gradients are not computed before calling this callback.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="devinterp.slt.gradient.GradientDistribution.plot">
+<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'blue'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_zero</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/gradient.html#GradientDistribution.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.gradient.GradientDistribution.plot" title="Link to this definition"></a></dt>
+<dd><p>Plots the gradient distribution for a specific parameter.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-devinterp.slt.llc">
+<span id="devinterp-slt-llc-module"></span><h2>devinterp.slt.llc module<a class="headerlink" href="#module-devinterp.slt.llc" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.llc.LLCEstimator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.llc.</span></span><span class="sig-name descname"><span class="pre">LLCEstimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_chains</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_draws</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/llc.html#LLCEstimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.llc.LLCEstimator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process.
+It calculates the LLC based on the average loss across draws for each chain:</p>
+<p><div class="math notranslate nohighlight">
+\[LLC = \frac{n}{\log(n)} * (avg_loss - init_loss)\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_chains</strong> – Number of chains to run. (should be identical to param passed to sample())</p></li>
+<li><p><strong>num_draws</strong> – Number of samples to draw. (should be identical to param passed to sample())</p></li>
+<li><p><strong>n</strong> – Number of samples used to calculate the LLC.</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.llc.OnlineLLCEstimator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.llc.</span></span><span class="sig-name descname"><span class="pre">OnlineLLCEstimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_chains</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_draws</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/llc.html#OnlineLLCEstimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.llc.OnlineLLCEstimator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.
+It calculates LLCs using the same formula as LLCEstimator, but continuously and including means and std across draws (as opposed to just across chains).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_chains</strong> – Number of chains to run. (should be identical to param passed to sample())</p></li>
+<li><p><strong>num_draws</strong> – Number of samples to draw. (should be identical to param passed to sample())</p></li>
+<li><p><strong>n</strong> – Number of samples used to calculate the LLC.</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-devinterp.slt.loss">
+<span id="devinterp-slt-loss-module"></span><h2>devinterp.slt.loss module<a class="headerlink" href="#module-devinterp.slt.loss" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.loss.OnlineLossStatistics">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.loss.</span></span><span class="sig-name descname"><span class="pre">OnlineLossStatistics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#devinterp.slt.llc.OnlineLLCEstimator" title="devinterp.slt.llc.OnlineLLCEstimator"><span class="pre">OnlineLLCEstimator</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/loss.html#OnlineLossStatistics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.loss.OnlineLossStatistics" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>Derivative callback that computes various loss statistics for OnlineLLCEstimator. Must
+be called after the base OnlineLLCEstimator has been called at each draw.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>base_callback</strong> – Base callback that computes original loss metric.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-devinterp.slt.norms">
+<span id="devinterp-slt-norms-module"></span><h2>devinterp.slt.norms module<a class="headerlink" href="#module-devinterp.slt.norms" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.norms.GradientNorm">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.norms.</span></span><span class="sig-name descname"><span class="pre">GradientNorm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_chains</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_draws</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_norm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/norms.html#GradientNorm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.norms.GradientNorm" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>Callback for computing the norm of the gradients of the optimizer / sampler.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_draws</strong> – Number of samples to draw. (should be identical to param passed to sample())</p></li>
+<li><p><strong>num_chains</strong> – Number of chains to run. (should be identical to param passed to sample())</p></li>
+<li><p><strong>p_norm</strong> – Order of the norm to be computed (e.g., 2 for Euclidean norm).</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.norms.NoiseNorm">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.norms.</span></span><span class="sig-name descname"><span class="pre">NoiseNorm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_chains</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_draws</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_norm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/norms.html#NoiseNorm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.norms.NoiseNorm" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>Callback for computing the norm of the noise added in the optimizer / sampler.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_draws</strong> – Number of samples to draw. (should be identical to param passed to sample())</p></li>
+<li><p><strong>num_chains</strong> – Number of chains to run. (should be identical to param passed to sample())</p></li>
+<li><p><strong>p_norm</strong> – Order of the norm to be computed (e.g., 2 for Euclidean norm).</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.norms.WeightNorm">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.norms.</span></span><span class="sig-name descname"><span class="pre">WeightNorm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_chains</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_draws</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_norm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/norms.html#WeightNorm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.norms.WeightNorm" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>Callback for computing the norm of the weights over the sampling process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_draws</strong> – Number of samples to draw. (should be identical to param passed to sample())</p></li>
+<li><p><strong>num_chains</strong> – Number of chains to run. (should be identical to param passed to sample())</p></li>
+<li><p><strong>p_norm</strong> – Order of the norm to be computed (e.g., 2 for Euclidean norm).</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-devinterp.slt.sampler">
+<span id="devinterp-slt-sampler-module"></span><h2>devinterp.slt.sampler module<a class="headerlink" href="#module-devinterp.slt.sampler" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="devinterp.slt.sampler.sample">
+<span class="sig-prename descclassname"><span class="pre">devinterp.slt.sampler.</span></span><span class="sig-name descname"><span class="pre">sample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model:</span> <span class="pre">~torch.nn.modules.module.Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loader:</span> <span class="pre">~torch.utils.data.dataloader.DataLoader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">criterion:</span> <span class="pre">~typing.Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampling_method:</span> <span class="pre">~typing.Type[~torch.optim.optimizer.Optimizer]</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'devinterp.optim.sgld.SGLD'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer_kwargs:</span> <span class="pre">~typing.Dict[str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">float</span> <span class="pre">|</span> <span class="pre">~typing.Literal['adaptive']]</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_draws:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_chains:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_burnin_steps:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_steps_bw_draws:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cores:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed:</span> <span class="pre">~typing.List[int]</span> <span class="pre">|</span> <span class="pre">int</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device:</span> <span class="pre">~torch.device</span> <span class="pre">|</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">device(type='cpu')</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callbacks:</span> <span class="pre">~typing.List[~devinterp.slt.callback.SamplerCallback]</span> <span class="pre">=</span> <span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/sampler.html#sample"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.sampler.sample" title="Link to this definition"></a></dt>
+<dd><p>Sample model weights using a given sampling_method, supporting multiple chains/cores, and calculate the observables (loss, llc, etc.) for each callback passed along. After calling this function, the stats of interest live in the callback object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> – The neural network model.</p></li>
+<li><p><strong>loader</strong> – DataLoader for input data.</p></li>
+<li><p><strong>criterion</strong> – Loss function.</p></li>
+<li><p><strong>sampling_method</strong> – Sampling method to use (really a PyTorch optimizer).</p></li>
+<li><p><strong>optimizer_kwargs</strong> – Keyword arguments for the PyTorch optimizer (used as sampler here).</p></li>
+<li><p><strong>num_draws</strong> – Number of samples to draw.</p></li>
+<li><p><strong>num_chains</strong> – Number of chains to run.</p></li>
+<li><p><strong>num_burnin_steps</strong> – Number of burn-in steps before sampling.</p></li>
+<li><p><strong>num_steps_bw_draws</strong> – Number of steps between each draw.</p></li>
+<li><p><strong>cores</strong> – Number of cores for parallel execution.</p></li>
+<li><p><strong>seed</strong> – Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed.</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+<li><p><strong>verbose</strong> – whether to print sample chain progress</p></li>
+<li><p><strong>callbacks</strong> – list of callbacks, each of type SamplerCallback</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-devinterp.slt.trace">
+<span id="devinterp-slt-trace-module"></span><h2>devinterp.slt.trace module<a class="headerlink" href="#module-devinterp.slt.trace" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.trace.OnlineTraceStatistics">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.trace.</span></span><span class="sig-name descname"><span class="pre">OnlineTraceStatistics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><span class="pre">SamplerCallback</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/trace.html#OnlineTraceStatistics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.trace.OnlineTraceStatistics" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>Derivative callback that computes mean/std statistics of a specified trace online. Must be called after the base callback has been called at each draw.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>base_callback</strong> – Base callback that computes original trace metric online.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-devinterp.slt.wbic">
+<span id="devinterp-slt-wbic-module"></span><h2>devinterp.slt.wbic module<a class="headerlink" href="#module-devinterp.slt.wbic" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="devinterp.slt.wbic.OnlineWBICEstimator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.slt.wbic.</span></span><span class="sig-name descname"><span class="pre">OnlineWBICEstimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_chains</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_draws</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/slt/wbic.html#OnlineWBICEstimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.slt.wbic.OnlineWBICEstimator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#devinterp.slt.callback.SamplerCallback" title="devinterp.slt.callback.SamplerCallback"><code class="xref py py-class docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></p>
+<p>Callback for estimating the Widely Applicable Bayesian Information Criterion (WBIC) in an online fashion.
+The WBIC used here is just <span class="math notranslate nohighlight">\(n\)</span> * (average sampled loss). (Watanabe, 2013)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_draws</strong> – Number of samples to draw. (should be identical to param passed to sample())</p></li>
+<li><p><strong>num_chains</strong> – Number of chains to run. (should be identical to param passed to sample())</p></li>
+<li><p><strong>n</strong> – Number of data points, used in the WBIC calculation.</p></li>
+<li><p><strong>device</strong> – Device to perform computations on, e.g., ‘cpu’ or ‘cuda’.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to devinterp’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="devinterp.optim.html" class="btn btn-neutral float-right" title="devinterp.optim package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Hoogland et al..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
