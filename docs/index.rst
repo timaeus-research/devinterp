@@ -61,7 +61,7 @@ To see DevInterp in action, check out our example notebooks:
 - `Toy Models of Superposition phase transition detection <https://www.github.com/timaeus-research/devinterp/blob/main/examples/tms.ipynb>`_ |colab3|
 - `MNIST eSGD vs SGD comparison <https://www.github.com/timaeus-research/devinterp/blob/main/examples/mnist.ipynb>`_ |colab4|
 
-For more advanced usage, see `the Diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| and for a quick guide on picking hyperparameters, see `the calibration notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab5|
+For more advanced usage, see `the Diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| and for a quick guide on picking hyperparameters, see `the calibration notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab6|
 
 
 Known Issues
@@ -70,6 +70,7 @@ Known Issues
 - We currently calculate the LLC taking the initial loss to be the loss after one sampling step. This is slightly wrong (it should be the loss *before* sampling), and there are a bunch of other reasonable and similarly compute-friendly alternative choices that can be made. 
 - Similarly, we now sample using minibatches that are passed along from the dataloader to :func:`~devinterp.slt.sampler.sample`. This choice is obscured by the repo, and we should offer alternatives.
 - The current implementation does not work with transformers out-of-the-box. This can be fixed by adding a wrapper to your model, for example passing :python:`unpack(model)` to :func:`~devinterp.slt.sampler.sample` where :python:`unpack` is defined by:
+
 .. code-block:: python
 
    class unpack(nn.Module):
@@ -81,12 +82,12 @@ Known Issues
 
 - LLC Estimation is currently more of an art than a science. It will take some time and pain to get it work reliably.
 
-If you run into issues not mentioned here, please first `check the github issues <https://github.com/timaeus-research/devinterp/issues>`_, then `ask in the DevInterp discord: <https://discord.gg/UwjWKCZZYR>`_, and only then make a new github issue.
+If you run into issues not mentioned here, please first `check the GitHub issues <https://github.com/timaeus-research/devinterp/issues>`_, then `ask in the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_, and only then make a new github issue.
 
 Credits & Citations
 =====================================
 
-This package was created by `Timaeus {https://timaeus.co}_. The main contributors to this package are Jesse Hoogland, Stan van Wingerden, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also made valuable contributions or provided useful advice.
+This package was created by `Timaeus <https://timaeus.co>`_. The main contributors to this package are Jesse Hoogland, Stan van Wingerden, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also made valuable contributions or provided useful advice.
 
 If this package was useful in your work, please cite it as:
 
