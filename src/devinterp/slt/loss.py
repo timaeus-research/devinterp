@@ -10,8 +10,17 @@ class OnlineLossStatistics(SamplerCallback):
     """
     Derivative callback that computes various loss statistics for :func:`~devinterp.slt.llc.OnlineLLCEstimator`. Must
     be called after the base :func:`~devinterp.slt.llc.OnlineLLCEstimator` has been called at each draw.
-
+    
+    .. |colab5| image:: https://colab.research.google.com/assets/colab-badge.svg 
+        :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb
+        
+    See `the diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| for examples on how to use this to diagnose your sample health.
+        
     :param base_callback: Base callback that computes original loss metric.
+    :type base_callback: :func:`~devinterp.slt.llc.OnlineLLCEstimator`
+
+    Note:
+        - Requires losses to be computed first, so call using f.e. :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance, ..., online_loss_stats_instance], ...)`
     """
 
     def __init__(self, base_callback: OnlineLLCEstimator):
@@ -69,6 +78,9 @@ class OnlineLossStatistics(SamplerCallback):
             self.z_scores[chain, draw] = float("nan")
 
     def sample(self):
+        """
+        :returns: A dict :python:`{"loss/percent_neg_steps": percent_neg_steps, "loss/percent_mean_neg_steps": percent_mean_neg_steps, "loss/percent_thresholded_neg_steps": percent_thresholded_neg_steps, "loss/z_scores": z_scores}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance, online_loss_stats_instance], ...)`)
+        """
         return {
             "loss/percent_neg_steps": self.percent_neg_steps.cpu().numpy(),
             "loss/percent_mean_neg_steps": self.percent_mean_neg_steps.cpu().numpy(),
@@ -82,7 +94,13 @@ class OnlineLossStatistics(SamplerCallback):
         return init_losses.std()
 
     def loss_hist_by_draw(self, draw: int = 0, bins: int = 10):
-        """TODO"""
+        """Plots a histogram of chain losses for a given draw index.
+        
+        :param draw: Draw index to plot histogram for. Default is 0
+        :type draw: int, optional   
+        :param bins: number of histogram bins. Default is 10
+        :type bins: int, optional
+        """
         losses_at_draw = self.base_callback.losses[:, draw]
         plt.hist(losses_at_draw, bins=bins)
         return losses_at_draw

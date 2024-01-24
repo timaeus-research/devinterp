@@ -5,15 +5,15 @@ import torch
 
 class SamplerCallback:
     """
-    Base class for creating callbacks used in :func:`devinterp.slt.sampler.sample()`.
+    Base class for creating callbacks used in :func:`devinterp.slt.sampler.sample()`. 
+    Each instantiated callback gets its :python:`__call__` called every sample, and :python:`finalize` called at the end of sample (if it exists).
+    Each callback method can access parameters in :python:`locals()`, so there's no need to pass variables along explicitly.
 
-    Each instantiated callback gets its methods :code:`__call__` called every sample, and :code:`finalize` called at the end of sample (if they exist).
-
-    Each callback method can access parameters in :code:`locals()`, so there's no need to pass variables along explicitly.
-
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. 
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.    
+    :raises NotImplementedError: if :python: `__call__` :python: `sample` are not overwritten.
+        
     Note:
-        - :code:`mps` devices might not work for all callbacks.
+        - :python:`mps` devices might not work for all callbacks.
     """
 
     def __init__(self, device: Union[torch.device, str] = "cpu"):
@@ -35,19 +35,18 @@ class SamplerCallback:
         return self
 
     def __call__(self, *args, **kwargs):
-        """Gets called at every (non burn-in) sample draw. Can access any variable in :code:`locals()` when called. 
+        """Gets called at every (non burn-in) sample draw. Can access any variable in :python:`locals()` when called. 
         Should be used for calucalting stats at every sample draw, for example running average chain loss.
         :raises NotImplementedError: if not overwritten for inherited classes.
         """
         raise NotImplementedError
 
     def finalize(self, *args, **kwargs):
-        """Gets called at the end of sampling. Can access any variable in :code:`locals()` when called. Should be used for calucalting stats over chains, for example average chain loss."""
+        """Gets called at the end of sampling. Can access any variable in :python:`locals()` when called. Should be used for calucalting stats over chains, for example average chain loss."""
         pass
 
     def sample(self, *args, **kwargs):
-        """Does not get called automatically, but functions as an interface to easily access stats calculated by the callback.
-        :raises NotImplementedError: if not overwritten for inherited classes."""
+        """Does not get called automatically, but functions as an interface to easily access stats calculated by the callback."""
         raise NotImplementedError
 
 

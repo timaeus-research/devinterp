@@ -43,6 +43,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.optim.html">Sampling Methods</a></li>
 </ul>
@@ -87,10 +88,14 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Callback for computing the norm of the weights over the sampling process.</span>
 
-<span class="sd">    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())</span>
-<span class="sd">    :param num_chains: Number of chains to run. (should be identical to param passed to sample())</span>
-<span class="sd">    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm).</span>
-<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
+<span class="sd">    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_draws: int</span>
+<span class="sd">    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_chains: int</span>
+<span class="sd">    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm). Default is 2</span>
+<span class="sd">    :type p_norm: int, optional</span>
+<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;. Default is &#39;cpu&#39;</span>
+<span class="sd">    :type device: str | torch.device, optional</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -120,10 +125,15 @@
         <span class="n">total_norm</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">pow</span><span class="p">(</span><span class="n">total_norm</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">p_norm</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">weight_norms</span><span class="p">[</span><span class="n">chain</span><span class="p">,</span> <span class="n">draw</span><span class="p">]</span> <span class="o">=</span> <span class="n">total_norm</span>
 
+<div class="viewcode-block" id="WeightNorm.sample">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.norms.WeightNorm.sample">[docs]</a>
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;:returns: A dict :python:`{&quot;weight_norm/trace&quot;: weight_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [weight_norm_instance], ...)`)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;weight_norm/trace&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight_norms</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
         <span class="p">}</span></div>
+</div>
 
 
 
@@ -133,10 +143,14 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Callback for computing the norm of the gradients of the optimizer / sampler.</span>
 
-<span class="sd">    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())</span>
-<span class="sd">    :param num_chains: Number of chains to run. (should be identical to param passed to sample())</span>
-<span class="sd">    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm).</span>
-<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
+<span class="sd">    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_draws: int</span>
+<span class="sd">    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_chains: int</span>
+<span class="sd">    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm). Default is 2</span>
+<span class="sd">    :type p_norm: int, optional</span>
+<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;. Default is &#39;cpu&#39;</span>
+<span class="sd">    :type device: str | torch.device, optional</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -166,10 +180,15 @@
         <span class="n">total_norm</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">pow</span><span class="p">(</span><span class="n">total_norm</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">p_norm</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">gradient_norms</span><span class="p">[</span><span class="n">chain</span><span class="p">,</span> <span class="n">draw</span><span class="p">]</span> <span class="o">=</span> <span class="n">total_norm</span>
 
+<div class="viewcode-block" id="GradientNorm.sample">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.norms.GradientNorm.sample">[docs]</a>
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;:returns: A dict :python:`{&quot;gradient_norm/trace&quot;: gradient_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [grad_norm_instance], ...)`)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;gradient_norm/trace&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">gradient_norms</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
         <span class="p">}</span></div>
+</div>
 
 
 
@@ -179,10 +198,14 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Callback for computing the norm of the noise added in the optimizer / sampler.</span>
 
-<span class="sd">    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())</span>
-<span class="sd">    :param num_chains: Number of chains to run. (should be identical to param passed to sample())</span>
-<span class="sd">    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm).</span>
-<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
+<span class="sd">    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_draws: int</span>
+<span class="sd">    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_chains: int</span>
+<span class="sd">    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm). Default is 2</span>
+<span class="sd">    :type p_norm: int, optional</span>
+<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;. Default is &#39;cpu&#39;</span>
+<span class="sd">    :type device: str | torch.device, optional</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -212,10 +235,15 @@
         <span class="n">total_norm</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">pow</span><span class="p">(</span><span class="n">total_norm</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">p_norm</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">noise_norms</span><span class="p">[</span><span class="n">chain</span><span class="p">,</span> <span class="n">draw</span><span class="p">]</span> <span class="o">=</span> <span class="n">total_norm</span>
 
+<div class="viewcode-block" id="NoiseNorm.sample">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.norms.NoiseNorm.sample">[docs]</a>
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;:returns: A dict :python:`{&quot;noise_norm/trace&quot;: noise_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [noise_norm_instance], ...)`)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;noise_norm/trace&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">noise_norms</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
         <span class="p">}</span></div>
+</div>
 
 </pre></div>
 

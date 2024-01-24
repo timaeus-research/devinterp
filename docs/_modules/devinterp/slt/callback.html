@@ -82,13 +82,15 @@
 <a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.callback.SamplerCallback">[docs]</a>
 <span class="k">class</span> <span class="nc">SamplerCallback</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Base class for creating callbacks used in :func:`devinterp.slt.sampler.sample()`.</span>
+<span class="sd">    Base class for creating callbacks used in :func:`devinterp.slt.sampler.sample()`. </span>
+<span class="sd">    Each instantiated callback gets its :python:`__call__` called every sample, and :python:`finalize` called at the end of sample (if it exists).</span>
+<span class="sd">    Each callback method can access parameters in :python:`locals()`, so there&#39;s no need to pass variables along explicitly.</span>
 
-<span class="sd">    Each instantiated callback gets its methods :code:`__call__` and :code:`finalize` called if those exist.</span>
-
-<span class="sd">    Each callback can access parameters in :code:`locals()` when a class function is called, so there&#39;s no need to pass variables along explicitly.</span>
-
-<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
+<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.    </span>
+<span class="sd">    :raises NotImplementedError: if :python: `__call__` :python: `sample` are not overwritten.</span>
+<span class="sd">        </span>
+<span class="sd">    Note:</span>
+<span class="sd">        - :python:`mps` devices might not work for all callbacks.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">):</span>
@@ -110,7 +112,7 @@
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets called at every (non burn-in) sample draw. Can access any variable in :code:`locals()` when called. </span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets called at every (non burn-in) sample draw. Can access any variable in :python:`locals()` when called. </span>
 <span class="sd">        Should be used for calucalting stats at every sample draw, for example running average chain loss.</span>
 <span class="sd">        :raises NotImplementedError: if not overwritten for inherited classes.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -119,15 +121,14 @@
 <div class="viewcode-block" id="SamplerCallback.finalize">
 <a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.callback.SamplerCallback.finalize">[docs]</a>
     <span class="k">def</span> <span class="nf">finalize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets called at the end of sampling. Can access any variable in :code:`locals()` when called. Should be used for calucalting stats over chains, for example average chain loss.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets called at the end of sampling. Can access any variable in :python:`locals()` when called. Should be used for calucalting stats over chains, for example average chain loss.&quot;&quot;&quot;</span>
         <span class="k">pass</span></div>
 
 
 <div class="viewcode-block" id="SamplerCallback.sample">
 <a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.callback.SamplerCallback.sample">[docs]</a>
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Does not get called automatically, but functions as an interface to easily access stats calculated by the callback.</span>
-<span class="sd">        :raises NotImplementedError: if not overwritten for inherited classes.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Does not get called automatically, but functions as an interface to easily access stats calculated by the callback.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
 </div>
 

@@ -22,23 +22,23 @@ class SGNHT(torch.optim.Optimizer):
     and $N(0, A)$ represents Gaussian noise with mean 0 and variance $A$.
     
     Note:
-        - :code:`diffusion_factor` is unique to this class, and functions as a way to allow for random parameter changes while keeping them from blowing up by guiding parameters back to a slowly-changing thermostat value using a friction term.
-        - This class does not have an explicit localization term like :func:`~devinterp.optim.sgld.SGLD` does. If you want to constrain your sampling, use :code:`bounding_box_size`
-        - Although this class is a subclass of :code:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point. 
+        - :python:`diffusion_factor` is unique to this class, and functions as a way to allow for random parameter changes while keeping them from blowing up by guiding parameters back to a slowly-changing thermostat value using a friction term.
+        - This class does not have an explicit localization term like :func:`~devinterp.optim.sgld.SGLD` does. If you want to constrain your sampling, use :python:`bounding_box_size`
+        - Although this class is a subclass of :python:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point. 
     
 
-    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :code:`model.parameters()` or something more fancy, just like other :code:`torch.optim.Optimizer` classes.
+    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :python:`model.parameters()` or something more fancy, just like other :python:`torch.optim.Optimizer` classes.
     :type params: Iterable
-    :param lr: Learning rate. Defaults to 0.01
+    :param lr: Learning rate $\epsilon$. Default is 0.01
     :type lr: float, optional
-    :param diffusion_factor: The diffusion factor of the thermostat. Defaults to 0.01
+    :param diffusion_factor: The diffusion factor $A$ of the thermostat. Default is 0.01
     :type diffusion_factor: float, optional
-    :param bounding_box_size: the size of the bounding box enclosing our trajectory. Defaults to None
+    :param bounding_box_size: the size of the bounding box enclosing our trajectory. Default is None
     :type bounding_box_size: float, optional
-    :param num_samples: Number of samples to average over. Should be equal to the size of your dataset, unless you know what you're doing. Defaults to 1
+    :param num_samples: Number of samples $n$ to average over. Should be equal to the size of your dataset, unless you know what you're doing. Default is 1
     :type num_samples: int, optional
     
-    :raises Warning: if :code:`num_samples` is set to 1
+    :raises Warning: if :python:`num_samples` is set to 1
     """
     def __init__(
         self,

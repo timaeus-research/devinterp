@@ -13,12 +13,18 @@ class LLCEstimator(SamplerCallback):
     Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process.
     It calculates the LLC based on the average loss across draws for each chain:
     
-    $$LLC = \frac{n}{\log(n)} * (avg_loss - init_loss)$$
+    $$LLC = \frac{n}{\log(n)} * (\textrm{avg_loss} - \textrm{init_loss})$$
 
-    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
-    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
-    :param n: Number of samples used to calculate the LLC.
+    For use with :func:`devinterp.slt.sampler.sample`.
+
+    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_draws: int
+    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_chains: int
+    :param n: Number of samples $n$ used to calculate the LLC.
+    :type n: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :type device: str | torch.device, optional
     """
 
     def __init__(
@@ -55,6 +61,9 @@ class LLCEstimator(SamplerCallback):
         self.llc_std = self.llc_per_chain.std()
 
     def sample(self):
+        """
+        :returns: A dict :python:`{"llc/mean": llc_mean, "llc/std": llc_std, "llc-chain/{i}": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
+        """
         return {
             "llc/mean": self.llc_mean.cpu().numpy().item(),
             "llc/std": self.llc_std.cpu().numpy().item(),
@@ -72,12 +81,18 @@ class LLCEstimator(SamplerCallback):
 class OnlineLLCEstimator(SamplerCallback):
     """
     Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.
-    It calculates LLCs using the same formula as LLCEstimator, but continuously and including means and std across draws (as opposed to just across chains).
+    It calculates LLCs using the same formula as :func:`devinterp.slt.llc.LLCEstimator`, but continuously and including means and std across draws (as opposed to just across chains).
+    For use with :func:`devinterp.slt.sampler.sample`.
 
-    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
-    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
-    :param n: Number of samples used to calculate the LLC.
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_draws: int
+    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_chains: int
+    :param n: Number of samples $n$ used to calculate the LLC.
+    :type n: int
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :type device: str | torch.device, optional
+    
     """
 
     def __init__(
@@ -129,6 +144,9 @@ class OnlineLLCEstimator(SamplerCallback):
         self.llc_stds = self.llcs.std(dim=0)
 
     def sample(self):
+        """    
+        :returns: A dict :python:`{"llc/means": llc_means, "llc/stds": llc_stds, "llc/trace": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
+        """
         return {
             "llc/means": self.llc_means.cpu().numpy(),
             "llc/stds": self.llc_stds.cpu().numpy(),

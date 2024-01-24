@@ -43,6 +43,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.optim.html">Sampling Methods</a></li>
 </ul>
@@ -87,17 +88,19 @@
 <a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.gradient.GradientDistribution">[docs]</a>
 <span class="k">class</span> <span class="nc">GradientDistribution</span><span class="p">(</span><span class="n">SamplerCallback</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Callback for plotting the distribution of gradients as a function of draws.</span>
+<span class="sd">    Callback for plotting the distribution of gradients as a function of draws. Does some magic to automatically adjust bins as more draws are taken.</span>
+<span class="sd">    For use with :func:`devinterp.slt.sampler.sample`.</span>
 
-<span class="sd">    :param num_draws: Number of samples to draw (should be identical to param passed to sample())</span>
-<span class="sd">    :param num_chains: Number of chains to run (should be identical to param passed to sample())</span>
-<span class="sd">    :param grad_dists: Stores the gradient distributions for each parameter.</span>
-<span class="sd">    :param min_bins: Minimum number of bins for histogram approximation.</span>
-<span class="sd">    :param param_names: List of parameter names to track. If None, all parameters are tracked.</span>
-<span class="sd">    :param bin_size: Size of each bin in the histogram.</span>
-<span class="sd">    :param num_bins: Number of bins in the histogram.</span>
-<span class="sd">    :param min_grad: Minimum gradient value encountered.</span>
+<span class="sd">    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_draws: int</span>
+<span class="sd">    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :param num_chains: int</span>
+<span class="sd">    :param min_bins: Minimum number of bins for histogram approximation. Default is 20</span>
+<span class="sd">    :type min_bins: int, optional</span>
+<span class="sd">    :param param_names: List of parameter names to track. If None, all parameters are tracked. Default is None</span>
+<span class="sd">    :type param_names: List[str], optional</span>
 <span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
+<span class="sd">    :type device: : str | torch.device, optional</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If gradients are not computed before calling this callback.</span>
@@ -216,15 +219,33 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">num_bins</span> <span class="o">=</span> <span class="n">new_bin_count</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">bin_size</span> <span class="o">*=</span> <span class="mi">2</span>
 
+<div class="viewcode-block" id="GradientDistribution.sample">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.gradient.GradientDistribution.sample">[docs]</a>
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :returns: A dict :python:`{&quot;gradient/distributions&quot;: grad_dists}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [gradient_dist_instance], ...)`)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;gradient/distributions&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">grad_dists</span><span class="p">,</span>
-        <span class="p">}</span>
+        <span class="p">}</span></div>
+
 
 <div class="viewcode-block" id="GradientDistribution.plot">
 <a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.gradient.GradientDistribution.plot">[docs]</a>
     <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">plot_zero</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Plots the gradient distribution for a specific parameter.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Plots the gradient distribution for a specific parameter.</span>
+<span class="sd">        </span>
+<span class="sd">        :param param_name: the name of the parameter plot gradients for.</span>
+<span class="sd">        :type param_name: str</span>
+<span class="sd">        :param color: The color to plot gradient bins in. Default is blue</span>
+<span class="sd">        :type color: str, optional</span>
+<span class="sd">        :param plot_zero: Whether to plot the line through y=0. Default is True</span>
+<span class="sd">        :type plot_zero: bool, optional</span>
+<span class="sd">        :param chain: The model to compute covariances on.</span>
+<span class="sd">        :type chain: int, optional</span>
+<span class="sd">        </span>
+<span class="sd">        :returns: None, but shows the denisty gradient bins over sampling steps.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">grad_dist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">grad_dists</span><span class="p">[</span><span class="n">param_name</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">chain</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">max_count</span> <span class="o">=</span> <span class="n">grad_dist</span><span class="p">[</span><span class="n">chain</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>

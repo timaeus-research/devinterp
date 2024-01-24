@@ -13,12 +13,17 @@ WeightAccessor = Callable[[nn.Module], torch.Tensor]
 class CovarianceAccumulator(SamplerCallback):
     """
     A callback to iteratively compute and store the covariance matrix of model weights.
-    For use with `sample`.
+    For passing along to :func:`devinterp.slt.sampler.sample`.
 
     :param num_weights: Total number of weights.
+    :type num_weights: int
     :param accessors: Functions to access model weights.
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
-    :param num_evals: Number of eigenvalues to compute.
+    :type accessors: List[Callable[[nn.Module], torch.Tensor]]
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :type device: str | torch.device, optional
+    :param num_evals: Number of eigenvalues to compute. Default is 3
+    :type num_evals: int, optional
+    
     """
 
     def __init__(
@@ -75,6 +80,9 @@ class CovarianceAccumulator(SamplerCallback):
         return results
 
     def sample(self):
+        """
+        :returns: A dict :python:`{"evals": eigenvalues_of_cov_matrix, "evecs": eigenvectors_of_cov_matrix, "matrix": cov_matrix}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [covariance_accumulator_instance], ...)`)
+        """
         return self.to_eigen(include_matrix=True)
 
     def __call__(self, model):
@@ -87,13 +95,19 @@ AttentionHeadWeightsAccessor = Callable[[nn.Module], Tuple[torch.Tensor, ...]]
 class WithinHeadCovarianceAccumulator:
     """
     A CovarianceAccumulator to compute covariance within attention heads.
-    For use with `sample`.
+    For use with :func:`devinterp.slt.sampler.sample`.
 
     :param num_heads: The number of attention heads.
+    :type num_heads: int
     :param num_weights_per_head: The number of weights per attention head.
+    :type num_weights_per_head: int
     :param accessors: Functions to access attention head weights.
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
-    :param num_evals: number of eigenvectors / eigenvalues to return.
+    :type accessors: List[Callable[[nn.Module], Tuple[torch.Tensor, ...]]]
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :type device: str | torch.device, optional
+    :param num_evals: number of eigenvectors / eigenvalues to compute. Default is 3
+    :type num_evals: int, optional
+    
     """
 
     def __init__(
@@ -196,6 +210,9 @@ class WithinHeadCovarianceAccumulator:
         return results
 
     def sample(self):
+        """
+        :returns: A dict :python:`{"evals": array_of_eigenvalues_of_cov_matrix_layer_idx_head_idx, "evecs": array_of_eigenvectors_of_cov_matrix_layer_idx_head_idx, "matrix": array_of_cov_matrices_layer_idx_head_idx}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [covariance_accumulator_instance], ...)`).
+        """
         return self.to_eigen(include_matrix=True)
 
     def __call__(self, model):
@@ -207,14 +224,19 @@ LayerWeightsAccessor = Callable[[nn.Module], torch.Tensor]
 
 class BetweenLayerCovarianceAccumulator:
     """
-    A CovarianceAccumulator to compute covariance between arbitrary layers.
-    For use with `sample`.
+    A CovarianceAccumulator to compute covariance between arbitrary layers. For use with :func:`devinterp.slt.sampler.sample`.
 
     :param model: The model to compute covariances on.
+    :type model: torch.nn.Module
     :param pairs: Named pairs of layers to compute covariances on.
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
-    :param num_evals: number of eigenvectors / eigenvalues to return.
+    :type pairs: Dict[str, Tuple[str, str]]
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :type device: str | torch.device, optional
+    :param num_evals: number of eigenvectors / eigenvalues to compute. Default is 3
+    :type num_evals: int
     :param accessors: Functions to access attention head weights.
+    :type accessors: Callable[[nn.Module], torch.Tensor]
+    
     """
 
     def __init__(
@@ -325,6 +347,9 @@ class BetweenLayerCovarianceAccumulator:
         return results
 
     def sample(self):
+        """
+        :returns: A dict with named_pairs keys, with corresponding values :python:`{"evals": eigenvalues_of_cov_matrix, "evecs": eigenvectors_of_cov_matrix, "matrix": cov_matrix}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [covariance_accumulator_instance], ...)`).
+        """
         return self.to_eigens(include_matrix=True)
 
     def __call__(self, model):

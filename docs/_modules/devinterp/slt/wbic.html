@@ -43,6 +43,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.optim.html">Sampling Methods</a></li>
 </ul>
@@ -84,12 +85,16 @@
 <span class="k">class</span> <span class="nc">OnlineWBICEstimator</span><span class="p">(</span><span class="n">SamplerCallback</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Callback for estimating the Widely Applicable Bayesian Information Criterion (WBIC) in an online fashion. </span>
-<span class="sd">    The WBIC used here is just $n$ * (average sampled loss). (Watanabe, 2013)</span>
+<span class="sd">    The WBIC used here is just $n * (\textrm{average sampled loss})$. (Watanabe, 2013)</span>
 
-<span class="sd">    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())</span>
-<span class="sd">    :param num_chains: Number of chains to run. (should be identical to param passed to sample())</span>
-<span class="sd">    :param n: Number of data points, used in the WBIC calculation.</span>
-<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
+<span class="sd">    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_draws: int</span>
+<span class="sd">    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_chains: int</span>
+<span class="sd">    :param n: Number of samples used to calculate the wbic.</span>
+<span class="sd">    :param n: int</span>
+<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;. Default is &#39;cpu&#39;</span>
+<span class="sd">    :param device: str | torch.device, optional</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -125,13 +130,19 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">wbic_means</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wbics</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">wbic_stds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wbics</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
+<div class="viewcode-block" id="OnlineWBICEstimator.sample">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.wbic.OnlineWBICEstimator.sample">[docs]</a>
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;    </span>
+<span class="sd">        :returns: A dict :python:`{&quot;wbic/means&quot;: wbic_means, &quot;wbic/stds&quot;: wbic_stds, &quot;wbic/trace&quot;: wbic_trace_per_chain, &quot;loss/trace&quot;: loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [wbic_estimator_instance], ...)`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;wbic/means&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">wbic_means</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
             <span class="s2">&quot;wbic/stds&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">wbic_stds</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
             <span class="s2">&quot;wbic/trace&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">wbics</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
             <span class="s2">&quot;loss/trace&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">losses</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
-        <span class="p">}</span>
+        <span class="p">}</span></div>
+
 
     <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">draw</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">loss</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">draw</span><span class="p">,</span> <span class="n">loss</span><span class="p">)</span></div>

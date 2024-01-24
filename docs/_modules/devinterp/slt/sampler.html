@@ -174,8 +174,8 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Sample model weights using a given sampling_method, supporting multiple chains/cores, </span>
 <span class="sd">    and calculate the observables (loss, llc, etc.) for each callback passed along. </span>
-<span class="sd">    The `update`, `finalize` and `sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called </span>
-<span class="sd">    during sampling, after sampling, and at `sampler_callback_object.sample()` respectively.</span>
+<span class="sd">    The :python:`update`, :python:`finalize` and :python:`sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called </span>
+<span class="sd">    during sampling, after sampling, and at :python:`sampler_callback_object.sample()` respectively.</span>
 <span class="sd">    </span>
 <span class="sd">    After calling this function, the stats of interest live in the callback object.</span>
 
@@ -187,30 +187,30 @@
 <span class="sd">    :type criterion: Callable</span>
 <span class="sd">    :param callbacks: list of callbacks, each of type SamplerCallback</span>
 <span class="sd">    :type callbacks: list[SamplerCallback]</span>
-<span class="sd">    :param sampling_method: Sampling method to use (a PyTorch optimizer under the hood). Defaults to SGLD</span>
+<span class="sd">    :param sampling_method: Sampling method to use (a PyTorch optimizer under the hood). Default is SGLD</span>
 <span class="sd">    :type sampling_method: torch.optim.Optimizer, optional</span>
-<span class="sd">    :param optimizer_kwargs: Keyword arguments for the PyTorch optimizer (used as sampler here). Defaults to None (using standard SGLD parameters as defined in the SGLD class)</span>
+<span class="sd">    :param optimizer_kwargs: Keyword arguments for the PyTorch optimizer (used as sampler here). Default is None (using standard SGLD parameters as defined in the SGLD class)</span>
 <span class="sd">    :type optimizer_kwargs: dict, optional</span>
-<span class="sd">    :param num_draws: Number of samples to draw. Defaults to 100</span>
+<span class="sd">    :param num_draws: Number of samples to draw. Default is 100</span>
 <span class="sd">    :type num_draws: int, optional</span>
-<span class="sd">    :param num_chains: Number of chains to run.Defaults to 10</span>
+<span class="sd">    :param num_chains: Number of chains to run. Default is 10</span>
 <span class="sd">    :type num_chains: int, optional</span>
-<span class="sd">    :param num_burnin_steps: Number of burn-in steps before sampling. Defaults to 0</span>
+<span class="sd">    :param num_burnin_steps: Number of burn-in steps before sampling. Default is 0</span>
 <span class="sd">    :type num_burnin_steps: int, optional</span>
-<span class="sd">    :param num_steps_bw_draws: Number of steps between each draw. Defaults to 1</span>
+<span class="sd">    :param num_steps_bw_draws: Number of steps between each draw. Default is 1</span>
 <span class="sd">    :type num_steps_bw_draws: int, optional</span>
-<span class="sd">    :param cores: Number of cores for parallel execution. Defaults to 1</span>
+<span class="sd">    :param cores: Number of cores for parallel execution. Default is 1</span>
 <span class="sd">    :type cores: int, optional</span>
-<span class="sd">    :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed. Defaults to None</span>
+<span class="sd">    :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed. Default is None</span>
 <span class="sd">    :type seed: int, optional</span>
-<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;. Defaults to &#39;cpu&#39;</span>
+<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;. Default is &#39;cpu&#39;</span>
 <span class="sd">    :type device: str or torch.device, optional</span>
-<span class="sd">    :param verbose: whether to print sample chain progress. Defaults to True</span>
+<span class="sd">    :param verbose: whether to print sample chain progress. Default is True</span>
 <span class="sd">    :type verbose: bool, optional</span>
 <span class="sd">    </span>
 <span class="sd">    :raises ValueError: if derivative callbacks (f.e. :func:`~devinterp.slt.loss.OnlineLossStatistics`) are passed before base callbacks (f.e. :func:`~devinterp.slt.llc.OnlineLLCEstimator`)</span>
 <span class="sd">    </span>
-<span class="sd">    :return: None (access LLCs or other observables through callback objects.sample())</span>
+<span class="sd">    :returns: None (access LLCs or other observables through callback objects.sample())</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">cores</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">cores</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">cpu_count</span><span class="p">())</span>

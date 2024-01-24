@@ -11,10 +11,14 @@ class WeightNorm(SamplerCallback):
     """
     Callback for computing the norm of the weights over the sampling process.
 
-    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
-    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
-    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm).
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_draws: int
+    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_chains: int
+    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm). Default is 2
+    :type p_norm: int, optional
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :type device: str | torch.device, optional
     """
 
     def __init__(
@@ -45,6 +49,8 @@ class WeightNorm(SamplerCallback):
         self.weight_norms[chain, draw] = total_norm
 
     def sample(self):
+        """:returns: A dict :python:`{"weight_norm/trace": weight_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [weight_norm_instance], ...)`)
+        """
         return {
             "weight_norm/trace": self.weight_norms.cpu().numpy(),
         }
@@ -54,10 +60,14 @@ class GradientNorm(SamplerCallback):
     """
     Callback for computing the norm of the gradients of the optimizer / sampler.
 
-    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
-    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
-    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm).
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_draws: int
+    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_chains: int
+    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm). Default is 2
+    :type p_norm: int, optional
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :type device: str | torch.device, optional
     """
 
     def __init__(
@@ -88,6 +98,8 @@ class GradientNorm(SamplerCallback):
         self.gradient_norms[chain, draw] = total_norm
 
     def sample(self):
+        """:returns: A dict :python:`{"gradient_norm/trace": gradient_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [grad_norm_instance], ...)`)
+        """
         return {
             "gradient_norm/trace": self.gradient_norms.cpu().numpy(),
         }
@@ -97,10 +109,14 @@ class NoiseNorm(SamplerCallback):
     """
     Callback for computing the norm of the noise added in the optimizer / sampler.
 
-    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
-    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
-    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm).
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_draws: int
+    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_chains: int
+    :param p_norm: Order of the norm to be computed (e.g., 2 for Euclidean norm). Default is 2
+    :type p_norm: int, optional
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :type device: str | torch.device, optional
     """
 
     def __init__(
@@ -131,6 +147,8 @@ class NoiseNorm(SamplerCallback):
         self.noise_norms[chain, draw] = total_norm
 
     def sample(self):
+        """:returns: A dict :python:`{"noise_norm/trace": noise_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [noise_norm_instance], ...)`)
+        """
         return {
             "noise_norm/trace": self.noise_norms.cpu().numpy(),
         }

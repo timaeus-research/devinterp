@@ -31,33 +31,36 @@ class SGLD(torch.optim.Optimizer):
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
         >>> optimizer.step()
-
+        
+    .. |colab6| image:: https://colab.research.google.com/assets/colab-badge.svg 
+        :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb
+        
     Note:
-        - :code:`elasticity` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
-        - :code:`noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.
-        - Although this class is a subclass of :code:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point. 
-        - Hyperparameter optimization is more of an art than a science. Check out the example notebooks LINK TODO
-    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :code:`model.parameters()` or something more fancy, just like other :code:`torch.optim.Optimizer` classes.
+        - :python:`elasticity` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
+        - :python:`noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.
+        - Although this class is a subclass of :python:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point. 
+        - Hyperparameter optimization is more of an art than a science. Check out `the calibration notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab6| for how to go about it in a simple case.
+    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :python:`model.parameters()` or something more fancy, just like other :python:`torch.optim.Optimizer` classes.
     :type params: Iterable
-    :param lr: Learning rate. Defaults to 0.01
+    :param lr: Learning rate $\epsilon$. Default is 0.01
     :type lr: float, optional
-    :param noise_level: Amount of Gaussian noise introduced into gradient updates. Don't change this unless you know very well what you're doing! Defaults to 1
+    :param noise_level: Amount of Gaussian noise $\sigma$ introduced into gradient updates . Don't change this unless you know very well what you're doing! Default is 1
     :type noise_level: float, optional
-    :param weight_decay: L2 regularization term, applied as weight decay. Defaults to 0
+    :param weight_decay: L2 regularization term $\lambda$, applied as weight decay. Default is 0
     :type weight_decay: float, optional
-    :param elasticity: Strength of the force pulling weights back to their initial values. Defaults to 0
+    :param elasticity: Strength of the force $\gamma$ pulling weights back to their initial values. Default is 0
     :type elasticity: float, optional
-    :param temperature: Temperature, either as a float or 'adaptive'(:code:`=np.log(num_samples)`). Defaults to 'adaptive'
+    :param temperature: Temperature $\frac{1}{\beta}$, either as a float or 'adaptive'(:python:`=np.log(num_samples)`). Default is 'adaptive'
     :type temperature: float | 'adaptive', optional
-    :param bounding_box_size: the size of the bounding box enclosing our trajectory. Defaults to None
+    :param bounding_box_size: the size of the bounding box enclosing our trajectory. Default is None
     :type bounding_box_size: float, optional
-    :param num_samples: Number of samples to average over, $$n$$ from the above formula.. Should be equal to the size of your dataset, unless you know what you're doing. Defaults to 1
+    :param num_samples: Number of samples $n$ to average over. Should be equal to the size of your dataset, unless you know what you're doing. Default is 1
     :type num_samples: int, optional
-    :param save_noise: whether to store the per-parameter noise during optimization . Defaults to False
+    :param save_noise: Whether to store the per-parameter noise during optimization. Default is False
     :type save_noise: bool, optional
     
-    :raises Warning: if :code:`noise_level` is set to anything other than 1
-    :raises Warning: if :code:`num_samples` is set to 1
+    :raises Warning: if :python:`noise_level` is set to anything other than 1
+    :raises Warning: if :python:`num_samples` is set to 1
     """
 
     def __init__(

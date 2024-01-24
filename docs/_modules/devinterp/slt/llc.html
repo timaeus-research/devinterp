@@ -43,6 +43,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.optim.html">Sampling Methods</a></li>
 </ul>
@@ -89,12 +90,18 @@
 <span class="sd">    Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process.</span>
 <span class="sd">    It calculates the LLC based on the average loss across draws for each chain:</span>
 <span class="sd">    </span>
-<span class="sd">    $$LLC = \frac{n}{\log(n)} * (avg_loss - init_loss)$$</span>
+<span class="sd">    $$LLC = \frac{n}{\log(n)} * (\textrm{avg_loss} - \textrm{init_loss})$$</span>
 
-<span class="sd">    :param num_chains: Number of chains to run. (should be identical to param passed to sample())</span>
-<span class="sd">    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())</span>
-<span class="sd">    :param n: Number of samples used to calculate the LLC.</span>
+<span class="sd">    For use with :func:`devinterp.slt.sampler.sample`.</span>
+
+<span class="sd">    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_draws: int</span>
+<span class="sd">    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_chains: int</span>
+<span class="sd">    :param n: Number of samples $n$ used to calculate the LLC.</span>
+<span class="sd">    :type n: int</span>
 <span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
+<span class="sd">    :type device: str | torch.device, optional</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -130,7 +137,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">llc_mean</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">llc_per_chain</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">llc_std</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">llc_per_chain</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
 
+<div class="viewcode-block" id="LLCEstimator.sample">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.llc.LLCEstimator.sample">[docs]</a>
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :returns: A dict :python:`{&quot;llc/mean&quot;: llc_mean, &quot;llc/std&quot;: llc_std, &quot;llc-chain/{i}&quot;: llc_trace_per_chain, &quot;loss/trace&quot;: loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;llc/mean&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">llc_mean</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span>
             <span class="s2">&quot;llc/std&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">llc_std</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span>
@@ -139,7 +151,8 @@
                 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_chains</span><span class="p">)</span>
             <span class="p">},</span>
             <span class="s2">&quot;loss/trace&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">losses</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
-        <span class="p">}</span>
+        <span class="p">}</span></div>
+
 
     <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">draw</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">loss</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">draw</span><span class="p">,</span> <span class="n">loss</span><span class="p">)</span></div>
@@ -151,12 +164,18 @@
 <span class="k">class</span> <span class="nc">OnlineLLCEstimator</span><span class="p">(</span><span class="n">SamplerCallback</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.</span>
-<span class="sd">    It calculates LLCs using the same formula as LLCEstimator, but continuously and including means and std across draws (as opposed to just across chains).</span>
+<span class="sd">    It calculates LLCs using the same formula as :func:`devinterp.slt.llc.LLCEstimator`, but continuously and including means and std across draws (as opposed to just across chains).</span>
+<span class="sd">    For use with :func:`devinterp.slt.sampler.sample`.</span>
 
-<span class="sd">    :param num_chains: Number of chains to run. (should be identical to param passed to sample())</span>
-<span class="sd">    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())</span>
-<span class="sd">    :param n: Number of samples used to calculate the LLC.</span>
-<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
+<span class="sd">    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_draws: int</span>
+<span class="sd">    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)</span>
+<span class="sd">    :type num_chains: int</span>
+<span class="sd">    :param n: Number of samples $n$ used to calculate the LLC.</span>
+<span class="sd">    :type n: int</span>
+<span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;. Default is &#39;cpu&#39;</span>
+<span class="sd">    :type device: str | torch.device, optional</span>
+<span class="sd">    </span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -207,13 +226,19 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">llc_means</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">llcs</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">llc_stds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">llcs</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
+<div class="viewcode-block" id="OnlineLLCEstimator.sample">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.llc.OnlineLLCEstimator.sample">[docs]</a>
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;    </span>
+<span class="sd">        :returns: A dict :python:`{&quot;llc/means&quot;: llc_means, &quot;llc/stds&quot;: llc_stds, &quot;llc/trace&quot;: llc_trace_per_chain, &quot;loss/trace&quot;: loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;llc/means&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">llc_means</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
             <span class="s2">&quot;llc/stds&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">llc_stds</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
             <span class="s2">&quot;llc/trace&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">llcs</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
             <span class="s2">&quot;loss/trace&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">losses</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
-        <span class="p">}</span>
+        <span class="p">}</span></div>
+
 
     <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">draw</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">loss</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">draw</span><span class="p">,</span> <span class="n">loss</span><span class="p">)</span></div>

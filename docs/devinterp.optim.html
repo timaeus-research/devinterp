@@ -124,29 +124,30 @@ and <span class="math notranslate nohighlight">\(\sigma\)</span> is the noise te
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <ul class="simple">
-<li><p><code class="code docutils literal notranslate"><span class="pre">elasticity</span></code> is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.</p></li>
-<li><p><code class="code docutils literal notranslate"><span class="pre">noise_level</span></code> is not intended to be changed, except when testing! Doing so will raise a warning.</p></li>
-<li><p>Although this class is a subclass of <code class="code docutils literal notranslate"><span class="pre">torch.optim.Optimizer</span></code>, this is a bit of a misnomer in this case. It’s not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.</p></li>
+<li><p><code class="code highlight python docutils literal highlight-python"><span class="n">elasticity</span></code> is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.</p></li>
+<li><p><code class="code highlight python docutils literal highlight-python"><span class="n">noise_level</span></code> is not intended to be changed, except when testing! Doing so will raise a warning.</p></li>
+<li><p>Although this class is a subclass of <code class="code highlight python docutils literal highlight-python"><span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span></code>, this is a bit of a misnomer in this case. It’s not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.</p></li>
+<li><p>Hyperparameter optimization is more of an art than a science. Check out <a class="reference external" href="https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb">the calibration notebook</a> <a class="reference external" href="https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb"><img alt="colab6" src="https://colab.research.google.com/assets/colab-badge.svg" /></a> for how to go about it in a simple case.</p></li>
 </ul>
 </div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>params</strong> (<em>Iterable</em>) – Iterable of parameters to optimize or dicts defining parameter groups. Either <code class="code docutils literal notranslate"><span class="pre">model.parameters()</span></code> or something more fancy, just like other <code class="code docutils literal notranslate"><span class="pre">torch.optim.Optimizer</span></code> classes.</p></li>
-<li><p><strong>lr</strong> (<em>float</em><em>, </em><em>optional</em>) – Learning rate. Defaults to 0.01</p></li>
-<li><p><strong>noise_level</strong> (<em>float</em><em>, </em><em>optional</em>) – Amount of Gaussian noise introduced into gradient updates. Don’t change this unless you know very well what you’re doing! Defaults to 1</p></li>
-<li><p><strong>weight_decay</strong> (<em>float</em><em>, </em><em>optional</em>) – L2 regularization term, applied as weight decay. Defaults to 0</p></li>
-<li><p><strong>elasticity</strong> (<em>float</em><em>, </em><em>optional</em>) – Strength of the force pulling weights back to their initial values. Defaults to 0</p></li>
-<li><p><strong>temperature</strong> (<em>float</em><em> | </em><em>'adaptive'</em><em>, </em><em>optional</em>) – Temperature, either as a float or ‘adaptive’(<code class="code docutils literal notranslate"><span class="pre">=np.log(num_samples)</span></code>). Defaults to ‘adaptive’</p></li>
-<li><p><strong>bounding_box_size</strong> (<em>float</em><em>, </em><em>optional</em>) – the size of the bounding box enclosing our trajectory. Defaults to None</p></li>
-<li><p><strong>num_samples</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of samples to average over. Should be equal to the size of your dataset, unless you know what you’re doing. Defaults to 1</p></li>
-<li><p><strong>save_noise</strong> (<em>bool</em><em>, </em><em>optional</em>) – whether to store the per-parameter noise during optimization . Defaults to False</p></li>
+<li><p><strong>params</strong> (<em>Iterable</em>) – Iterable of parameters to optimize or dicts defining parameter groups. Either <code class="code highlight python docutils literal highlight-python"><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span></code> or something more fancy, just like other <code class="code highlight python docutils literal highlight-python"><span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span></code> classes.</p></li>
+<li><p><strong>lr</strong> (<em>float</em><em>, </em><em>optional</em>) – Learning rate <span class="math notranslate nohighlight">\(\epsilon\)</span>. Default is 0.01</p></li>
+<li><p><strong>noise_level</strong> (<em>float</em><em>, </em><em>optional</em>) – Amount of Gaussian noise <span class="math notranslate nohighlight">\(\sigma\)</span> introduced into gradient updates . Don’t change this unless you know very well what you’re doing! Default is 1</p></li>
+<li><p><strong>weight_decay</strong> (<em>float</em><em>, </em><em>optional</em>) – L2 regularization term <span class="math notranslate nohighlight">\(\lambda\)</span>, applied as weight decay. Default is 0</p></li>
+<li><p><strong>elasticity</strong> (<em>float</em><em>, </em><em>optional</em>) – Strength of the force <span class="math notranslate nohighlight">\(\gamma\)</span> pulling weights back to their initial values. Default is 0</p></li>
+<li><p><strong>temperature</strong> (<em>float</em><em> | </em><em>'adaptive'</em><em>, </em><em>optional</em>) – Temperature <span class="math notranslate nohighlight">\(\frac{1}{\beta}\)</span>, either as a float or ‘adaptive’(<code class="code highlight python docutils literal highlight-python"><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">num_samples</span><span class="p">)</span></code>). Default is ‘adaptive’</p></li>
+<li><p><strong>bounding_box_size</strong> (<em>float</em><em>, </em><em>optional</em>) – the size of the bounding box enclosing our trajectory. Default is None</p></li>
+<li><p><strong>num_samples</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of samples <span class="math notranslate nohighlight">\(n\)</span> to average over. Should be equal to the size of your dataset, unless you know what you’re doing. Default is 1</p></li>
+<li><p><strong>save_noise</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to store the per-parameter noise during optimization. Default is False</p></li>
 </ul>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>Warning</strong> – if <code class="code docutils literal notranslate"><span class="pre">noise_level</span></code> is set to anything other than 1</p></li>
-<li><p><strong>Warning</strong> – if <code class="code docutils literal notranslate"><span class="pre">num_samples</span></code> is set to 1</p></li>
+<li><p><strong>Warning</strong> – if <code class="code highlight python docutils literal highlight-python"><span class="n">noise_level</span></code> is set to anything other than 1</p></li>
+<li><p><strong>Warning</strong> – if <code class="code highlight python docutils literal highlight-python"><span class="n">num_samples</span></code> is set to 1</p></li>
 </ul>
 </dd>
 </dl>
@@ -172,29 +173,29 @@ maintaining the kinetic energy of the system.</p>
 </p>
 <p>where <span class="math notranslate nohighlight">\(w_t\)</span> is the weight at time <span class="math notranslate nohighlight">\(t\)</span>, <span class="math notranslate nohighlight">\(\epsilon\)</span> is the learning rate,
 <span class="math notranslate nohighlight">\((\beta n)\)</span> is the inverse temperature (we’re in the tempered Bayes paradigm),
-<span class="math notranslate nohighlight">\(n\)</span> is the number of training samples, <span class="math notranslate nohighlight">\(m\)</span> is the batch size,
+<span class="math notranslate nohighlight">\(n\)</span> is the number of samples, <span class="math notranslate nohighlight">\(m\)</span> is the batch size,
 <span class="math notranslate nohighlight">\(\xi_t\)</span> is the thermostat variable at time <span class="math notranslate nohighlight">\(t\)</span>, <span class="math notranslate nohighlight">\(A\)</span> is the diffusion factor,
 and <span class="math notranslate nohighlight">\(N(0, A)\)</span> represents Gaussian noise with mean 0 and variance <span class="math notranslate nohighlight">\(A\)</span>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <ul class="simple">
-<li><p><code class="code docutils literal notranslate"><span class="pre">diffusion_factor</span></code> is unique to this class, and functions as a way to allow for random parameter changes while keeping them from blowing up by guiding parameters back to a slowly-changing thermostat value using a friction term.</p></li>
-<li><p>This class does not have an explicit localization term like <a class="reference internal" href="#devinterp.optim.sgld.SGLD" title="devinterp.optim.sgld.SGLD"><code class="xref py py-func docutils literal notranslate"><span class="pre">SGLD()</span></code></a> does. If you want to constrain your sampling, use <code class="code docutils literal notranslate"><span class="pre">bounding_box_size</span></code></p></li>
-<li><p>Although this class is a subclass of <code class="code docutils literal notranslate"><span class="pre">torch.optim.Optimizer</span></code>, this is a bit of a misnomer in this case. It’s not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.</p></li>
+<li><p><code class="code highlight python docutils literal highlight-python"><span class="n">diffusion_factor</span></code> is unique to this class, and functions as a way to allow for random parameter changes while keeping them from blowing up by guiding parameters back to a slowly-changing thermostat value using a friction term.</p></li>
+<li><p>This class does not have an explicit localization term like <a class="reference internal" href="#devinterp.optim.sgld.SGLD" title="devinterp.optim.sgld.SGLD"><code class="xref py py-func docutils literal notranslate"><span class="pre">SGLD()</span></code></a> does. If you want to constrain your sampling, use <code class="code highlight python docutils literal highlight-python"><span class="n">bounding_box_size</span></code></p></li>
+<li><p>Although this class is a subclass of <code class="code highlight python docutils literal highlight-python"><span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span></code>, this is a bit of a misnomer in this case. It’s not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.</p></li>
 </ul>
 </div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>params</strong> (<em>Iterable</em>) – Iterable of parameters to optimize or dicts defining parameter groups. Either <code class="code docutils literal notranslate"><span class="pre">model.parameters()</span></code> or something more fancy, just like other <code class="code docutils literal notranslate"><span class="pre">torch.optim.Optimizer</span></code> classes.</p></li>
-<li><p><strong>lr</strong> (<em>float</em><em>, </em><em>optional</em>) – Learning rate. Defaults to 0.01</p></li>
-<li><p><strong>diffusion_factor</strong> (<em>float</em><em>, </em><em>optional</em>) – The diffusion factor of the thermostat. Defaults to 0.01</p></li>
-<li><p><strong>bounding_box_size</strong> (<em>float</em><em>, </em><em>optional</em>) – the size of the bounding box enclosing our trajectory. Defaults to None</p></li>
-<li><p><strong>num_samples</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of samples to average over. Should be equal to the size of your dataset, unless you know what you’re doing. Defaults to 1</p></li>
+<li><p><strong>params</strong> (<em>Iterable</em>) – Iterable of parameters to optimize or dicts defining parameter groups. Either <code class="code highlight python docutils literal highlight-python"><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span></code> or something more fancy, just like other <code class="code highlight python docutils literal highlight-python"><span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span></code> classes.</p></li>
+<li><p><strong>lr</strong> (<em>float</em><em>, </em><em>optional</em>) – Learning rate <span class="math notranslate nohighlight">\(\epsilon\)</span>. Default is 0.01</p></li>
+<li><p><strong>diffusion_factor</strong> (<em>float</em><em>, </em><em>optional</em>) – The diffusion factor <span class="math notranslate nohighlight">\(A\)</span> of the thermostat. Default is 0.01</p></li>
+<li><p><strong>bounding_box_size</strong> (<em>float</em><em>, </em><em>optional</em>) – the size of the bounding box enclosing our trajectory. Default is None</p></li>
+<li><p><strong>num_samples</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of samples <span class="math notranslate nohighlight">\(n\)</span> to average over. Should be equal to the size of your dataset, unless you know what you’re doing. Default is 1</p></li>
 </ul>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>Warning</strong> – if <code class="code docutils literal notranslate"><span class="pre">num_samples</span></code> is set to 1</p>
+<dd class="field-even"><p><strong>Warning</strong> – if <code class="code highlight python docutils literal highlight-python"><span class="n">num_samples</span></code> is set to 1</p>
 </dd>
 </dl>
 </dd></dl>

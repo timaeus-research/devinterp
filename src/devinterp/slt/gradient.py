@@ -11,17 +11,19 @@ from devinterp.slt.callback import SamplerCallback
 
 class GradientDistribution(SamplerCallback):
     """
-    Callback for plotting the distribution of gradients as a function of draws.
+    Callback for plotting the distribution of gradients as a function of draws. Does some magic to automatically adjust bins as more draws are taken.
+    For use with :func:`devinterp.slt.sampler.sample`.
 
-    :param num_draws: Number of samples to draw (should be identical to param passed to sample())
-    :param num_chains: Number of chains to run (should be identical to param passed to sample())
-    :param grad_dists: Stores the gradient distributions for each parameter.
-    :param min_bins: Minimum number of bins for histogram approximation.
-    :param param_names: List of parameter names to track. If None, all parameters are tracked.
-    :param bin_size: Size of each bin in the histogram.
-    :param num_bins: Number of bins in the histogram.
-    :param min_grad: Minimum gradient value encountered.
+    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_draws: int
+    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
+    :param num_chains: int
+    :param min_bins: Minimum number of bins for histogram approximation. Default is 20
+    :type min_bins: int, optional
+    :param param_names: List of parameter names to track. If None, all parameters are tracked. Default is None
+    :type param_names: List[str], optional
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :type device: : str | torch.device, optional
 
     Raises:
         ValueError: If gradients are not computed before calling this callback.
@@ -141,12 +143,27 @@ class GradientDistribution(SamplerCallback):
             self.bin_size *= 2
 
     def sample(self):
+        """
+        :returns: A dict :python:`{"gradient/distributions": grad_dists}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [gradient_dist_instance], ...)`)
+        """
         return {
             "gradient/distributions": self.grad_dists,
         }
 
     def plot(self, param_name: str, color="blue", plot_zero=True, chain: int = None):
-        """Plots the gradient distribution for a specific parameter."""
+        """Plots the gradient distribution for a specific parameter.
+        
+        :param param_name: the name of the parameter plot gradients for.
+        :type param_name: str
+        :param color: The color to plot gradient bins in. Default is blue
+        :type color: str, optional
+        :param plot_zero: Whether to plot the line through y=0. Default is True
+        :type plot_zero: bool, optional
+        :param chain: The model to compute covariances on.
+        :type chain: int, optional
+        
+        :returns: None, but shows the denisty gradient bins over sampling steps.
+        """
         grad_dist = self.grad_dists[param_name]
         if chain is not None:
             max_count = grad_dist[chain].max()

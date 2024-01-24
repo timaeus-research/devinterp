@@ -87,8 +87,17 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Derivative callback that computes various loss statistics for :func:`~devinterp.slt.llc.OnlineLLCEstimator`. Must</span>
 <span class="sd">    be called after the base :func:`~devinterp.slt.llc.OnlineLLCEstimator` has been called at each draw.</span>
-
+<span class="sd">    </span>
+<span class="sd">    .. |colab5| image:: https://colab.research.google.com/assets/colab-badge.svg </span>
+<span class="sd">        :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb</span>
+<span class="sd">        </span>
+<span class="sd">    See `the diagnostics notebook &lt;https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb&gt;`_ |colab5| for examples on how to use this to diagnose your sample health.</span>
+<span class="sd">        </span>
 <span class="sd">    :param base_callback: Base callback that computes original loss metric.</span>
+<span class="sd">    :type base_callback: :func:`~devinterp.slt.llc.OnlineLLCEstimator`</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        - Requires losses to be computed first, so call using f.e. :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance, ..., online_loss_stats_instance], ...)`</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">base_callback</span><span class="p">:</span> <span class="n">OnlineLLCEstimator</span><span class="p">):</span>
@@ -145,13 +154,19 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">z_scores</span><span class="p">[</span><span class="n">chain</span><span class="p">,</span> <span class="n">draw</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">)</span>
 
+<div class="viewcode-block" id="OnlineLossStatistics.sample">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics.sample">[docs]</a>
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :returns: A dict :python:`{&quot;loss/percent_neg_steps&quot;: percent_neg_steps, &quot;loss/percent_mean_neg_steps&quot;: percent_mean_neg_steps, &quot;loss/percent_thresholded_neg_steps&quot;: percent_thresholded_neg_steps, &quot;loss/z_scores&quot;: z_scores}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance, online_loss_stats_instance], ...)`)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;loss/percent_neg_steps&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">percent_neg_steps</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
             <span class="s2">&quot;loss/percent_mean_neg_steps&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">percent_mean_neg_steps</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
             <span class="s2">&quot;loss/percent_thresholded_neg_steps&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">percent_thresholded_neg_steps</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
             <span class="s2">&quot;loss/z_scores&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_scores</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
-        <span class="p">}</span>
+        <span class="p">}</span></div>
+
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">est_minibatch_noise</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -161,7 +176,13 @@
 <div class="viewcode-block" id="OnlineLossStatistics.loss_hist_by_draw">
 <a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics.loss_hist_by_draw">[docs]</a>
     <span class="k">def</span> <span class="nf">loss_hist_by_draw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">draw</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">bins</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;TODO&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Plots a histogram of chain losses for a given draw index.</span>
+<span class="sd">        </span>
+<span class="sd">        :param draw: Draw index to plot histogram for. Default is 0</span>
+<span class="sd">        :type draw: int, optional   </span>
+<span class="sd">        :param bins: number of histogram bins. Default is 10</span>
+<span class="sd">        :type bins: int, optional</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">losses_at_draw</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_callback</span><span class="o">.</span><span class="n">losses</span><span class="p">[:,</span> <span class="n">draw</span><span class="p">]</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">losses_at_draw</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">bins</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">losses_at_draw</span></div>

@@ -8,12 +8,16 @@ from devinterp.slt.callback import SamplerCallback
 class OnlineWBICEstimator(SamplerCallback):
     """
     Callback for estimating the Widely Applicable Bayesian Information Criterion (WBIC) in an online fashion. 
-    The WBIC used here is just $n$ * (average sampled loss). (Watanabe, 2013)
+    The WBIC used here is just $n * (\textrm{average sampled loss})$. (Watanabe, 2013)
 
-    :param num_draws: Number of samples to draw. (should be identical to param passed to sample())
-    :param num_chains: Number of chains to run. (should be identical to param passed to sample())
-    :param n: Number of data points, used in the WBIC calculation.
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_draws: int
+    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
+    :type num_chains: int
+    :param n: Number of samples used to calculate the wbic.
+    :param n: int
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :param device: str | torch.device, optional
     """
 
     def __init__(
@@ -50,6 +54,9 @@ class OnlineWBICEstimator(SamplerCallback):
         self.wbic_stds = self.wbics.std(axis=0)
 
     def sample(self):
+        """    
+        :returns: A dict :python:`{"wbic/means": wbic_means, "wbic/stds": wbic_stds, "wbic/trace": wbic_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [wbic_estimator_instance], ...)`).
+        """
         return {
             "wbic/means": self.wbic_means.cpu().numpy(),
             "wbic/stds": self.wbic_stds.cpu().numpy(),

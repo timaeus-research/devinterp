@@ -7,28 +7,25 @@ Welcome to devinterp's documentation!
 =====================================
 
 
-DevInterp is a python library for conducting research on developmental interpretability, a novel AI safety research agenda rooted in Singular Learning Theory (SLT). DevInterp proposes tools for detecting, locating, and ultimately *controlling* the development of structure over training.
+DevInterp is a python library for conducting research on developmental interpretability, which is a novel AI safety research agenda rooted in Singular Learning Theory (SLT). DevInterp proposes tools for detecting, locating, and ultimately *controlling* the development of structure over training.
 
-`Read more about developmental interpretability <https://www.lesswrong.com/posts/TjaeCWvLZtEDAS5Ex/towards-developmental-interpretability>`_.
+Read more about `developmental interpretability here <https://www.lesswrong.com/posts/TjaeCWvLZtEDAS5Ex/towards-developmental-interpretability>`_!
 
-.. warning:: This library is still in early development. Don't expect things to work on a first attempt. We are actively working on improving the library and adding new features. If you have questions or suggestions, please feel free to open an issue or submit a pull request.
+For an overview of papers that either used or inspired this package, `click here <https://devinterp.com/publications>`_.
 
-TODO discord and github links
+For questions, it's easiest to `join the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_!
+
+.. warning:: This library is still in early development. Don't expect things to work on a first attempt. We are actively working on improving the library and adding new features.
 
 Installation
-************
+=====================================
 
-To install :code:`devinterp`, simply run:
-
-.. code-block:: bash
-
-   pip install devinterp
-
+To install :code:`devinterp`, simply run :bash:`pip install devinterp`.
 
 **Requirements**: Python 3.8 or higher.
 
 Minimal Example
-***************
+=====================================
 
 .. code-block:: python
 
@@ -40,13 +37,9 @@ Minimal Example
    sample(model, trainloader, ..., callbacks = [llc_estimator])
    
    llc_mean = llc_estimator.sample()["llc/mean"]
-   llc_std = llc_estimator.sample()["llc/std"]
-   loss_mean = llc_estimator.sample()["loss/mean"]
-
-The three functions used here are the main contribution of this repo, and are documented in :ref:`SGLD<devinterp.optim:devinterp.optim.sgld module>`, :ref:`LLCEstimator<devinterp.slt:devinterp.slt.llc module>`, and :ref:`sample<devinterp.slt:devinterp.slt.sampler module>`. 
 
 Examples
-***************
+=====================================
 
 To see DevInterp in action, check out our example notebooks:
 
@@ -72,21 +65,28 @@ For more advanced usage, see `the Diagnostics notebook <https://www.github.com/t
 
 
 Known Issues
-************
+=====================================
 
-TODO 
+- We currently calculate the LLC taking the initial loss to be the loss after one sampling step. This is slightly wrong (it should be the loss *before* sampling), and there are a bunch of other reasonable and similarly compute-friendly alternative choices that can be made. 
+- Similarly, we now sample using minibatches that are passed along from the dataloader to :func:`~devinterp.slt.sampler.sample`. This choice is obscured by the repo, and we should offer alternatives.
+- The current implementation does not work with transformers out-of-the-box. This can be fixed by adding a wrapper to your model, for example passing :python:`unpack(model)` to :func:`~devinterp.slt.sampler.sample` where :python:`unpack` is defined by:
+.. code-block:: python
 
-Variations of LLC (eval on validation set, full dataset, gradient minibatch, new minibatch) -> Blocked on refactoring/cleaning up ICL
+   class unpack(nn.Module):
+    def __init__(model: nn.Module):
+         self.model = model
 
-Variation on initial loss: optional argument to LLC callback for an init loss, otherwise fallback to batch (with warning) 
+    def forward(data: Tuple[torch.Tensor, torch.Tensor]):
+         return self.model(*data)
 
-Custom forward pass or documentation that we encourage using a wrapper instead 
+- LLC Estimation is currently more of an art than a science. It will take some time and pain to get it work reliably.
 
+If you run into issues not mentioned here, please first `check the github issues <https://github.com/timaeus-research/devinterp/issues>`_, then `ask in the DevInterp discord: <https://discord.gg/UwjWKCZZYR>`_, and only then make a new github issue.
 
 Credits & Citations
-********************
+=====================================
 
-The main contributers to this package are Jesse Hoogland, Stan van Wingerden, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also had valuable contributions or provided useful advice.
+This package was created by `Timaeus {https://timaeus.co}_. The main contributors to this package are Jesse Hoogland, Stan van Wingerden, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also made valuable contributions or provided useful advice.
 
 If this package was useful in your work, please cite it as:
 

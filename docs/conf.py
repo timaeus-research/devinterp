@@ -60,6 +60,15 @@ html_sidebars = {
         "donate.html",
     ]
 }
+rst_prolog = """
+.. role:: python(code)
+    :language: python
+    :class: highlight
+    
+.. role:: bash(code)
+    :language: bash
+    :class: highlight
+"""
 html_static_path = ["static"]
 
 
