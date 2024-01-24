@@ -43,6 +43,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.optim.html">Sampling Methods</a></li>
 </ul>
@@ -81,14 +82,11 @@
 <a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.callback.SamplerCallback">[docs]</a>
 <span class="k">class</span> <span class="nc">SamplerCallback</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Base class for creating callbacks used in sample().</span>
+<span class="sd">    Base class for creating callbacks used in :func:`devinterp.slt.sampler.sample()`.</span>
 
-<span class="sd">    Each instantiated callback gets its functions update(), finalize() and sample() called if those exist.</span>
+<span class="sd">    Each instantiated callback gets its methods :code:`__call__` and :code:`finalize` called if those exist.</span>
 
-<span class="sd">    update() happens at every (non burn-in) sample draw, finalize() happens after all draws are finished,</span>
-<span class="sd">    and sample() is a helper function that allows access to whatever relevant parameters the callback has computed.</span>
-
-<span class="sd">    For legibility, each callback can also access parameters in locals() when a class function is called.</span>
+<span class="sd">    Each callback can access parameters in :code:`locals()` when a class function is called, so there&#39;s no need to pass variables along explicitly.</span>
 
 <span class="sd">    :param device: Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -112,7 +110,26 @@
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets called at every (non burn-in) sample draw. Can access any variable in :code:`locals()` when called. </span>
+<span class="sd">        Should be used for calucalting stats at every sample draw, for example running average chain loss.</span>
+<span class="sd">        :raises NotImplementedError: if not overwritten for inherited classes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+<div class="viewcode-block" id="SamplerCallback.finalize">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.callback.SamplerCallback.finalize">[docs]</a>
+    <span class="k">def</span> <span class="nf">finalize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets called at the end of sampling. Can access any variable in :code:`locals()` when called. Should be used for calucalting stats over chains, for example average chain loss.&quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="SamplerCallback.sample">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.callback.SamplerCallback.sample">[docs]</a>
+    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Does not get called automatically, but functions as an interface to easily access stats calculated by the callback.</span>
+<span class="sd">        :raises NotImplementedError: if not overwritten for inherited classes.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+</div>
 
 
 
@@ -132,7 +149,6 @@
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;Base callback </span><span class="si">{</span><span class="n">base_callback</span><span class="si">}</span><span class="s2"> of derivative callback </span><span class="si">{</span><span class="n">callback</span><span class="si">}</span><span class="s2"> was not passed.&quot;</span>
                 <span class="p">)</span>
-
     <span class="k">return</span> <span class="kc">True</span>
 </pre></div>
 

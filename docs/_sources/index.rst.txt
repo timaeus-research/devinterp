@@ -13,10 +13,12 @@ DevInterp is a python library for conducting research on developmental interpret
 
 .. warning:: This library is still in early development. Don't expect things to work on a first attempt. We are actively working on improving the library and adding new features. If you have questions or suggestions, please feel free to open an issue or submit a pull request.
 
+TODO discord and github links
+
 Installation
 ************
 
-To install `devinterp`, simply run:
+To install :code:`devinterp`, simply run:
 
 .. code-block:: bash
 
@@ -25,7 +27,25 @@ To install `devinterp`, simply run:
 
 **Requirements**: Python 3.8 or higher.
 
-Getting Started
+Minimal Example
+***************
+
+.. code-block:: python
+
+   from devinterp.slt import sample, LLCEstimator
+   from devinterp.optim import SGLD
+
+   # Assuming you have a PyTorch Module and DataLoader
+   llc_estimator = LLCEstimator(...)
+   sample(model, trainloader, ..., callbacks = [llc_estimator])
+   
+   llc_mean = llc_estimator.sample()["llc/mean"]
+   llc_std = llc_estimator.sample()["llc/std"]
+   loss_mean = llc_estimator.sample()["loss/mean"]
+
+The three functions used here are the main contribution of this repo, and are documented in :ref:`SGLD<devinterp.optim:devinterp.optim.sgld module>`, :ref:`LLCEstimator<devinterp.slt:devinterp.slt.llc module>`, and :ref:`sample<devinterp.slt:devinterp.slt.sampler module>`. 
+
+Examples
 ***************
 
 To see DevInterp in action, check out our example notebooks:
@@ -51,23 +71,6 @@ To see DevInterp in action, check out our example notebooks:
 For more advanced usage, see `the Diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| and for a quick guide on picking hyperparameters, see `the calibration notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab5|
 
 
-Minimal Example
-***************
-
-.. code-block:: python
-
-   from devinterp.slt import sample, LLCEstimator
-   from devinterp.optim import SGLD
-
-   # Assuming you have a PyTorch Module and DataLoader
-   llc_estimator = LLCEstimator(...)
-   learning_coeff = sample(model, trainloader, ..., callbacks = [llc_estimator])
-   
-   llc_mean = llc_estimator.sample()["llc/mean"]
-   llc_std = llc_estimator.sample()["llc/std"]
-   loss_mean = llc_estimator.sample()["loss/mean"]
-
-
 Known Issues
 ************
 
@@ -78,11 +81,6 @@ Variations of LLC (eval on validation set, full dataset, gradient minibatch, new
 Variation on initial loss: optional argument to LLC callback for an init loss, otherwise fallback to batch (with warning) 
 
 Custom forward pass or documentation that we encourage using a wrapper instead 
-
-Contributing
-************
-
-See `CONTRIBUTING.md <https://github.com/timaeus-research/devinterp/blob/main/CONTRIBUTING.md>`_ for guidelines on how to contribute. For questions, please `hop into the DevInterp Discord <https://discord.gg/UwjWKCZZYR>`_!
 
 
 Credits & Citations

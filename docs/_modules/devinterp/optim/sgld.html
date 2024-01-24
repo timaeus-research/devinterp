@@ -43,6 +43,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.optim.html">Sampling Methods</a></li>
 </ul>
@@ -86,10 +87,9 @@
 <span class="sd">    Implements Stochastic Gradient Langevin Dynamics (SGLD) optimizer.</span>
 
 <span class="sd">    This optimizer blends Stochastic Gradient Descent (SGD) with Langevin Dynamics,</span>
-<span class="sd">    introducing Gaussian noise to the gradient updates. It can also include an</span>
-<span class="sd">    elasticity term that acts like a special form of weight decay.</span>
+<span class="sd">    introducing Gaussian noise to the gradient updates. This makes it sample weights from the posterior distribution, instead of optimizing weights.</span>
 
-<span class="sd">    It follows Lau et al.&#39;s (2023) implementation, which is a modification of</span>
+<span class="sd">    This implementation follows Lau et al.&#39;s (2023) implementation, which is a modification of</span>
 <span class="sd">    Welling and Teh (2011) that omits the learning rate schedule and introduces</span>
 <span class="sd">    an elasticity term that pulls the weights towards their initial values.</span>
 
@@ -110,21 +110,31 @@
 <span class="sd">        &gt;&gt;&gt; optimizer.step()</span>
 
 <span class="sd">    Note:</span>
-<span class="sd">        - `elasticity` is unique to this implementation and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.</span>
-<span class="sd">        - `noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.</span>
+<span class="sd">        - :code:`elasticity` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.</span>
+<span class="sd">        - :code:`noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.</span>
+<span class="sd">        - Although this class is a subclass of :code:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It&#39;s not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point. </span>
 
-<span class="sd">    :param params: Iterable of parameters to optimize or dicts defining parameter groups (required)</span>
-<span class="sd">    :param lr: Learning rate</span>
-<span class="sd">    :param noise_level: Amount of Gaussian noise introduced into gradient updates (default: 1).</span>
-<span class="sd">    :param weight_decay: L2 regularization term, applied as weight decay (default: 0)</span>
-<span class="sd">    :param elasticity: Strength of the force pulling weights back to their initial values (default: 0)</span>
-<span class="sd">    :param temperature: Temperature, either as a float or &#39;adaptive&#39;(=np.log(num_samples)). (default: adaptive)</span>
-<span class="sd">    :param bounding_box_size: the size of the bounding box enclosing our trajectory</span>
-<span class="sd">    :param num_samples: Number of samples to average over (default: 1)</span>
-<span class="sd">    :param save_noise: whether to store the per-parameter noise during optimization (default: False)</span>
-
-
-
+<span class="sd">    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :code:`model.parameters()` or something more fancy, just like other :code:`torch.optim.Optimizer` classes.</span>
+<span class="sd">    :type params: Iterable</span>
+<span class="sd">    :param lr: Learning rate. Defaults to 0.01</span>
+<span class="sd">    :type lr: float, optional</span>
+<span class="sd">    :param noise_level: Amount of Gaussian noise introduced into gradient updates. Don&#39;t change this unless you know very well what you&#39;re doing! Defaults to 1</span>
+<span class="sd">    :type noise_level: float, optional</span>
+<span class="sd">    :param weight_decay: L2 regularization term, applied as weight decay. Defaults to 0</span>
+<span class="sd">    :type weight_decay: float, optional</span>
+<span class="sd">    :param elasticity: Strength of the force pulling weights back to their initial values. Defaults to 0</span>
+<span class="sd">    :type elasticity: float, optional</span>
+<span class="sd">    :param temperature: Temperature, either as a float or &#39;adaptive&#39;(:code:`=np.log(num_samples)`). Defaults to &#39;adaptive&#39;</span>
+<span class="sd">    :type temperature: float | &#39;adaptive&#39;, optional</span>
+<span class="sd">    :param bounding_box_size: the size of the bounding box enclosing our trajectory. Defaults to None</span>
+<span class="sd">    :type bounding_box_size: float, optional</span>
+<span class="sd">    :param num_samples: Number of samples to average over. Should be equal to the size of your dataset, unless you know what you&#39;re doing. Defaults to 1</span>
+<span class="sd">    :type num_samples: int, optional</span>
+<span class="sd">    :param save_noise: whether to store the per-parameter noise during optimization . Defaults to False</span>
+<span class="sd">    :type save_noise: bool, optional</span>
+<span class="sd">    </span>
+<span class="sd">    :raises Warning: if :code:`noise_level` is set to anything other than 1</span>
+<span class="sd">    :raises Warning: if :code:`num_samples` is set to 1</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -142,6 +152,10 @@
         <span class="k">if</span> <span class="n">noise_level</span> <span class="o">!=</span> <span class="mf">1.0</span><span class="p">:</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
                 <span class="s2">&quot;Warning: noise_level in SGLD is unequal to zero, are you intending to use SGD?&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">num_samples</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;Warning: num_samples is set to 1, make sure you know what you&#39;re doing! If not, just use num_samples = len(dataset)&quot;</span>
             <span class="p">)</span>
         <span class="n">defaults</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
             <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span>

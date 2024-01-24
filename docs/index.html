@@ -82,16 +82,33 @@
 <p class="admonition-title">Warning</p>
 <p>This library is still in early development. Don’t expect things to work on a first attempt. We are actively working on improving the library and adding new features. If you have questions or suggestions, please feel free to open an issue or submit a pull request.</p>
 </div>
+<p>TODO discord and github links</p>
 <section id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
-<p>To install <cite>devinterp</cite>, simply run:</p>
+<p>To install <code class="code docutils literal notranslate"><span class="pre">devinterp</span></code>, simply run:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>devinterp
 </pre></div>
 </div>
 <p><strong>Requirements</strong>: Python 3.8 or higher.</p>
 </section>
-<section id="getting-started">
-<h2>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h2>
+<section id="minimal-example">
+<h2>Minimal Example<a class="headerlink" href="#minimal-example" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">devinterp.slt</span> <span class="kn">import</span> <span class="n">sample</span><span class="p">,</span> <span class="n">LLCEstimator</span>
+<span class="kn">from</span> <span class="nn">devinterp.optim</span> <span class="kn">import</span> <span class="n">SGLD</span>
+
+<span class="c1"># Assuming you have a PyTorch Module and DataLoader</span>
+<span class="n">llc_estimator</span> <span class="o">=</span> <span class="n">LLCEstimator</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="n">sample</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">trainloader</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">callbacks</span> <span class="o">=</span> <span class="p">[</span><span class="n">llc_estimator</span><span class="p">])</span>
+
+<span class="n">llc_mean</span> <span class="o">=</span> <span class="n">llc_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">()[</span><span class="s2">&quot;llc/mean&quot;</span><span class="p">]</span>
+<span class="n">llc_std</span> <span class="o">=</span> <span class="n">llc_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">()[</span><span class="s2">&quot;llc/std&quot;</span><span class="p">]</span>
+<span class="n">loss_mean</span> <span class="o">=</span> <span class="n">llc_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">()[</span><span class="s2">&quot;loss/mean&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>The three functions used here are the main contribution of this repo, and are documented in <a class="reference internal" href="devinterp.optim.html#module-devinterp.optim.sgld"><span class="std std-ref">SGLD</span></a>, <a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.llc"><span class="std std-ref">LLCEstimator</span></a>, and <a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.sampler"><span class="std std-ref">sample</span></a>.</p>
+</section>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h2>
 <p>To see DevInterp in action, check out our example notebooks:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://www.github.com/timaeus-research/devinterp/blob/main/examples/introduction.ipynb">Introduction</a> <a class="reference external" href="https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/introduction.ipynb"><img alt="colab1" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p></li>
@@ -101,31 +118,12 @@
 </ul>
 <p>For more advanced usage, see <a class="reference external" href="https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb">the Diagnostics notebook</a> <a class="reference external" href="https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb"><img alt="colab5" src="https://colab.research.google.com/assets/colab-badge.svg" /></a> and for a quick guide on picking hyperparameters, see <a class="reference external" href="https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb">the calibration notebook</a> <a class="reference external" href="https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb"><img alt="colab5" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
 </section>
-<section id="minimal-example">
-<h2>Minimal Example<a class="headerlink" href="#minimal-example" title="Link to this heading"></a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">devinterp.slt</span> <span class="kn">import</span> <span class="n">sample</span><span class="p">,</span> <span class="n">LLCEstimator</span>
-<span class="kn">from</span> <span class="nn">devinterp.optim</span> <span class="kn">import</span> <span class="n">SGLD</span>
-
-<span class="c1"># Assuming you have a PyTorch Module and DataLoader</span>
-<span class="n">llc_estimator</span> <span class="o">=</span> <span class="n">LLCEstimator</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-<span class="n">learning_coeff</span> <span class="o">=</span> <span class="n">sample</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">trainloader</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">callbacks</span> <span class="o">=</span> <span class="p">[</span><span class="n">llc_estimator</span><span class="p">])</span>
-
-<span class="n">llc_mean</span> <span class="o">=</span> <span class="n">llc_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">()[</span><span class="s2">&quot;llc/mean&quot;</span><span class="p">]</span>
-<span class="n">llc_std</span> <span class="o">=</span> <span class="n">llc_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">()[</span><span class="s2">&quot;llc/std&quot;</span><span class="p">]</span>
-<span class="n">loss_mean</span> <span class="o">=</span> <span class="n">llc_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">()[</span><span class="s2">&quot;loss/mean&quot;</span><span class="p">]</span>
-</pre></div>
-</div>
-</section>
 <section id="known-issues">
 <h2>Known Issues<a class="headerlink" href="#known-issues" title="Link to this heading"></a></h2>
 <p>TODO</p>
 <p>Variations of LLC (eval on validation set, full dataset, gradient minibatch, new minibatch) -&gt; Blocked on refactoring/cleaning up ICL</p>
 <p>Variation on initial loss: optional argument to LLC callback for an init loss, otherwise fallback to batch (with warning)</p>
 <p>Custom forward pass or documentation that we encourage using a wrapper instead</p>
-</section>
-<section id="contributing">
-<h2>Contributing<a class="headerlink" href="#contributing" title="Link to this heading"></a></h2>
-<p>See <a class="reference external" href="https://github.com/timaeus-research/devinterp/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> for guidelines on how to contribute. For questions, please <a class="reference external" href="https://discord.gg/UwjWKCZZYR">hop into the DevInterp Discord</a>!</p>
 </section>
 <section id="credits-citations">
 <h2>Credits &amp; Citations<a class="headerlink" href="#credits-citations" title="Link to this heading"></a></h2>
@@ -149,7 +147,11 @@
 <li class="toctree-l1"><a class="reference internal" href="devinterp.slt.html">SLT Observables</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#submodules">Submodules</a></li>
 <li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.callback">devinterp.slt.callback module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.callback.SamplerCallback"><code class="docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.callback.SamplerCallback"><code class="docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.callback.SamplerCallback.finalize"><code class="docutils literal notranslate"><span class="pre">SamplerCallback.finalize()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.callback.SamplerCallback.sample"><code class="docutils literal notranslate"><span class="pre">SamplerCallback.sample()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.cov">devinterp.slt.cov module</a><ul>
@@ -171,7 +173,10 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.loss">devinterp.slt.loss module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics"><code class="docutils literal notranslate"><span class="pre">OnlineLossStatistics</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics"><code class="docutils literal notranslate"><span class="pre">OnlineLossStatistics</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics.loss_hist_by_draw"><code class="docutils literal notranslate"><span class="pre">OnlineLossStatistics.loss_hist_by_draw()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.norms">devinterp.slt.norms module</a><ul>

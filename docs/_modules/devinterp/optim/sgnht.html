@@ -43,6 +43,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.optim.html">Sampling Methods</a></li>
 </ul>
@@ -96,13 +97,26 @@
 <span class="sd">    $n$ is the number of training samples, $m$ is the batch size,</span>
 <span class="sd">    $\xi_t$ is the thermostat variable at time $t$, $A$ is the diffusion factor,</span>
 <span class="sd">    and $N(0, A)$ represents Gaussian noise with mean 0 and variance $A$.</span>
+<span class="sd">    </span>
+<span class="sd">    Note:</span>
+<span class="sd">        - :code:`diffusion_factor` is unique to this class, and functions as a way to allow for random parameter changes while keeping them from blowing up by guiding parameters back to a slowly-changing thermostat value using a friction term.</span>
+<span class="sd">        - This class does not have an explicit localization term like :func:`~devinterp.optim.sgld.SGLD` does. If you want to constrain your sampling, use :code:`bounding_box_size`</span>
+<span class="sd">        - Although this class is a subclass of :code:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It&#39;s not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point. </span>
+<span class="sd">    </span>
 
-<span class="sd">    :param params: Iterable of parameters to optimize or dicts defining parameter groups (required)</span>
-<span class="sd">    :param lr: Learning rate</span>
-<span class="sd">    :param diffusion_factor: The diffusion factor of the thermostat (default: 0.01)</span>
-<span class="sd">    :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)</span>
-<span class="sd">    :param num_samples: Number of samples to average over (default: 1)&quot;&quot;&quot;</span>
-
+<span class="sd">    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :code:`model.parameters()` or something more fancy, just like other :code:`torch.optim.Optimizer` classes.</span>
+<span class="sd">    :type params: Iterable</span>
+<span class="sd">    :param lr: Learning rate. Defaults to 0.01</span>
+<span class="sd">    :type lr: float, optional</span>
+<span class="sd">    :param diffusion_factor: The diffusion factor of the thermostat. Defaults to 0.01</span>
+<span class="sd">    :type diffusion_factor: float, optional</span>
+<span class="sd">    :param bounding_box_size: the size of the bounding box enclosing our trajectory. Defaults to None</span>
+<span class="sd">    :type bounding_box_size: float, optional</span>
+<span class="sd">    :param num_samples: Number of samples to average over. Should be equal to the size of your dataset, unless you know what you&#39;re doing. Defaults to 1</span>
+<span class="sd">    :type num_samples: int, optional</span>
+<span class="sd">    </span>
+<span class="sd">    :raises Warning: if :code:`num_samples` is set to 1</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">params</span><span class="p">,</span>

@@ -8,8 +8,8 @@ from devinterp.slt.llc import OnlineLLCEstimator
 
 class OnlineLossStatistics(SamplerCallback):
     """
-    Derivative callback that computes various loss statistics for OnlineLLCEstimator. Must
-    be called after the base OnlineLLCEstimator has been called at each draw.
+    Derivative callback that computes various loss statistics for :func:`~devinterp.slt.llc.OnlineLLCEstimator`. Must
+    be called after the base :func:`~devinterp.slt.llc.OnlineLLCEstimator` has been called at each draw.
 
     :param base_callback: Base callback that computes original loss metric.
     """
@@ -82,6 +82,7 @@ class OnlineLossStatistics(SamplerCallback):
         return init_losses.std()
 
     def loss_hist_by_draw(self, draw: int = 0, bins: int = 10):
+        """TODO"""
         losses_at_draw = self.base_callback.losses[:, draw]
         plt.hist(losses_at_draw, bins=bins)
         return losses_at_draw

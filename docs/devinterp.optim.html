@@ -48,6 +48,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Sampling Methods</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
@@ -100,9 +101,8 @@
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Optimizer</span></code></p>
 <p>Implements Stochastic Gradient Langevin Dynamics (SGLD) optimizer.</p>
 <p>This optimizer blends Stochastic Gradient Descent (SGD) with Langevin Dynamics,
-introducing Gaussian noise to the gradient updates. It can also include an
-elasticity term that acts like a special form of weight decay.</p>
-<p>It follows Lau et al.’s (2023) implementation, which is a modification of
+introducing Gaussian noise to the gradient updates. This makes it sample weights from the posterior distribution, instead of optimizing weights.</p>
+<p>This implementation follows Lau et al.’s (2023) implementation, which is a modification of
 Welling and Teh (2011) that omits the learning rate schedule and introduces
 an elasticity term that pulls the weights towards their initial values.</p>
 <p>The equation for the update is as follows:</p>
@@ -124,22 +124,29 @@ and <span class="math notranslate nohighlight">\(\sigma\)</span> is the noise te
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <ul class="simple">
-<li><p><cite>elasticity</cite> is unique to this implementation and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.</p></li>
-<li><p><cite>noise_level</cite> is not intended to be changed, except when testing! Doing so will raise a warning.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">elasticity</span></code> is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">noise_level</span></code> is not intended to be changed, except when testing! Doing so will raise a warning.</p></li>
+<li><p>Although this class is a subclass of <code class="code docutils literal notranslate"><span class="pre">torch.optim.Optimizer</span></code>, this is a bit of a misnomer in this case. It’s not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.</p></li>
 </ul>
 </div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>params</strong> – Iterable of parameters to optimize or dicts defining parameter groups (required)</p></li>
-<li><p><strong>lr</strong> – Learning rate</p></li>
-<li><p><strong>noise_level</strong> – Amount of Gaussian noise introduced into gradient updates (default: 1).</p></li>
-<li><p><strong>weight_decay</strong> – L2 regularization term, applied as weight decay (default: 0)</p></li>
-<li><p><strong>elasticity</strong> – Strength of the force pulling weights back to their initial values (default: 0)</p></li>
-<li><p><strong>temperature</strong> – Temperature, either as a float or ‘adaptive’(=np.log(num_samples)). (default: adaptive)</p></li>
-<li><p><strong>bounding_box_size</strong> – the size of the bounding box enclosing our trajectory</p></li>
-<li><p><strong>num_samples</strong> – Number of samples to average over (default: 1)</p></li>
-<li><p><strong>save_noise</strong> – whether to store the per-parameter noise during optimization (default: False)</p></li>
+<li><p><strong>params</strong> (<em>Iterable</em>) – Iterable of parameters to optimize or dicts defining parameter groups. Either <code class="code docutils literal notranslate"><span class="pre">model.parameters()</span></code> or something more fancy, just like other <code class="code docutils literal notranslate"><span class="pre">torch.optim.Optimizer</span></code> classes.</p></li>
+<li><p><strong>lr</strong> (<em>float</em><em>, </em><em>optional</em>) – Learning rate. Defaults to 0.01</p></li>
+<li><p><strong>noise_level</strong> (<em>float</em><em>, </em><em>optional</em>) – Amount of Gaussian noise introduced into gradient updates. Don’t change this unless you know very well what you’re doing! Defaults to 1</p></li>
+<li><p><strong>weight_decay</strong> (<em>float</em><em>, </em><em>optional</em>) – L2 regularization term, applied as weight decay. Defaults to 0</p></li>
+<li><p><strong>elasticity</strong> (<em>float</em><em>, </em><em>optional</em>) – Strength of the force pulling weights back to their initial values. Defaults to 0</p></li>
+<li><p><strong>temperature</strong> (<em>float</em><em> | </em><em>'adaptive'</em><em>, </em><em>optional</em>) – Temperature, either as a float or ‘adaptive’(<code class="code docutils literal notranslate"><span class="pre">=np.log(num_samples)</span></code>). Defaults to ‘adaptive’</p></li>
+<li><p><strong>bounding_box_size</strong> (<em>float</em><em>, </em><em>optional</em>) – the size of the bounding box enclosing our trajectory. Defaults to None</p></li>
+<li><p><strong>num_samples</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of samples to average over. Should be equal to the size of your dataset, unless you know what you’re doing. Defaults to 1</p></li>
+<li><p><strong>save_noise</strong> (<em>bool</em><em>, </em><em>optional</em>) – whether to store the per-parameter noise during optimization . Defaults to False</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>Warning</strong> – if <code class="code docutils literal notranslate"><span class="pre">noise_level</span></code> is set to anything other than 1</p></li>
+<li><p><strong>Warning</strong> – if <code class="code docutils literal notranslate"><span class="pre">num_samples</span></code> is set to 1</p></li>
 </ul>
 </dd>
 </dl>
@@ -168,15 +175,26 @@ maintaining the kinetic energy of the system.</p>
 <span class="math notranslate nohighlight">\(n\)</span> is the number of training samples, <span class="math notranslate nohighlight">\(m\)</span> is the batch size,
 <span class="math notranslate nohighlight">\(\xi_t\)</span> is the thermostat variable at time <span class="math notranslate nohighlight">\(t\)</span>, <span class="math notranslate nohighlight">\(A\)</span> is the diffusion factor,
 and <span class="math notranslate nohighlight">\(N(0, A)\)</span> represents Gaussian noise with mean 0 and variance <span class="math notranslate nohighlight">\(A\)</span>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p><code class="code docutils literal notranslate"><span class="pre">diffusion_factor</span></code> is unique to this class, and functions as a way to allow for random parameter changes while keeping them from blowing up by guiding parameters back to a slowly-changing thermostat value using a friction term.</p></li>
+<li><p>This class does not have an explicit localization term like <a class="reference internal" href="#devinterp.optim.sgld.SGLD" title="devinterp.optim.sgld.SGLD"><code class="xref py py-func docutils literal notranslate"><span class="pre">SGLD()</span></code></a> does. If you want to constrain your sampling, use <code class="code docutils literal notranslate"><span class="pre">bounding_box_size</span></code></p></li>
+<li><p>Although this class is a subclass of <code class="code docutils literal notranslate"><span class="pre">torch.optim.Optimizer</span></code>, this is a bit of a misnomer in this case. It’s not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.</p></li>
+</ul>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>params</strong> – Iterable of parameters to optimize or dicts defining parameter groups (required)</p></li>
-<li><p><strong>lr</strong> – Learning rate</p></li>
-<li><p><strong>diffusion_factor</strong> – The diffusion factor of the thermostat (default: 0.01)</p></li>
-<li><p><strong>bounding_box_size</strong> – the size of the bounding box enclosing our trajectory The diffusion factor (default: None)</p></li>
-<li><p><strong>num_samples</strong> – Number of samples to average over (default: 1)</p></li>
+<li><p><strong>params</strong> (<em>Iterable</em>) – Iterable of parameters to optimize or dicts defining parameter groups. Either <code class="code docutils literal notranslate"><span class="pre">model.parameters()</span></code> or something more fancy, just like other <code class="code docutils literal notranslate"><span class="pre">torch.optim.Optimizer</span></code> classes.</p></li>
+<li><p><strong>lr</strong> (<em>float</em><em>, </em><em>optional</em>) – Learning rate. Defaults to 0.01</p></li>
+<li><p><strong>diffusion_factor</strong> (<em>float</em><em>, </em><em>optional</em>) – The diffusion factor of the thermostat. Defaults to 0.01</p></li>
+<li><p><strong>bounding_box_size</strong> (<em>float</em><em>, </em><em>optional</em>) – the size of the bounding box enclosing our trajectory. Defaults to None</p></li>
+<li><p><strong>num_samples</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of samples to average over. Should be equal to the size of your dataset, unless you know what you’re doing. Defaults to 1</p></li>
 </ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Warning</strong> – if <code class="code docutils literal notranslate"><span class="pre">num_samples</span></code> is set to 1</p>
 </dd>
 </dl>
 </dd></dl>

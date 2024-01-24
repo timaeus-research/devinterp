@@ -10,10 +10,9 @@ class SGLD(torch.optim.Optimizer):
     Implements Stochastic Gradient Langevin Dynamics (SGLD) optimizer.
 
     This optimizer blends Stochastic Gradient Descent (SGD) with Langevin Dynamics,
-    introducing Gaussian noise to the gradient updates. It can also include an
-    elasticity term that acts like a special form of weight decay.
+    introducing Gaussian noise to the gradient updates. This makes it sample weights from the posterior distribution, instead of optimizing weights.
 
-    It follows Lau et al.'s (2023) implementation, which is a modification of
+    This implementation follows Lau et al.'s (2023) implementation, which is a modification of
     Welling and Teh (2011) that omits the learning rate schedule and introduces
     an elasticity term that pulls the weights towards their initial values.
 
@@ -34,21 +33,31 @@ class SGLD(torch.optim.Optimizer):
         >>> optimizer.step()
 
     Note:
-        - `elasticity` is unique to this implementation and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
-        - `noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.
-
-    :param params: Iterable of parameters to optimize or dicts defining parameter groups (required)
-    :param lr: Learning rate
-    :param noise_level: Amount of Gaussian noise introduced into gradient updates (default: 1).
-    :param weight_decay: L2 regularization term, applied as weight decay (default: 0)
-    :param elasticity: Strength of the force pulling weights back to their initial values (default: 0)
-    :param temperature: Temperature, either as a float or 'adaptive'(=np.log(num_samples)). (default: adaptive)
-    :param bounding_box_size: the size of the bounding box enclosing our trajectory
-    :param num_samples: Number of samples to average over (default: 1)
-    :param save_noise: whether to store the per-parameter noise during optimization (default: False)
-
-
-
+        - :code:`elasticity` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
+        - :code:`noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.
+        - Although this class is a subclass of :code:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point. 
+        - Hyperparameter optimization is more of an art than a science. Check out the example notebooks LINK TODO
+    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :code:`model.parameters()` or something more fancy, just like other :code:`torch.optim.Optimizer` classes.
+    :type params: Iterable
+    :param lr: Learning rate. Defaults to 0.01
+    :type lr: float, optional
+    :param noise_level: Amount of Gaussian noise introduced into gradient updates. Don't change this unless you know very well what you're doing! Defaults to 1
+    :type noise_level: float, optional
+    :param weight_decay: L2 regularization term, applied as weight decay. Defaults to 0
+    :type weight_decay: float, optional
+    :param elasticity: Strength of the force pulling weights back to their initial values. Defaults to 0
+    :type elasticity: float, optional
+    :param temperature: Temperature, either as a float or 'adaptive'(:code:`=np.log(num_samples)`). Defaults to 'adaptive'
+    :type temperature: float | 'adaptive', optional
+    :param bounding_box_size: the size of the bounding box enclosing our trajectory. Defaults to None
+    :type bounding_box_size: float, optional
+    :param num_samples: Number of samples to average over, $$n$$ from the above formula.. Should be equal to the size of your dataset, unless you know what you're doing. Defaults to 1
+    :type num_samples: int, optional
+    :param save_noise: whether to store the per-parameter noise during optimization . Defaults to False
+    :type save_noise: bool, optional
+    
+    :raises Warning: if :code:`noise_level` is set to anything other than 1
+    :raises Warning: if :code:`num_samples` is set to 1
     """
 
     def __init__(
@@ -66,6 +75,10 @@ class SGLD(torch.optim.Optimizer):
         if noise_level != 1.0:
             warnings.warn(
                 "Warning: noise_level in SGLD is unequal to zero, are you intending to use SGD?"
+            )
+        if num_samples == 1:
+            warnings.warn(
+                "Warning: num_samples is set to 1, make sure you know what you're doing! If not, just use num_samples = len(dataset)"
             )
         defaults = dict(
             lr=lr,

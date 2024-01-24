@@ -82,6 +82,7 @@ def sample(
     model: torch.nn.Module,
     loader: DataLoader,
     criterion: Callable,
+    callbacks: List[SamplerCallback],
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
@@ -92,25 +93,47 @@ def sample(
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[SamplerCallback] = [],
 ):
     """
-    Sample model weights using a given sampling_method, supporting multiple chains/cores, and calculate the observables (loss, llc, etc.) for each callback passed along. After calling this function, the stats of interest live in the callback object.
+    Sample model weights using a given sampling_method, supporting multiple chains/cores, 
+    and calculate the observables (loss, llc, etc.) for each callback passed along. 
+    The `update`, `finalize` and `sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called 
+    during sampling, after sampling, and at `sampler_callback_object.sample()` respectively.
+    
+    After calling this function, the stats of interest live in the callback object.
 
     :param model: The neural network model.
+    :type model: torch.nn.Module
     :param loader: DataLoader for input data.
+    :type loader: DataLoader
     :param criterion: Loss function.
-    :param sampling_method: Sampling method to use (really a PyTorch optimizer).
-    :param optimizer_kwargs: Keyword arguments for the PyTorch optimizer (used as sampler here).
-    :param num_draws: Number of samples to draw.
-    :param num_chains: Number of chains to run.
-    :param num_burnin_steps: Number of burn-in steps before sampling.
-    :param num_steps_bw_draws: Number of steps between each draw.
-    :param cores: Number of cores for parallel execution.
-    :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed.
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
-    :param verbose: whether to print sample chain progress
+    :type criterion: Callable
     :param callbacks: list of callbacks, each of type SamplerCallback
+    :type callbacks: list[SamplerCallback]
+    :param sampling_method: Sampling method to use (a PyTorch optimizer under the hood). Defaults to SGLD
+    :type sampling_method: torch.optim.Optimizer, optional
+    :param optimizer_kwargs: Keyword arguments for the PyTorch optimizer (used as sampler here). Defaults to None (using standard SGLD parameters as defined in the SGLD class)
+    :type optimizer_kwargs: dict, optional
+    :param num_draws: Number of samples to draw. Defaults to 100
+    :type num_draws: int, optional
+    :param num_chains: Number of chains to run.Defaults to 10
+    :type num_chains: int, optional
+    :param num_burnin_steps: Number of burn-in steps before sampling. Defaults to 0
+    :type num_burnin_steps: int, optional
+    :param num_steps_bw_draws: Number of steps between each draw. Defaults to 1
+    :type num_steps_bw_draws: int, optional
+    :param cores: Number of cores for parallel execution. Defaults to 1
+    :type cores: int, optional
+    :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed. Defaults to None
+    :type seed: int, optional
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Defaults to 'cpu'
+    :type device: str or torch.device, optional
+    :param verbose: whether to print sample chain progress. Defaults to True
+    :type verbose: bool, optional
+    
+    :raises ValueError: if derivative callbacks (f.e. :func:`~devinterp.slt.loss.OnlineLossStatistics`) are passed before base callbacks (f.e. :func:`~devinterp.slt.llc.OnlineLLCEstimator`)
+    
+    :return: None (access LLCs or other observables through callback objects.sample())
     """
     if cores is None:
         cores = min(4, cpu_count())

@@ -43,6 +43,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../devinterp.optim.html">Sampling Methods</a></li>
 </ul>
@@ -84,8 +85,8 @@
 <a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics">[docs]</a>
 <span class="k">class</span> <span class="nc">OnlineLossStatistics</span><span class="p">(</span><span class="n">SamplerCallback</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Derivative callback that computes various loss statistics for OnlineLLCEstimator. Must</span>
-<span class="sd">    be called after the base OnlineLLCEstimator has been called at each draw.</span>
+<span class="sd">    Derivative callback that computes various loss statistics for :func:`~devinterp.slt.llc.OnlineLLCEstimator`. Must</span>
+<span class="sd">    be called after the base :func:`~devinterp.slt.llc.OnlineLLCEstimator` has been called at each draw.</span>
 
 <span class="sd">    :param base_callback: Base callback that computes original loss metric.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -157,10 +158,14 @@
         <span class="n">init_losses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_callback</span><span class="o">.</span><span class="n">losses</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">init_losses</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
 
+<div class="viewcode-block" id="OnlineLossStatistics.loss_hist_by_draw">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics.loss_hist_by_draw">[docs]</a>
     <span class="k">def</span> <span class="nf">loss_hist_by_draw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">draw</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">bins</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;TODO&quot;&quot;&quot;</span>
         <span class="n">losses_at_draw</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_callback</span><span class="o">.</span><span class="n">losses</span><span class="p">[:,</span> <span class="n">draw</span><span class="p">]</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">losses_at_draw</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">bins</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">losses_at_draw</span></div>
+</div>
 
 </pre></div>
 

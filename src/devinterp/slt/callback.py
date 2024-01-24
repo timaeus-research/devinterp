@@ -5,16 +5,15 @@ import torch
 
 class SamplerCallback:
     """
-    Base class for creating callbacks used in sample().
+    Base class for creating callbacks used in :func:`devinterp.slt.sampler.sample()`.
 
-    Each instantiated callback gets its functions update(), finalize() and sample() called if those exist.
+    Each instantiated callback gets its methods :code:`__call__` called every sample, and :code:`finalize` called at the end of sample (if they exist).
 
-    update() happens at every (non burn-in) sample draw, finalize() happens after all draws are finished,
-    and sample() is a helper function that allows access to whatever relevant parameters the callback has computed.
+    Each callback method can access parameters in :code:`locals()`, so there's no need to pass variables along explicitly.
 
-    For legibility, each callback can also access parameters in locals() when a class function is called.
-
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. 
+    Note:
+        - :code:`mps` devices might not work for all callbacks.
     """
 
     def __init__(self, device: Union[torch.device, str] = "cpu"):
@@ -36,6 +35,19 @@ class SamplerCallback:
         return self
 
     def __call__(self, *args, **kwargs):
+        """Gets called at every (non burn-in) sample draw. Can access any variable in :code:`locals()` when called. 
+        Should be used for calucalting stats at every sample draw, for example running average chain loss.
+        :raises NotImplementedError: if not overwritten for inherited classes.
+        """
+        raise NotImplementedError
+
+    def finalize(self, *args, **kwargs):
+        """Gets called at the end of sampling. Can access any variable in :code:`locals()` when called. Should be used for calucalting stats over chains, for example average chain loss."""
+        pass
+
+    def sample(self, *args, **kwargs):
+        """Does not get called automatically, but functions as an interface to easily access stats calculated by the callback.
+        :raises NotImplementedError: if not overwritten for inherited classes."""
         raise NotImplementedError
 
 
@@ -55,5 +67,4 @@ def validate_callbacks(callbacks: List[Callable]):
                 raise ValueError(
                     f"Base callback {base_callback} of derivative callback {callback} was not passed."
                 )
-
     return True
