@@ -64,6 +64,7 @@ class SGLD(torch.optim.Optimizer):
         bounding_box_size=None,
         num_samples=1,
         save_noise=False,
+        precond=None
     ):
         defaults = dict(
             lr=lr,
@@ -77,6 +78,9 @@ class SGLD(torch.optim.Optimizer):
         super(SGLD, self).__init__(params, defaults)
         self.save_noise = save_noise
         self.noise = None
+        self.precond = precond
+        # TODO if precond is list, assert precond shape is sama as param groups shape 
+        # TODO if precond is list, assert precond is always above 0 
 
         # Save the initial parameters if the elasticity term is set
         for group in self.param_groups:
@@ -90,19 +94,20 @@ class SGLD(torch.optim.Optimizer):
     def step(self, closure=None):
         self.noise = []
         for group in self.param_groups:
-            for p in group["params"]:
+            for i, p in enumerate(group["params"]):
                 if p.grad is None:
                     continue
                 param_state = self.state[p]
+                
                 dw = p.grad.data * group["num_samples"] / group["temperature"]
-
+                precond_factor_dw = torch.reshape(torch.tensor([self.precond[i], 1/self.precond[i]], device='cuda'), dw.shape)
                 if group["weight_decay"] != 0:
                     dw.add_(p.data, alpha=group["weight_decay"])
 
                 if group["elasticity"] != 0:
                     initial_param = self.state[p]["initial_param"]
                     dw.add_((p.data - initial_param), alpha=group["elasticity"])
-
+                dw *= precond_factor_dw
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
 
                 # Add Gaussian noise
@@ -111,8 +116,9 @@ class SGLD(torch.optim.Optimizer):
                 )
                 if self.save_noise:
                     self.noise.append(noise)
-                p.data.add_(noise, alpha=group["lr"] ** 0.5)
-                
+                noise *= precond_factor_dw
+                p.data.add_(noise, alpha=(group["lr"]) ** 0.5)
+
                 # Rebound if exceeded bounding box size
                 if group["bounding_box_size"]:
                     torch.clamp_(
