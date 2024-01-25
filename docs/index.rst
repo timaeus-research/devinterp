@@ -61,7 +61,7 @@ To see DevInterp in action, check out our example notebooks:
 - `Toy Models of Superposition phase transition detection <https://www.github.com/timaeus-research/devinterp/blob/main/examples/tms.ipynb>`_ |colab3|
 - `MNIST eSGD vs SGD comparison <https://www.github.com/timaeus-research/devinterp/blob/main/examples/mnist.ipynb>`_ |colab4|
 
-For more advanced usage, see `the Diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| and for a quick guide on picking hyperparameters, see `the calibration notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab6|
+For more advanced usage, see `the Diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| and for a quick guide on picking hyperparameters, see `the calibration notebook. <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab6|
 
 
 Known Issues
