@@ -14,7 +14,7 @@ from devinterp.utils import *
 
 import itertools
 
-DEVICE = "cuda"
+DEVICE = 'cpu'
 
 
 def make_pop_loss_fn(true_model):
@@ -181,21 +181,29 @@ def test_accuracy_rrr(sampling_method, layer_widths):
     torch.manual_seed(42)
     np.random.seed(42)
     criterion = F.mse_loss
-    factors = np.array([1.0, 1.0])
-    true_model = ReducedRankRegressor(layer_widths, factors)
+    org_true_model = ReducedRankRegressor(layer_widths)
 
-    train_dataloader, train_data, x, y = generated_rrr_dataset(layer_widths, true_model)
-    true_matrix = true_model.to_numpy_matrix()
-    true_rank = np.linalg.matrix_rank(true_matrix)
-    true_lc = true_dln_learning_coefficient(
-        true_rank, layer_widths[1:], layer_widths[0], verbose=False
-    )
     num_chains = 1
-    num_draws = 10
-    for mult_fact in [0.001, 1.0, 1000.0]:
-        print("____")
-        factors2 = torch.Tensor([mult_fact, 1 / mult_fact]).to(DEVICE)
-        model = ReducedRankRegressor(layer_widths, factors2).to(DEVICE)
+    num_draws = 10000
+    print("____")
+    for mult_fact in [1e-9, 1e-6, 1e-3, 1e0, 1e3, 1e6, 1e9]:
+        precond_factors = torch.tensor([mult_fact**2, mult_fact**-2])
+        target_model = copy.deepcopy(org_true_model)
+        target_model.layer1.weight.data *= mult_fact
+        # target_model.layer1.bias.data *= mult_fact
+        target_model.layer2.weight.data *= 1 / mult_fact
+        # target_model.layer2.bias.data *= 1 / mult_fact
+        train_dataloader, train_data, x, y = generated_rrr_dataset(
+            layer_widths, target_model
+        )
+        target_matrix = target_model.to_numpy_matrix()
+        target_rank = np.linalg.matrix_rank(target_matrix)
+        target_lc = true_dln_learning_coefficient(
+            target_rank, layer_widths[1:], layer_widths[0], verbose=False
+        )
+        model = ReducedRankRegressor(layer_widths).to(DEVICE)
+        model.layer1.weight.data *= mult_fact
+        model.layer2.weight.data *= 1 / mult_fact
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
         for _ in range(500):
             optimizer.zero_grad()
@@ -203,35 +211,33 @@ def test_accuracy_rrr(sampling_method, layer_widths):
             loss = criterion(outputs, y.to(DEVICE))
             loss.backward()
             optimizer.step()
-        print(list(model.parameters()))
 
-        for precond_factor in [0, 1, 2]:
-            llc_estimator = LLCEstimator(
-                num_chains=num_chains, num_draws=num_draws, n=len(train_data)
-            )
+        llc_estimator = LLCEstimator(
+            num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+        )
 
-            sample(
-                model,
-                train_dataloader,
-                criterion=criterion,
-                optimizer_kwargs=dict(
-                    lr=0.0005,
-                    num_samples=len(train_data),
-                    precond=factors2.detach() ** precond_factor,
-                ),
-                sampling_method=sampling_method,
-                num_chains=num_chains,
-                num_draws=num_draws,
-                callbacks=[llc_estimator],
-                verbose=False,
-                seed=42,
-                device=DEVICE,
-            )
-            llc_mean = llc_estimator.sample()["llc/mean"]
+        sample(
+            model,
+            train_dataloader,
+            criterion=criterion,
+            optimizer_kwargs=dict(
+                lr=0.00001,
+                num_samples=len(train_data),
+                precond=precond_factors,
+            ),
+            sampling_method=sampling_method,
+            num_chains=num_chains,
+            num_draws=num_draws,
+            callbacks=[llc_estimator],
+            verbose=False,
+            seed=42,
+            device=DEVICE,
+        )
+        llc_mean = llc_estimator.sample()["llc/mean"]
 
-            input(
-                f"estimated {llc_mean:.3f} vs {true_lc:.3f} {factors2**precond_factor} {factors2} {layer_widths}"
-            )
+        print(
+            f"estimated {llc_mean:.3f} vs {target_lc:.3f} {mult_fact} model {layer_widths}"
+        )
     # assert (
     #     llc_mean - 2 * llc_std_dev < true_lc < llc_mean + 2 * llc_std_dev
     # ), f"DLN case {case} estimated LLC mean {llc_mean:.3f} +- {2*llc_std_dev:.3f} vs True LC {true_lc:.3f} for (M, H, N)={(m, h, n)} using {sampling_method}"
@@ -244,9 +250,9 @@ def test_accuracy_rrr(sampling_method, layer_widths):
 
 for layer_widths in [
     (1, 2, 1),
-    (5, 10, 5),
-    (10, 20, 20, 10),
-    (20, 40, 40, 20),
-    (40, 80, 80, 40),
+    # (5, 10, 5),
+    # (10, 20, 10),
+    # (20, 40, 20),
+    # (40, 80, 40),
 ]:
     test_accuracy_rrr(SGLD, layer_widths)
