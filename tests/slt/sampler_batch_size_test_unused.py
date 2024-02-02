@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
@@ -9,7 +8,7 @@ from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
-from devinterp.zoo.test_utils import *
+from devinterp.test_utils import *
 from devinterp.utils import *
 
 

@@ -10,6 +10,23 @@ from devinterp.slt.callback import SamplerCallback
 
 
 class GradientDistribution(SamplerCallback):
+    """
+    Callback for plotting the distribution of gradients as a function of draws. 
+
+    param:
+        num_draws (int): Number of samples to draw (should be identical to param passed to sample())
+        num_chains (int): Number of chains to run (should be identical to param passed to sample())
+        grad_dists (dict): Stores the gradient distributions for each parameter.
+        min_bins (int): Minimum number of bins for histogram approximation.
+        param_names (List[str], optional): List of parameter names to track. If None, all parameters are tracked.
+        bin_size (torch.Tensor): Size of each bin in the histogram.
+        num_bins (torch.Tensor): Number of bins in the histogram.
+        min_grad (torch.Tensor): Minimum gradient value encountered.
+        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+
+    Raises:
+        ValueError: If gradients are not computed before calling this callback.
+    """
     def __init__(self, num_chains: int, num_draws: int, min_bins: int = 20, param_names: List[str] = None, device='cpu'):
         self.num_chains = num_chains
         self.num_draws = num_draws
@@ -31,6 +48,7 @@ class GradientDistribution(SamplerCallback):
     def __call__(self, chain: int, draw: int, model: nn.Module):
         self.update(chain, draw, model)
     
+    # Updates the gradient histograms for each parameter.
     def update(self, chain: int, draw: int, model: nn.Module):
         for param_name, param in model.named_parameters():
             if self.param_names is not None and param_name not in self.param_names:
@@ -101,6 +119,7 @@ class GradientDistribution(SamplerCallback):
         }
 
     def plot(self, param_name: str, color='blue', plot_zero=True, chain: int = None):
+        """Plots the gradient distribution for a specific parameter."""
         grad_dist = self.grad_dists[param_name]
         if chain is not None:
             max_count = grad_dist[chain].max()

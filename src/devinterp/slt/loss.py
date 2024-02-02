@@ -1,4 +1,3 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
@@ -7,7 +6,8 @@ from devinterp.slt.llc import OnlineLLCEstimator
 
 
 class OnlineLossStatistics(SamplerCallback):
-    """Derivative callback that computes various loss statistics for OnlineLLCEstimator. Must
+    """
+    Derivative callback that computes various loss statistics for OnlineLLCEstimator. Must
     be called after the base OnlineLLCEstimator has been called at each draw.
     Parameters:
         base_callback (OnlineLLCEstimator): Base callback that computes original loss metric.

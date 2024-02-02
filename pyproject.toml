@@ -22,12 +22,7 @@ classifiers = [
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-dev = [
-    "pytest",
-    "mypy",
-    "pytest-cov",
-    "moto[ec2,s3,all]"
-]
+dev = ["pytest==7.4.3"]
 
 
 [project.urls]

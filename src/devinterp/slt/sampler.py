@@ -4,8 +4,6 @@ from copy import deepcopy
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 import warnings
 
-import numpy as np
-import pandas as pd
 import torch
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
@@ -13,7 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from devinterp.optim.sgld import SGLD
-from devinterp.slt.callback import validate_callbacks
+from devinterp.slt.callback import validate_callbacks, SamplerCallback
 
 
 def call_with(func: Callable, **kwargs):
@@ -40,7 +38,7 @@ def sample_single_chain(
     seed: Optional[int] = None,
     verbose=True,
     device: torch.device = torch.device("cpu"),
-    callbacks: List[Callable] = [],
+    callbacks: List[SamplerCallback] = [],
 ):
     if num_burnin_steps:
         warnings.warn('Burn-in is currently not implemented correctly, please set num_burnin_steps to 0.')
@@ -74,7 +72,7 @@ def sample_single_chain(
 
             with torch.no_grad():
                 for callback in callbacks:
-                    call_with(callback, **locals())  # TODO: Cursed. This is the way. 
+                    call_with(callback, **locals())  # Cursed. This is the way. 
 
 
 def _sample_single_chain(kwargs):
@@ -93,26 +91,30 @@ def sample(
     num_steps_bw_draws: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    device: torch.device = torch.device("cpu"),
+    device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[Callable] = [],    
+    callbacks: List[SamplerCallback] = [],    
 ):
     """
-    Sample model weights using a given optimizer, supporting multiple chains.
+    Sample model weights using a given sampling_method, supporting multiple chains. 
+    See the example notebooks examples/diagnostics.ipynb and examples/sgld_calibration.ipynb for (respectively)
+    info on what callbacks to pass along and how to calibrate sampler/optimizer hyperparams.
 
     Parameters:
         model (torch.nn.Module): The neural network model.
-        step (Literal['sgld']): The name of the optimizer to use to step.
         loader (DataLoader): DataLoader for input data.
         criterion (torch.nn.Module): Loss function.
+        sampling_method (torch.optim.Optimizer): Sampling method to use (really a PyTorch optimizer).
+        optimizer_kwargs (Optional[Dict[str, Union[float, Literal['adaptive']]]]): Keyword arguments for the PyTorch optimizer (used as sampler here).
         num_draws (int): Number of samples to draw.
         num_chains (int): Number of chains to run.
         num_burnin_steps (int): Number of burn-in steps before sampling.
         num_steps_bw_draws (int): Number of steps between each draw.
         cores (Optional[int]): Number of cores for parallel execution.
-        seed (Optional[Union[int, List[int]]]): Random seed(s) for sampling.
-        progressbar (bool): Whether to display a progress bar.
-        optimizer_kwargs (Optional[Dict[str, Union[float, Literal['adaptive']]]]): Keyword arguments for the optimizer.
+        seed (Optional[Union[int, List[int]]]): Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed.
+        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+        verbose (bool): whether to print sample chain progress
+        callbacks (List[SamplerCallback]): list of callbacks, each of type SamplerCallback
     """
     if cores is None:
         cores = min(4, cpu_count())

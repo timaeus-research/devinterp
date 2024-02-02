@@ -4,6 +4,16 @@ from devinterp.slt.callback import SamplerCallback
 
 
 class OnlineWBICEstimator(SamplerCallback):
+    """
+    Callback for estimating the Widely Applicable Bayesian Information Criterion (WBIC) in an online fashion. 
+    The WBIC used here is just n * (average sampled loss). (Watanabe, 2013)
+
+    Attributes:
+        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
+        num_chains (int): Number of chains to run. (should be identical to param passed to sample())
+        n (torch.Tensor): Number of data points, used in the WBIC calculation.
+        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    """
     def __init__(self, num_chains: int, num_draws: int, n: int, device='cpu'):
         self.num_chains = num_chains
         self.num_draws = num_draws
