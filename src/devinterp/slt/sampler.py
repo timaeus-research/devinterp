@@ -2,6 +2,7 @@ import inspect
 import itertools
 from copy import deepcopy
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -41,6 +42,11 @@ def sample_single_chain(
     device: torch.device = torch.device("cpu"),
     callbacks: List[Callable] = [],
 ):
+    if num_burnin_steps:
+        warnings.warn('Burn-in is currently not implemented correctly, please set num_burnin_steps to 0.')
+    if num_draws > len(loader):
+        warnings.warn('You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)')
+      
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
@@ -112,6 +118,7 @@ def sample(
         cores = min(4, cpu_count())
 
     if seed is not None:
+        warnings.warn("You are using seeded runs, for full reproducibility check https://pytorch.org/docs/stable/notes/randomness.html")
         if isinstance(seed, int):
             seeds = [seed + i for i in range(num_chains)]
         elif len(seed) != num_chains:
