@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 
 from devinterp.slt.callback import SamplerCallback

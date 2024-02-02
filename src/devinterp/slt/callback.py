@@ -1,5 +1,6 @@
 import warnings
-from typing import Callable, List
+import torch
+from typing import Callable, List, Union
 
 
 class SamplerCallback:

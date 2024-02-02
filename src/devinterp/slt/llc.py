@@ -1,6 +1,5 @@
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
