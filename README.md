@@ -50,9 +50,9 @@ For papers that either inspired or used the DevInterp package, [click here](http
 
 - Similarly, we now sample using minibatches that are passed along from the dataloader to sample(). This choice is obscured by the repo, and we should offer alternatives.
 
-- The current implementation does not work with transformers out-of-the-box. This can be fixed by adding a wrapper to your model, for example passing unpack(model) to sample() where unpack is defined by:
+- The current implementation does not work with transformers out-of-the-box. This can be fixed by adding a wrapper to your model, for example passing Unpack(model) to sample() where unpack is defined by:
 ```python
-class unpack(nn.Module):
+class Unpack(nn.Module):
  def __init__(model: nn.Module):
       self.model = model
 
@@ -61,7 +61,7 @@ class unpack(nn.Module):
 ```
 - LLC Estimation is currently more of an art than a science. It will take some time and pain to get it work reliably.
 
-If you run into issues not mentioned here, please first check the github issues, then ask in [the DevInterp Discord](https://discord.gg/UwjWKCZZYR):, and only then make a new github issue.
+If you run into issues not mentioned here, please first check the github issues, then ask in [the DevInterp Discord](https://discord.gg/UwjWKCZZYR), and only then make a new github issue.
 
 ## Contributing
 
