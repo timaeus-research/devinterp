@@ -24,6 +24,11 @@ def call_with(func: Callable, **kwargs):
     # Call the function with the filtered kwargs
     return func(**filtered_kwargs)
 
+def batch_to_device(batch: Union[Dict[str, torch.Tensor], torch.Tensor], device: torch.device):
+    """ Puts a batch onto the specified device"""
+    if isinstance(batch, torch.Tensor):
+        return batch.to(device)
+    return {k: batch_to_device(v, device) for k, v in batch.items()}
 
 def sample_single_chain(
     ref_model: nn.Module,
@@ -57,11 +62,11 @@ def sample_single_chain(
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
     model.train()
 
-    for i, (xs, ys) in  tqdm(zip(range(num_steps), itertools.cycle(loader)), desc=f"Chain {chain}", total=num_steps, disable=not verbose):
+    for i, batch in  tqdm(zip(range(num_steps), itertools.cycle(loader)), desc=f"Chain {chain}", total=num_steps, disable=not verbose):
         optimizer.zero_grad()
-        xs, ys = xs.to(device), ys.to(device)
-        y_preds = model(xs)
-        loss = criterion(y_preds, ys)
+        batch = batch_to_device(batch, device)
+        output = model(batch)
+        loss = criterion(output, batch)
 
         loss.backward()
         optimizer.step()
