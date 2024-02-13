@@ -41,6 +41,7 @@ def sample_single_chain(
     num_draws: int = 100,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
+    grad_accum_steps: int = 1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
@@ -51,10 +52,15 @@ def sample_single_chain(
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
 ):
+    if grad_accum_steps > 1:
+        assert type(grad_accum_steps) == int, "grad_accum_steps must be an integer."
+        num_steps_bw_draws *= grad_accum_steps
+        num_burnin_steps *= grad_accum_steps
     if num_draws > len(loader):
         warnings.warn(
             "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
         )
+        
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
     optimizer_kwargs = optimizer_kwargs or {}
@@ -86,32 +92,39 @@ def sample_single_chain(
 
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
 
-    for i, (xs, ys) in tqdm(
-        zip(range(num_steps), itertools.cycle(loader)),
-        desc=f"Chain {chain}",
-        total=num_steps,
-        disable=not verbose,
-    ):
-        model.train()
-        optimizer.zero_grad()
-        xs, ys = xs.to(device), ys.to(device)
-        y_preds = model(xs)
-        loss = criterion(y_preds, ys)
+    cumulative_loss = 0
+    with tqdm(desc=f"Chain {chain}", 
+              total=num_steps // grad_accum_steps, 
+              disable=not verbose) as pbar:
+        for i, (xs, ys) in zip(range(num_steps), itertools.cycle(loader)):
+            model.train()
+            xs, ys = xs.to(device), ys.to(device)
+            y_preds = model(xs)
+            loss = criterion(y_preds, ys)
 
-        loss.backward()
-        # if optimize_over_per_model_param: # not sure this is needed tbh
-        #     for param_name, optimize_over in optimize_over_per_model_param.items():
-        #         getattr(model, param_name).grad = getattr(model, param_name).grad*optimize_over
+            if grad_accum_steps > 1:
+                loss = loss / grad_accum_steps
+                cumulative_loss += loss.item()
+            loss.backward()
 
-        optimizer.step()
+            # i+1 instead of i so that the gradient accumulates to an entire batch first
+            # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
+            if (i+1) % grad_accum_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                pbar.update(1)
 
-        if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
-            draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
-            loss = loss.item()
+            if i >= num_burnin_steps and (i + 1 - num_burnin_steps) % num_steps_bw_draws == 0:
+                draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
+                if grad_accum_steps > 1:
+                    loss = cumulative_loss
+                    cumulative_loss = 0
+                else:
+                    loss = loss.item()
 
-            with torch.no_grad():
-                for callback in callbacks:
-                    call_with(callback, **locals())  # Cursed. This is the way.
+                with torch.no_grad():
+                    for callback in callbacks:
+                        call_with(callback, **locals())  # Cursed. This is the way.
 
 
 def _sample_single_chain(kwargs):
@@ -130,6 +143,7 @@ def sample(
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
+    grad_accum_steps: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
@@ -231,6 +245,7 @@ def sample(
             num_burnin_steps=num_burnin_steps,
             num_steps_bw_draws=num_steps_bw_draws,
             init_loss=init_loss,
+            grad_accum_steps=grad_accum_steps,
             sampling_method=sampling_method,
             optimizer_kwargs=optimizer_kwargs,
             device=device,
@@ -263,6 +278,7 @@ def estimate_learning_coeff_with_summary(
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
+    grad_accum_steps: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
@@ -298,6 +314,7 @@ def estimate_learning_coeff_with_summary(
         num_chains=num_chains,
         num_burnin_steps=num_burnin_steps,
         num_steps_bw_draws=num_steps_bw_draws,
+        grad_accum_steps=grad_accum_steps,
         cores=cores,
         seed=seed,
         device=device,
@@ -328,6 +345,7 @@ def estimate_learning_coeff(
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
+    grad_accum_steps: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
@@ -344,6 +362,7 @@ def estimate_learning_coeff(
         num_chains=num_chains,
         num_burnin_steps=num_burnin_steps,
         num_steps_bw_draws=num_steps_bw_draws,
+        grad_accum_steps=grad_accum_steps,
         cores=cores,
         seed=seed,
         device=device,
