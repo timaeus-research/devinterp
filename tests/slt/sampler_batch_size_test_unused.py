@@ -39,21 +39,21 @@ def test_batch_size_convergence(batch_sizes, sampling_method, model):
         num_draws = 5_000 * 1000 // batch_size
         train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
         llc_estimator = LLCEstimator(
-            num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+            num_chains=num_chains,
+            num_draws=num_draws,
+            temperature=optimal_temperature(train_data),
         )
 
         online_llc_estimator = OnlineLLCEstimator(
-            num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+            num_chains=num_chains,
+            num_draws=num_draws,
+            temperature=optimal_temperature(train_data),
         )
         sample(
             model,
             train_dataloader,
             criterion=criterion,
-            optimizer_kwargs=dict(
-                lr=lr,
-                bounding_box_size=1.0,
-                num_samples=len(train_data),
-            ),
+            optimizer_kwargs=dict(lr=lr, bounding_box_size=1.0),
             sampling_method=sampling_method,
             num_chains=num_chains,
             num_draws=num_draws,

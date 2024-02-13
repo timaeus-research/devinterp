@@ -11,16 +11,21 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from devinterp.optim.sgld import SGLD
+from devinterp.utils import (
+    optimal_temperature,
+    get_init_loss_one_batch,
+    get_init_loss_full_batch,
+)
 from devinterp.slt.callback import validate_callbacks, SamplerCallback
 
 
 def call_with(func: Callable, **kwargs):
     """Check the func annotation and call with only the necessary kwargs."""
     sig = inspect.signature(func)
-    
+
     # Filter out the kwargs that are not in the function's signature
     filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
-    
+
     # Call the function with the filtered kwargs
     return func(**filtered_kwargs)
 
@@ -39,16 +44,14 @@ def sample_single_chain(
     verbose=True,
     device: torch.device = torch.device("cpu"),
     callbacks: List[SamplerCallback] = [],
+    init_loss: float = None,
 ):
-    if num_burnin_steps:
-        warnings.warn('Burn-in is currently not implemented correctly, please set num_burnin_steps to 0.')
-    if num_draws > len(loader):
-        warnings.warn('You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)')
-      
+
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
     optimizer_kwargs = optimizer_kwargs or {}
+    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader.dataset))
     optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
 
     if seed is not None:
@@ -57,7 +60,12 @@ def sample_single_chain(
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
     model.train()
 
-    for i, (xs, ys) in  tqdm(zip(range(num_steps), itertools.cycle(loader)), desc=f"Chain {chain}", total=num_steps, disable=not verbose):
+    for i, (xs, ys) in tqdm(
+        zip(range(num_steps), itertools.cycle(loader)),
+        desc=f"Chain {chain}",
+        total=num_steps,
+        disable=not verbose,
+    ):
         optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
@@ -72,7 +80,7 @@ def sample_single_chain(
 
             with torch.no_grad():
                 for callback in callbacks:
-                    call_with(callback, **locals())  # Cursed. This is the way. 
+                    call_with(callback, **locals())  # Cursed. This is the way.
 
 
 def _sample_single_chain(kwargs):
@@ -89,14 +97,15 @@ def sample(
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
+    init_loss: float = None,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[SamplerCallback] = [],    
+    callbacks: List[SamplerCallback] = [],
 ):
     """
-    Sample model weights using a given sampling_method, supporting multiple chains. 
+    Sample model weights using a given sampling_method, supporting multiple chains.
     See the example notebooks examples/diagnostics.ipynb and examples/sgld_calibration.ipynb for (respectively)
     info on what callbacks to pass along and how to calibrate sampler/optimizer hyperparams.
 
@@ -116,11 +125,24 @@ def sample(
         verbose (bool): whether to print sample chain progress
         callbacks (List[SamplerCallback]): list of callbacks, each of type SamplerCallback
     """
+    if num_burnin_steps < num_draws:
+        warnings.warn(
+            "You are taking more draws than burn-in steps, your LLC estimates will likely be underestimates. Please check LLC chain convergence."
+        )
+    if num_draws > len(loader):
+        warnings.warn(
+            "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
+        )
+    if not init_loss:
+        init_loss = get_init_loss_one_batch(loader, model, criterion, device)
+        # alternative: init_loss = get_init_loss_full_batch(loader, model, criterion, device)
     if cores is None:
         cores = min(4, cpu_count())
 
     if seed is not None:
-        warnings.warn("You are using seeded runs, for full reproducibility check https://pytorch.org/docs/stable/notes/randomness.html")
+        warnings.warn(
+            "You are using seeded runs, for full reproducibility check https://pytorch.org/docs/stable/notes/randomness.html"
+        )
         if isinstance(seed, int):
             seeds = [seed + i for i in range(num_chains)]
         elif len(seed) != num_chains:
@@ -142,11 +164,12 @@ def sample(
             num_draws=num_draws,
             num_burnin_steps=num_burnin_steps,
             num_steps_bw_draws=num_steps_bw_draws,
+            init_loss=init_loss,
             sampling_method=sampling_method,
             optimizer_kwargs=optimizer_kwargs,
             device=device,
             verbose=verbose,
-            callbacks=callbacks
+            callbacks=callbacks,
         )
 
     if cores > 1:
@@ -160,5 +183,3 @@ def sample(
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
-
-
