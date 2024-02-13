@@ -41,6 +41,7 @@ def sample_single_chain(
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
+    grad_accum_steps=1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
@@ -50,10 +51,14 @@ def sample_single_chain(
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
 ):
+    if grad_accum_steps > 1:
+        num_steps_bw_draws *= grad_accum_steps
+        num_burnin_steps *= grad_accum_steps
     if num_draws > len(loader):
         warnings.warn(
             "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
         )
+        
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
@@ -70,25 +75,36 @@ def sample_single_chain(
 
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
 
-    for i, (xs, ys) in tqdm(
-        zip(range(num_steps), itertools.cycle(loader)),
-        desc=f"Chain {chain}",
-        total=num_steps,
-        disable=not verbose,
+    cumulative_loss = 0
+    for i, (xs, ys) in  tqdm(
+        zip(range(num_steps), itertools.cycle(loader)), 
+        desc=f"Chain {chain}", 
+        total=num_steps, 
+        disable=not verbose
     ):
         model.train()
-        optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
         loss = criterion(y_preds, ys)
 
+        if grad_accum_steps > 1:
+            loss = loss / grad_accum_steps
+            cumulative_loss += loss.item()
         loss.backward()
 
-        optimizer.step()
+        # i+1 instead of i so that the gradient accumulates to an entire batch first
+        # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
+        if (i+1) % grad_accum_steps == 0:
+            optimizer.step()
+            optimizer.zero_grad()
 
-        if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
+        if i >= num_burnin_steps and (i + 1 - num_burnin_steps) % num_steps_bw_draws == 0:
             draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
-            loss = loss.item()
+            if grad_accum_steps > 1:
+                loss = cumulative_loss
+                cumulative_loss = 0
+            else:
+                loss = loss.item()
 
             with torch.no_grad():
                 for callback in callbacks:
@@ -111,6 +127,7 @@ def sample(
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
+    grad_accum_steps: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
@@ -211,6 +228,7 @@ def sample(
             num_burnin_steps=num_burnin_steps,
             num_steps_bw_draws=num_steps_bw_draws,
             init_loss=init_loss,
+            grad_accum_steps=grad_accum_steps,
             sampling_method=sampling_method,
             optimizer_kwargs=optimizer_kwargs,
             device=device,
