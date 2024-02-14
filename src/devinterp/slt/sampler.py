@@ -64,6 +64,7 @@ def sample_single_chain(
         loss = criterion(y_preds, ys)
 
         loss.backward()
+
         optimizer.step()
 
         if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:

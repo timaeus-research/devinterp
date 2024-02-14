@@ -68,7 +68,9 @@ class SGLD(torch.optim.Optimizer):
         save_noise=False,
     ):
         if noise_level != 1.0:
-            warnings.warn('Warning: noise_level in SGLD is unequal to zero, are you intending to use SGD?')
+            warnings.warn(
+                "Warning: noise_level in SGLD is unequal to zero, are you intending to use SGD?"
+            )
         defaults = dict(
             lr=lr,
             noise_level=noise_level,
@@ -93,6 +95,7 @@ class SGLD(torch.optim.Optimizer):
 
     def step(self, closure=None):
         self.noise = []
+        self.dws = []
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -105,7 +108,12 @@ class SGLD(torch.optim.Optimizer):
 
                 if group["elasticity"] != 0:
                     initial_param = self.state[p]["initial_param"]
-                    dw.add_((p.data - initial_param), alpha=group["elasticity"])
+                    initial_param_distance = p.data - initial_param
+                    dw.add_(initial_param_distance, alpha=group["elasticity"])
+                    self.initial_param_distance = initial_param_distance.clone().detach()
+    
+
+                self.dws.append(dw.clone().detach())
 
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
 
@@ -116,7 +124,7 @@ class SGLD(torch.optim.Optimizer):
                 if self.save_noise:
                     self.noise.append(noise)
                 p.data.add_(noise, alpha=group["lr"] ** 0.5)
-                
+
                 # Rebound if exceeded bounding box size
                 if group["bounding_box_size"]:
                     torch.clamp_(
