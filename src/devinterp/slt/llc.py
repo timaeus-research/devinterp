@@ -10,12 +10,12 @@ from devinterp.slt.sampler import sample
 
 class LLCEstimator(SamplerCallback):
     """
-    Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process. 
+    Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process.
     It calculates the LLC based on the average loss across draws for each chain:
     $$
     TODO
     $$
-    
+
     Attributes:
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
@@ -35,7 +35,7 @@ class LLCEstimator(SamplerCallback):
         self.device = device
 
     def update(self, chain: int, draw: int, loss: float):
-        self.losses[chain, draw] = loss 
+        self.losses[chain, draw] = loss
 
     @property
     def init_loss(self):
@@ -46,7 +46,7 @@ class LLCEstimator(SamplerCallback):
         self.llc_per_chain = (self.n / self.n.log()) * (avg_losses - self.init_loss)
         self.llc_mean = self.llc_per_chain.mean()
         self.llc_std = self.llc_per_chain.std()
-        
+
     def sample(self):
         return {
             "llc/mean": self.llc_mean.cpu().numpy().item(),
@@ -54,7 +54,7 @@ class LLCEstimator(SamplerCallback):
             **{f"llc-chain/{i}": self.llc_per_chain[i].cpu().numpy().item() for i in range(self.num_chains)},
             "loss/trace": self.losses.cpu().numpy(),
         }
-    
+
     def __call__(self, chain: int, draw: int, loss: float):
         self.update(chain, draw, loss)
 
@@ -62,7 +62,7 @@ class LLCEstimator(SamplerCallback):
 
 class OnlineLLCEstimator(SamplerCallback):
     """
-    Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process. 
+    Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.
     It calculates LLCs using the same formula as LLCEstimator, but continuously and including means and std across draws (as opposed to just across chains).
 
     Attributes:
@@ -86,7 +86,7 @@ class OnlineLLCEstimator(SamplerCallback):
         self.device = device
 
     def update(self, chain: int, draw: int, loss: float):
-        self.losses[chain, draw] = loss 
+        self.losses[chain, draw] = loss
         init_loss = self.losses[chain, 0]
 
         if draw == 0:  # TODO: We can probably drop this and it still works (but harder to read)
@@ -117,7 +117,7 @@ class OnlineLLCEstimator(SamplerCallback):
             "llc/trace": self.llcs.cpu().numpy(),
             "loss/trace": self.losses.cpu().numpy()
         }
-    
+
     def __call__(self, chain: int, draw: int, loss: float):
         self.update(chain, draw, loss)
 
@@ -138,8 +138,9 @@ def estimate_learning_coeff_with_summary(
     verbose: bool = True,
     callbacks: List[Callable] = [],
     online: bool = False,
+    tqdm_kwargs: dict = {},
 ) -> dict:
-    
+
     if online:
         llc_estimator = OnlineLLCEstimator(num_chains, num_draws, optimizer_kwargs['num_samples'], device=device)
     else:
@@ -162,6 +163,7 @@ def estimate_learning_coeff_with_summary(
         device=device,
         verbose=verbose,
         callbacks=callbacks,
+        tqdm_kwargs=tqdm_kwargs,
     )
 
     results = {}
@@ -188,6 +190,7 @@ def estimate_learning_coeff(
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
     callbacks: List[Callable] = [],
+    tqdm_kwargs: dict = {},
 ) -> float:
     return estimate_learning_coeff_with_summary(
         model=model,
@@ -205,4 +208,5 @@ def estimate_learning_coeff(
         verbose=verbose,
         callbacks=callbacks,
         online=False,
+        tqdm_kwargs=tqdm_kwargs,
     )["llc/mean"]

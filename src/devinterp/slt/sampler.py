@@ -8,7 +8,7 @@ import torch
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
 from torch.utils.data import DataLoader
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import validate_callbacks, SamplerCallback
@@ -17,10 +17,10 @@ from devinterp.slt.callback import validate_callbacks, SamplerCallback
 def call_with(func: Callable, **kwargs):
     """Check the func annotation and call with only the necessary kwargs."""
     sig = inspect.signature(func)
-    
+
     # Filter out the kwargs that are not in the function's signature
     filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
-    
+
     # Call the function with the filtered kwargs
     return func(**filtered_kwargs)
 
@@ -39,9 +39,10 @@ def sample_single_chain(
     verbose=True,
     device: torch.device = torch.device("cpu"),
     callbacks: List[SamplerCallback] = [],
+    tqdm_kwargs: dict = {},
 ):
     # Initialize new model and optimizer for this chain
-    model = deepcopy(ref_model).to(device)
+    model = deepcopy(ref_model).to(device, print_details=False)
 
     optimizer_kwargs = optimizer_kwargs or {}
     optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
@@ -52,7 +53,7 @@ def sample_single_chain(
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
     model.train()
 
-    for i, (xs, ys) in  tqdm(zip(range(num_steps), itertools.cycle(loader)), desc=f"Chain {chain}", total=num_steps, disable=not verbose):
+    for i, (xs, ys) in tqdm(zip(range(num_steps), itertools.cycle(loader)), desc=f"Chain {chain}", total=num_steps, disable=not verbose, **tqdm_kwargs):
         optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
@@ -67,7 +68,7 @@ def sample_single_chain(
 
             with torch.no_grad():
                 for callback in callbacks:
-                    call_with(callback, **locals())  # Cursed. This is the way. 
+                    call_with(callback, **locals())  # Cursed. This is the way.
 
 
 def _sample_single_chain(kwargs):
@@ -88,10 +89,11 @@ def sample(
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[SamplerCallback] = [],    
+    callbacks: List[SamplerCallback] = [],
+    tqdm_kwargs: dict = {},
 ):
     """
-    Sample model weights using a given sampling_method, supporting multiple chains. 
+    Sample model weights using a given sampling_method, supporting multiple chains.
     See the example notebooks examples/diagnostics.ipynb and examples/sgld_calibration.ipynb for (respectively)
     info on what callbacks to pass along and how to calibrate sampler/optimizer hyperparams.
 
@@ -132,8 +134,9 @@ def sample(
 
     validate_callbacks(callbacks)
 
-    def get_args(i):
-        return dict(
+    tqdm_kwargs = {**tqdm_kwargs, "position": tqdm_kwargs.get("position", 0)}
+    def get_args(i, *, is_parallel: bool):
+        args = dict(
             chain=i,
             seed=seeds[i],
             ref_model=model,
@@ -146,19 +149,30 @@ def sample(
             optimizer_kwargs=optimizer_kwargs,
             device=device,
             verbose=verbose,
-            callbacks=callbacks
+            callbacks=callbacks,
         )
+        if is_parallel:
+            # every progress bar should have a separate position since they update simultaneously
+            args["tqdm_kwargs"] = {**tqdm_kwargs,
+                "position": tqdm_kwargs.get("position", 0)+1+i,
+                "leave": True, # this might help with async updates
+            }
+        else:
+            # only one position, but we need to leave the bar in place on the last iteration
+            args["tqdm_kwargs"] = {**tqdm_kwargs,
+                "position": tqdm_kwargs.get("position", 0)+1,
+                "leave": tqdm_kwargs.get("leave", True) and (i == num_chains - 1),
+            }
+        return args
 
     if cores > 1:
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
-            pool.map(_sample_single_chain, [get_args(i) for i in range(num_chains)])
+            pool.map(_sample_single_chain, [get_args(i, is_parallel=True) for i in range(num_chains)])
     else:
-        for i in range(num_chains):
-            _sample_single_chain(get_args(i))
+        for i in tqdm(range(num_chains), desc="Chain", **tqdm_kwargs):
+            _sample_single_chain(get_args(i, is_parallel=False))
 
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
-
-
