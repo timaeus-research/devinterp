@@ -55,9 +55,9 @@ def sample_single_chain(
         torch.manual_seed(seed)
 
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
-    model.train()
 
     for i, (xs, ys) in  tqdm(zip(range(num_steps), itertools.cycle(loader)), desc=f"Chain {chain}", total=num_steps, disable=not verbose):
+        model.train()
         optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)

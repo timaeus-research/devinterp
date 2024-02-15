@@ -21,16 +21,18 @@ def mala_acceptance_probability(
 
     Args:
     prev_point: The previous point in parameter space.
-    current_point: The current point in parameter space.
     prev_grad: Gradient of the prev point in parameter space.
-    current_grad: Gradient of the current point in parameter space.
     prev_loss: Loss of the previous point in parameter space.
+    current_grad: Gradient of the current point in parameter space.
+    current_point: The current point in parameter space.
     current_loss: Loss of the current point in parameter space.
     learning_rate (float): Learning rate of the model.
 
     Returns:
     float: Acceptance probability for the proposed transition.
     """
+    if torch.isnan(current_loss):
+        return np.nan
     # Compute the log of the proposal probabilities (using the Gaussian proposal distribution)
     log_q_current_to_prev = -torch.sum(
         (prev_point - current_point - (learning_rate * 0.5 * -current_grad)) ** 2
@@ -38,12 +40,11 @@ def mala_acceptance_probability(
     log_q_prev_to_current = -torch.sum(
         (current_point - prev_point - (learning_rate * 0.5 * -prev_grad)) ** 2
     ) / (2 * learning_rate)
-
     # Compute the acceptance probability
     acceptance_log_prob = (
         log_q_current_to_prev - log_q_prev_to_current + prev_loss - current_loss
     )
-
+    # print(acceptance_log_prob)
     return min(1.0, torch.exp(acceptance_log_prob))
 
 
@@ -81,66 +82,78 @@ class MalaAcceptanceRate(SamplerCallback):
             param.clone().detach() for param in list(model.parameters())
         ]
         self.current_grads = [torch.zeros(param.size()) for param in model.parameters()]
-        self.prev_params = []
-        self.prev_grads = []
+        self.prev_params = [0.0]
+        self.prev_grads = [0.0]
         self.prev_mala_loss = 0.0
 
     def __call__(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
         self.update(chain, draw, model, loss, optimizer)
 
     def update(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
-        self.current_grads = optimizer.dws
-        mala_loss = (
-            (loss * self.num_samples / np.log(self.num_samples))
-            + torch.pow(optimizer.initial_param_distance, 2) * self.elasticity / 2
-        )
-        # print(
-        #     draw,
-        #     "current",
-        #     self.current_params,  # MALA param
-        #     self.current_grads[-1],  # MALA gradient! nice
-        #     mala_loss,  # MALA loss
-        #     "prev",
-        #     self.prev_params,
-        #     self.prev_grads,
-        #     self.prev_mala_loss,
-        # )
-        if draw > 0:
+        model.eval()
+        with torch.no_grad():
+            self.current_grads = optimizer.dws
+            # print(loss)
+            # print(loss * self.num_samples / np.log(self.num_samples))
+            # print(optimizer.elasticity_loss)
+            mala_loss = (
+                loss * self.num_samples / np.log(self.num_samples)
+            ) + optimizer.elasticity_loss
+            # print(
+            #     draw,
+            #     "current",
+            #     self.current_params,  # MALA param
+            #     self.current_grads,  # MALA gradient! nice
+            #     mala_loss.item(),  # MALA loss
+            #     optimizer.elasticity_loss,
+            #     loss,
+            # )
+            # input()
+            if draw > -1:
 
-            for current_param, current_grad, prev_param, prev_grad in zip(
-                self.current_params,
-                self.current_grads,
-                self.prev_params,
-                self.prev_grads,
-            ):
-                self.mala_acceptance_rate[chain, draw - 1] = (
-                    mala_acceptance_probability(
-                        prev_param,
-                        prev_grad,
-                        self.prev_mala_loss,
-                        current_param,
-                        current_grad,
-                        mala_loss,
-                        self.learning_rate,
+                for current_param, current_grad, prev_param, prev_grad in zip(
+                    self.current_params,
+                    self.current_grads,
+                    self.prev_params,
+                    self.prev_grads,
+                ):
+                    self.mala_acceptance_rate[chain, draw - 1] = (
+                        mala_acceptance_probability(
+                            prev_param,
+                            prev_grad,
+                            self.prev_mala_loss,
+                            current_param,
+                            current_grad,
+                            mala_loss,
+                            self.learning_rate,
+                        )
                     )
-                )
-                # input(
-                #     mala_acceptance_probability(
-                #         prev_param,
-                #         prev_grad,
-                #         self.prev_mala_loss,
-                #         current_param,
-                #         current_grad,
-                #         mala_loss,
-                #         self.learning_rate,
-                #     )
-                # )
-        self.prev_params = self.current_params
-        self.current_params = [
-            param.clone().detach() for param in list(model.parameters())
-        ]
-        self.prev_grads = self.current_grads
-        self.prev_mala_loss = mala_loss
+                    # print(mala_acceptance_probability(
+                    #         prev_param,
+                    #         prev_grad,
+                    #         self.prev_mala_loss,
+                    #         current_param,
+                    #         current_grad,
+                    #         mala_loss,
+                    #         self.learning_rate,
+                    #     )[-1].item())
+                    # input(
+                    #     mala_acceptance_probability(
+                    #         prev_param,
+                    #         prev_grad,
+                    #         self.prev_mala_loss,
+                    #         current_param,
+                    #         current_grad,
+                    #         mala_loss,
+                    #         self.learning_rate,
+                    #     )
+                    # )
+            self.prev_params = self.current_params
+            self.current_params = [
+                param.clone().detach() for param in list(model.parameters())
+            ]
+            self.prev_grads = self.current_grads
+            self.prev_mala_loss = mala_loss
 
     def sample(self):
         return {

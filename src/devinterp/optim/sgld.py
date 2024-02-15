@@ -89,13 +89,16 @@ class SGLD(torch.optim.Optimizer):
             if group["elasticity"] != 0 or group["bounding_box_size"] != 0:
                 for p in group["params"]:
                     param_state = self.state[p]
-                    param_state["initial_param"] = p.data.clone().detach()
+                    param_state["initial_param"] = torch.zeros_like(
+                        p.data.clone().detach()
+                    )
             if group["temperature"] == "adaptive":  # TODO: Better name
                 group["temperature"] = np.log(group["num_samples"])
 
     def step(self, closure=None):
         self.noise = []
         self.dws = []
+        self.elasticity_loss = torch.tensor([0.0], requires_grad=False)
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -105,14 +108,15 @@ class SGLD(torch.optim.Optimizer):
 
                 if group["weight_decay"] != 0:
                     dw.add_(p.data, alpha=group["weight_decay"])
-
                 if group["elasticity"] != 0:
                     initial_param = self.state[p]["initial_param"]
                     initial_param_distance = p.data - initial_param
                     dw.add_(initial_param_distance, alpha=group["elasticity"])
-                    self.initial_param_distance = initial_param_distance.clone().detach()
-    
-
+                    self.elasticity_loss += (
+                        torch.sum(torch.pow(initial_param_distance.clone().detach(), 2))
+                        * group["elasticity"]
+                        / 2
+                    )
                 self.dws.append(dw.clone().detach())
 
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
