@@ -6,7 +6,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt import sample
-from devinterp.slt.mala import MalaAcceptanceRate
+from devinterp.slt.mala import MalaAcceptanceRate, mala_acceptance_probability
 from devinterp.test_utils import *
 from devinterp.utils import *
 
@@ -25,7 +25,7 @@ class Polynomial(nn.Module):
         return torch.sum(torch.pow(self.weights, self.powers))
 
 
-# @pytest.fixture
+@pytest.fixture
 def generated_normalcrossing_dataset():
     torch.manual_seed(42)
     np.random.seed(42)
@@ -35,6 +35,43 @@ def generated_normalcrossing_dataset():
     train_data = TensorDataset(x, y)
     train_dataloader = DataLoader(train_data, batch_size=num_samples, shuffle=True)
     return train_dataloader, train_data, x, y
+
+
+
+def linear_loss(y_preds, ys):
+    return torch.mean(y_preds)
+
+
+MALA_CALC_TESTCASES = [
+    [[0.0, 0.0], [0.0, 0.0], [0.0], [1.5, 5.5], [1.5, 5.5], [16.25], 0.1, 0.6661436],
+    [[1. ,1.], [1., 1.], 1.0, [1.5, 0.5], [1.5, 0.5], 1.25, 0.5, 0.9692332],
+    [[0., 0.], [0., 0.], 0.0, [10.5,  5.5], [10.5,  5.5], 70.25, 0.1, 0.17268492],
+    [[0., 0.], [0., 0.], 0.0, [10.5,  5.5], [10.5,  5.5], 70.25, 0.5, 0.00015359]
+]
+
+@pytest.mark.parametrize("prev_point,prev_grad,prev_loss,current_point,current_grad,current_loss,learning_rate,benchmark_accept_prob", MALA_CALC_TESTCASES)
+def test_mala_calc(
+    prev_point,
+    prev_grad,
+    prev_loss,
+    current_point,
+    current_grad,
+    current_loss,
+    learning_rate,
+    benchmark_accept_prob,
+):
+    mala_accept_prob = mala_acceptance_probability(
+        torch.tensor(prev_point),
+         torch.tensor(prev_grad),
+         torch.tensor(prev_loss),
+         torch.tensor(current_point),
+         torch.tensor(current_grad),
+         torch.tensor(current_loss),
+         torch.tensor(learning_rate),
+    )
+    assert np.isclose(
+        mala_accept_prob, benchmark_accept_prob, atol=0.000001
+    ), f"MALA accept prob {mala_accept_prob}, not close to benchmark value {benchmark_accept_prob:.2f}"
 
 
 SETS_TO_TEST = [
@@ -47,23 +84,18 @@ SETS_TO_TEST = [
     [[8], 1.5e-2, 100.0, 0.87],
     [[8], 1.0e-2, 0.1, 0.97],
     [[8], 1.0e-5, 100.0, 0.999],
-    [[2, 2], 1.0e-3, 100.0, 0.971],  # linear_loss
+    [[2, 2], 1.0e-3, 100.0, 0.971],
+    [[2, 2], 1.0e-2, 100.0, 0.54],
+    [[2, 2], 3e-3, 0.01, 0.91],
+    [[0, 2], 2.0e-3, 100.0, 0.95],
+    [[4, 0], 1.0e-3, 100.0, 0.995],
+    [[4, 4], 1.0e-2, 100.0, 0.87],
 ]
 
 
-def quaternary_loss(y_preds, ys):
-    return torch.mean(torch.pow((y_preds), 4))
-
-
-def linear_loss(y_preds, ys):
-    return torch.mean(y_preds)
-
-
-# @pytest.mark.parametrize("sampling_method", [SGLD])
-# @pytest.mark.parametrize("powers,lr,elasticity,accept_prob", SETS_TO_TEST)
-def test_mala_closeness(
+@pytest.mark.parametrize("powers,lr,elasticity,accept_prob", SETS_TO_TEST)
+def test_mala_callback_closeness(
     generated_normalcrossing_dataset,
-    sampling_method,
     powers,
     lr,
     elasticity,
@@ -73,7 +105,6 @@ def test_mala_closeness(
     for seed in range(10):
         seed += 1
         model = Polynomial(powers)
-        # model.weights = nn.Parameter(torch.tensor([-0.01065028, -0.03249225]))
         train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
         criterion = linear_loss
         num_draws = 5_000
@@ -93,7 +124,7 @@ def test_mala_closeness(
             optimizer_kwargs=dict(
                 lr=lr, elasticity=elasticity, num_samples=len(train_data)
             ),
-            sampling_method=sampling_method,
+            sampling_method=SGLD,
             num_chains=num_chains,
             num_draws=num_draws,
             callbacks=[mala_estimator],
@@ -103,19 +134,7 @@ def test_mala_closeness(
         mala_acceptance_rate_mean = mala_estimator.sample()["mala_accept/mean"]
         if not np.isnan(mala_acceptance_rate_mean):
             break
-    plt.plot(mala_estimator.sample()["mala_accept/trace"][-1])
-    plt.show()
-    print(
-        f"hyperparams: loss = weight^{powers[0]*2:<2}, lr = {lr:<6.5f}, gamma = {elasticity:<7.3f}, zach's value = {accept_prob}, ours = {mala_acceptance_rate_mean:.2f}"
-    )
     assert np.isclose(
-        mala_acceptance_rate_mean, accept_prob, rtol=0.01
-    ), f"MALA Rate mean {mala_acceptance_rate_mean:.3f}, not close to benchmark value {accept_prob:.3f}, lr {lr} elas {elasticity}"
+        mala_acceptance_rate_mean, accept_prob, atol=0.01
+    ), f"MALA Rate mean {mala_acceptance_rate_mean:.2f}, not close to benchmark value {accept_prob:.2f}, lr {lr} elas {elasticity}"
 
-
-for _ in SETS_TO_TEST:
-    test_mala_closeness(
-        generated_normalcrossing_dataset(),
-        SGLD,
-        *_,
-    )
