@@ -38,16 +38,16 @@ def generated_normalcrossing_dataset():
 
 
 SETS_TO_TEST = [
-    # [[1], 1.0e-2, 100.0, 0.59],F.mse_loss
-    # [[1], 1.0e-2, 0.1, 0.73],F.mse_loss
-    # [[1], 1.0e-3, 100.0, 0.98],F.mse_loss
-    # [[2], 1.5e-2, 100.0, 0.85],F.mse_loss
-    # [[2], 1.5e-2, 1.0, 0.935],F.mse_loss
-    # [[2], 1.5e-5, 100.0, 0.999],F.mse_loss
-    # [[4], 1.5e-2, 100.0, 0.87],F.mse_loss
-    # [[4], 1.0e-2, 0.1, 0.97],F.mse_loss
-    # [[4], 1.0e-5, 100.0, 0.999],F.mse_loss
-    [[2, 2], 1.0e-3, 100.0, 0.971], #linear_loss
+    [[2], 1.0e-2, 100.0, 0.59],
+    [[2], 1.0e-2, 0.1, 0.73],
+    [[2], 1.0e-3, 100.0, 0.98],
+    [[4], 1.5e-2, 100.0, 0.85],
+    [[4], 1.5e-2, 1.0, 0.935],
+    [[4], 1.5e-5, 100.0, 0.999],
+    [[8], 1.5e-2, 100.0, 0.87],
+    [[8], 1.0e-2, 0.1, 0.97],
+    [[8], 1.0e-5, 100.0, 0.999],
+    [[2, 2], 1.0e-3, 100.0, 0.971],  # linear_loss
 ]
 
 
@@ -57,6 +57,7 @@ def quaternary_loss(y_preds, ys):
 
 def linear_loss(y_preds, ys):
     return torch.mean(y_preds)
+
 
 # @pytest.mark.parametrize("sampling_method", [SGLD])
 # @pytest.mark.parametrize("powers,lr,elasticity,accept_prob", SETS_TO_TEST)
@@ -72,7 +73,7 @@ def test_mala_closeness(
     for seed in range(10):
         seed += 1
         model = Polynomial(powers)
-        model.weights = nn.Parameter(torch.tensor([-0.01065028, -0.03249225]))
+        # model.weights = nn.Parameter(torch.tensor([-0.01065028, -0.03249225]))
         train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
         criterion = linear_loss
         num_draws = 5_000
