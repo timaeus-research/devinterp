@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import Union
 import numpy as np
 import torch
@@ -40,11 +39,9 @@ def mala_acceptance_probability(
     log_q_prev_to_current = -torch.sum(
         (current_point - prev_point - (learning_rate * 0.5 * -prev_grad)) ** 2
     ) / (2 * learning_rate)
-    # Compute the acceptance probability
     acceptance_log_prob = (
         log_q_current_to_prev - log_q_prev_to_current + prev_loss - current_loss
     )
-    # print(acceptance_log_prob)
     return min(1.0, torch.exp(acceptance_log_prob))
 
 
@@ -55,6 +52,7 @@ class MalaAcceptanceRate(SamplerCallback):
     Attributes:
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
+        num_samples (int): size of dataset passed to sample()
         learning_rate (int): Learning rate of the model.
         device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
@@ -64,96 +62,60 @@ class MalaAcceptanceRate(SamplerCallback):
         num_chains: int,
         num_draws: int,
         num_samples: int,
-        model: nn.Module,
         learning_rate: float,
-        elasticity: float,
         device: Union[torch.device, str] = "cpu",
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
         self.learning_rate = learning_rate
-        self.elasticity = elasticity
         self.num_samples = num_samples
         self.mala_acceptance_rate = torch.zeros(
             (num_chains, num_draws - 1), dtype=torch.float32
         ).to(device)
         self.device = device
-        self.current_params = [
-            param.clone().detach() for param in list(model.parameters())
-        ]
-        self.current_grads = [torch.zeros(param.size()) for param in model.parameters()]
-        self.prev_params = [0.0]
-        self.prev_grads = [0.0]
+        self.current_params = []
+        self.current_grads = []
+        self.prev_params = []
+        self.prev_grads = []
         self.prev_mala_loss = 0.0
 
     def __call__(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
         self.update(chain, draw, model, loss, optimizer)
 
     def update(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
-        model.eval()
-        with torch.no_grad():
-            self.current_grads = optimizer.dws
-            # print(loss)
-            # print(loss * self.num_samples / np.log(self.num_samples))
-            # print(optimizer.elasticity_loss)
-            mala_loss = (
-                loss * self.num_samples / np.log(self.num_samples)
-            ) + optimizer.elasticity_loss
-            # print(
-            #     draw,
-            #     "current",
-            #     self.current_params,  # MALA param
-            #     self.current_grads,  # MALA gradient! nice
-            #     mala_loss.item(),  # MALA loss
-            #     optimizer.elasticity_loss,
-            #     loss,
-            # )
-            # input()
-            if draw > -1:
-
-                for current_param, current_grad, prev_param, prev_grad in zip(
-                    self.current_params,
-                    self.current_grads,
-                    self.prev_params,
-                    self.prev_grads,
-                ):
-                    self.mala_acceptance_rate[chain, draw - 1] = (
-                        mala_acceptance_probability(
-                            prev_param,
-                            prev_grad,
-                            self.prev_mala_loss,
-                            current_param,
-                            current_grad,
-                            mala_loss,
-                            self.learning_rate,
-                        )
+        # we need the grads & loss from the pass, but the current params are from after the step
+        # (so we update those only that after the calculation)
+        self.current_grads = optimizer.dws
+        # mala acceptance loss is different from pytorch supplied loss
+        mala_loss = (
+            loss * self.num_samples / np.log(self.num_samples)
+        ) + optimizer.elasticity_loss
+        if draw > 1:
+            for current_param, current_grad, prev_param, prev_grad in zip(
+                self.current_params,
+                self.current_grads,
+                self.prev_params,
+                self.prev_grads,
+            ):
+                self.mala_acceptance_rate[chain, draw - 1] = (
+                    mala_acceptance_probability(
+                        prev_param,
+                        prev_grad,
+                        self.prev_mala_loss,
+                        current_param,
+                        current_grad,
+                        mala_loss,
+                        self.learning_rate,
                     )
-                    # print(mala_acceptance_probability(
-                    #         prev_param,
-                    #         prev_grad,
-                    #         self.prev_mala_loss,
-                    #         current_param,
-                    #         current_grad,
-                    #         mala_loss,
-                    #         self.learning_rate,
-                    #     )[-1].item())
-                    # input(
-                    #     mala_acceptance_probability(
-                    #         prev_param,
-                    #         prev_grad,
-                    #         self.prev_mala_loss,
-                    #         current_param,
-                    #         current_grad,
-                    #         mala_loss,
-                    #         self.learning_rate,
-                    #     )
-                    # )
-            self.prev_params = self.current_params
-            self.current_params = [
-                param.clone().detach() for param in list(model.parameters())
-            ]
-            self.prev_grads = self.current_grads
-            self.prev_mala_loss = mala_loss
+                )
+        # move new -> old, then update new after
+        self.prev_params = self.current_params
+        self.prev_grads = self.current_grads
+        self.prev_mala_loss = mala_loss
+        # params update only at the end, as decribed
+        self.current_params = [
+            param.clone().detach() for param in list(model.parameters())
+        ]
 
     def sample(self):
         return {

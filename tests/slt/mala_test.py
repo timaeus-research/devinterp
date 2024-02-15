@@ -113,8 +113,6 @@ def test_mala_callback_closeness(
             num_chains=1,
             num_draws=num_draws,
             num_samples=len(train_data),
-            model=model,
-            elasticity=elasticity,
             learning_rate=lr,
         )
         sample(
