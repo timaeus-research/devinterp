@@ -49,6 +49,7 @@ def sample_single_chain(
     model = deepcopy(ref_model).to(device)
 
     optimizer_kwargs = optimizer_kwargs or {}
+    optimizer_kwargs.setdefault('device', device)
     optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
 
     if seed is not None:
