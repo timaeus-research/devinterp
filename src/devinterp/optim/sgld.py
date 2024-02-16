@@ -66,6 +66,7 @@ class SGLD(torch.optim.Optimizer):
         bounding_box_size=None,
         num_samples=1,
         save_noise=False,
+        device='cpu'
     ):
         if noise_level != 1.0:
             warnings.warn(
@@ -79,26 +80,26 @@ class SGLD(torch.optim.Optimizer):
             temperature=temperature,
             bounding_box_size=bounding_box_size,
             num_samples=num_samples,
+            device=device
         )
         super(SGLD, self).__init__(params, defaults)
         self.save_noise = save_noise
         self.noise = None
-
+        self.device = device
         # Save the initial parameters if the elasticity term is set
         for group in self.param_groups:
             if group["elasticity"] != 0 or group["bounding_box_size"] != 0:
                 for p in group["params"]:
                     param_state = self.state[p]
-                    param_state["initial_param"] = torch.zeros_like(
-                        p.data.clone().detach()
-                    )
+                    param_state["initial_param"] = p.data.clone().detach()
             if group["temperature"] == "adaptive":  # TODO: Better name
                 group["temperature"] = np.log(group["num_samples"])
 
     def step(self, closure=None):
         self.noise = []
         self.dws = []
-        self.elasticity_loss = torch.tensor([0.0], requires_grad=False)
+        self.elasticity_loss = torch.tensor([0.0], requires_grad=False, device=self.device)
+        # print(self.elasticity_loss )
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -112,6 +113,7 @@ class SGLD(torch.optim.Optimizer):
                     initial_param = self.state[p]["initial_param"]
                     initial_param_distance = p.data - initial_param
                     dw.add_(initial_param_distance, alpha=group["elasticity"])
+                    # print(torch.sum(torch.pow(initial_param_distance.clone().detach(), 2)))
                     self.elasticity_loss += (
                         torch.sum(torch.pow(initial_param_distance.clone().detach(), 2))
                         * group["elasticity"]
