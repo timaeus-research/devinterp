@@ -99,7 +99,6 @@ class SGLD(torch.optim.Optimizer):
         self.noise = []
         self.dws = []
         self.elasticity_loss = torch.tensor([0.0], requires_grad=False, device=self.device)
-        # print(self.elasticity_loss )
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -113,7 +112,6 @@ class SGLD(torch.optim.Optimizer):
                     initial_param = self.state[p]["initial_param"]
                     initial_param_distance = p.data - initial_param
                     dw.add_(initial_param_distance, alpha=group["elasticity"])
-                    # print(torch.sum(torch.pow(initial_param_distance.clone().detach(), 2)))
                     self.elasticity_loss += (
                         torch.sum(torch.pow(initial_param_distance.clone().detach(), 2))
                         * group["elasticity"]
