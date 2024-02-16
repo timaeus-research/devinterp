@@ -6,7 +6,11 @@ from torch.utils.data import DataLoader
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback
 from devinterp.slt.sampler import sample
-from devinterp.utils import optimal_temperature
+from devinterp.utils import (
+    optimal_temperature,
+    get_init_loss_one_batch,
+    get_init_loss_full_batch,
+)
 
 
 class LLCEstimator(SamplerCallback):
@@ -91,7 +95,9 @@ class OnlineLLCEstimator(SamplerCallback):
             device
         )
         self.llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
-        self.moving_avg_llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
+        self.moving_avg_llcs = torch.zeros(
+            (num_chains, num_draws), dtype=torch.float32
+        ).to(device)
 
         self.temperature = torch.tensor(temperature, dtype=torch.float32).to(device)
 
@@ -103,7 +109,7 @@ class OnlineLLCEstimator(SamplerCallback):
     def update(self, chain: int, draw: int, loss: float, init_loss: float):
         self.losses[chain, draw] = loss
         self.llcs[chain, draw] = self.temperature * (loss - init_loss)
-        if draw == 0:  # TODO: We can probably drop this and it still works (but harder to read)
+        if draw == 0:
             self.moving_avg_llcs[chain, draw] = self.temperature * (loss - init_loss)
         else:
             t = draw + 1
@@ -145,9 +151,12 @@ def estimate_learning_coeff_with_summary(
     verbose: bool = True,
     callbacks: List[Callable] = [],
     online: bool = False,
+    init_loss: float = None,
 ) -> dict:
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader.dataset))
-
+    if not init_loss:
+        init_loss = get_init_loss_one_batch(loader, model, criterion, device)
+        # alternative: init_loss = get_init_loss_full_batch(loader, model, criterion, device)
     if online:
         llc_estimator = OnlineLLCEstimator(
             num_chains, num_draws, optimizer_kwargs["temperature"], device=device
@@ -200,6 +209,7 @@ def estimate_learning_coeff(
     device: torch.device = torch.device("cpu"),
     verbose: bool = True,
     callbacks: List[Callable] = [],
+    init_loss: float = None,
 ) -> float:
     return estimate_learning_coeff_with_summary(
         model=model,
