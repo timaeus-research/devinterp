@@ -183,6 +183,7 @@ def estimate_learning_coeff_with_summary(
         device=device,
         verbose=verbose,
         callbacks=callbacks,
+        init_loss= init_loss
     )
 
     results = {}
@@ -227,4 +228,5 @@ def estimate_learning_coeff(
         verbose=verbose,
         callbacks=callbacks,
         online=False,
+        init_loss=init_loss
     )["llc/mean"]
