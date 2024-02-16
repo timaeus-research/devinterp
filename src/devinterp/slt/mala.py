@@ -90,7 +90,12 @@ class MalaAcceptanceRate(SamplerCallback):
         mala_loss = (
             loss * self.num_samples / np.log(self.num_samples)
         ) + optimizer.elasticity_loss
+        # print(
+        #     loss * self.num_samples / np.log(self.num_samples),
+        #     optimizer.elasticity_loss,
+        # )
         if draw > 1:
+            # print(len(                self.current_grads), len(self.current_params))
             for current_param, current_grad, prev_param, prev_grad in zip(
                 self.current_params,
                 self.current_grads,
