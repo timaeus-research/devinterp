@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-
+import warnings
 
 class SGNHT(torch.optim.Optimizer):
     def __init__(
@@ -10,6 +10,9 @@ class SGNHT(torch.optim.Optimizer):
         diffusion_factor=0.01,
         bounding_box_size=None,
         num_samples=1,
+        save_noise=False,
+        save_mala_vars=False,
+        device='cpu'
     ):
         r"""
         Initialize the Stochastic Gradient Nose Hoover Thermostat (SGNHT) Optimizer.
@@ -39,6 +42,14 @@ class SGNHT(torch.optim.Optimizer):
         :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
         :param num_samples: Number of samples to average over (default: 1)
         """
+        if save_noise:
+            warnings.warn(
+                "Warning: NoiseNorm not implemented for SGNHT! If you insist on using NoiseNorm, use SGLD instead."
+            )
+        if save_mala_vars:
+            warnings.warn(
+                "Warning: MALA not implemented for SGNHT! If you insist on using MALA, use SGLD instead."
+            )
         defaults = dict(
             lr=lr,
             diffusion_factor=diffusion_factor,
