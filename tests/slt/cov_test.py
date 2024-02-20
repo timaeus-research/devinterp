@@ -63,7 +63,7 @@ def test_covariance_accumulator_with_known_cov(dummy_model, known_accessor, cov_
 
     acc.finalize()
 
-    cov_matrix = acc.to_matrix().detach().cpu().numpy()
+    cov_matrix = acc.to_matrix().detach().cpu()
     assert np.allclose(
         cov_matrix, cov_matrix, atol=1e-1
     )  # Tolerance due to finite sample

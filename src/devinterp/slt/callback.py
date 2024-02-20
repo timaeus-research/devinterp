@@ -1,9 +1,22 @@
 import warnings
-from typing import Callable, List
+import torch
+from typing import Callable, List, Union
 
 
 class SamplerCallback:
-    def __init__(self, device="cpu"):
+    """
+    Base class for creating callbacks used in sample(). 
+    Each instantiated callback gets its functions update(), finalize() and sample() called if those exist. 
+    update() happens at every (non burn-in) sample draw, finalize() happens after all draws are finished, 
+    and sample() is a helper function that allows access to whatever relevant parameters the callback has computed. 
+    For legibility, ach callback can also access parameters in locals() when a class function is called.
+    
+    Parameters:
+        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
+
+    """
+
+    def __init__(self, device: Union[torch.device, str] ="cpu"):
         self.device = device
     
     def share_memory_(self):
