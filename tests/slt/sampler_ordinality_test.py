@@ -27,9 +27,9 @@ def generated_linedot_normalcrossing_dataset():
 
 
 @pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
-@pytest.mark.parametrize("model", [Polynomial])
+@pytest.mark.parametrize("model", [Polynomial, LinePlusDot]) #LinePlusDot currently not tested, TODO
 @pytest.mark.parametrize("dim", [2, 10, 100])
-def test_ordinality_linedot_normal_crossing(
+def test_linedot_normal_crossing(
     generated_linedot_normalcrossing_dataset, sampling_method, model, dim
 ):
     seed = 42
