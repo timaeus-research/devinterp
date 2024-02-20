@@ -66,6 +66,7 @@ class SGLD(torch.optim.Optimizer):
         bounding_box_size=None,
         num_samples=1,
         save_noise=False,
+        save_mala_vars=False,
         device='cpu'
     ):
         if noise_level != 1.0:
@@ -84,6 +85,7 @@ class SGLD(torch.optim.Optimizer):
         )
         super(SGLD, self).__init__(params, defaults)
         self.save_noise = save_noise
+        self.save_mala_vars = save_mala_vars
         self.noise = None
         self.device = device
         # Save the initial parameters if the elasticity term is set
@@ -96,9 +98,11 @@ class SGLD(torch.optim.Optimizer):
                 group["temperature"] = np.log(group["num_samples"])
 
     def step(self, closure=None):
-        self.noise = []
-        self.dws = []
-        self.elasticity_loss = torch.tensor([0.0], requires_grad=False, device=self.device)
+        if self.save_noise:
+            self.noise = []
+        if self.save_mala_vars:
+            self.dws = []
+            self.elasticity_loss = torch.tensor([0.0], requires_grad=False, device=self.device)
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -112,12 +116,13 @@ class SGLD(torch.optim.Optimizer):
                     initial_param = self.state[p]["initial_param"]
                     initial_param_distance = p.data - initial_param
                     dw.add_(initial_param_distance, alpha=group["elasticity"])
-                    self.elasticity_loss += (
-                        torch.sum(torch.pow(initial_param_distance.clone().detach(), 2))
-                        * group["elasticity"]
-                        / 2
-                    )
-                self.dws.append(dw.clone().detach())
+                    if self.save_mala_vars:
+                        self.elasticity_loss += (
+                            torch.sum(torch.pow(initial_param_distance.clone().detach(), 2))
+                            * group["elasticity"]
+                            / 2
+                        )
+                    self.dws.append(dw.clone().detach())
 
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
 
