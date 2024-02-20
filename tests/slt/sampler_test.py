@@ -79,27 +79,23 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
 
 
 # @pytest.mark.parametrize("batch_sizes", [[1, 10, 100, 1000]])
-# @pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
+# @pytest.mark.parametrize("sampling_method", [SGLD])
 # @pytest.mark.parametrize("model", [Polynomial])
-def test_batch_size_convergence(batch_sizes, sampling_method, model):
+def unused_test_batch_size_convergence(
+    generated_normalcrossing_dataset, batch_sizes, sampling_method, model
+):
     seed = 42
     model = model([2, 2])
     criterion = F.mse_loss
-    lr = 0.0000002
-    num_chains = 5
+    lr = 0.0002
+    num_chains = 1
     means = []
     stds = []
-    train_data, _, _ = generated_normalcrossing_dataset()
+    _, train_data, _, _ = generated_normalcrossing_dataset
     for batch_size in batch_sizes:
-        num_draws = 5_000 * 1000 // batch_size
+        num_draws = 5_000
         train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
         llc_estimator = LLCEstimator(
-            num_chains=num_chains,
-            num_draws=num_draws,
-            temperature=optimal_temperature(train_data),
-        )
-
-        online_llc_estimator = OnlineLLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
             temperature=optimal_temperature(train_data),
@@ -108,18 +104,15 @@ def test_batch_size_convergence(batch_sizes, sampling_method, model):
             model,
             train_dataloader,
             criterion=criterion,
-            optimizer_kwargs=dict(lr=lr, bounding_box_size=1.0),
+            optimizer_kwargs=dict(lr=lr, localization=1.0),
             sampling_method=sampling_method,
             num_chains=num_chains,
             num_draws=num_draws,
-            callbacks=[online_llc_estimator],
+            callbacks=[llc_estimator],
             verbose=False,
         )
-        # means += [llc_estimator.sample()["llc/mean"]]
-        # stds += [llc_estimator.sample()["llc/std"]]
-        trace = online_llc_estimator.sample()["llc/trace"]
-        plot_trace(trace, f"LLC {batch_size}")
-        # print(llc_estimator.sample()["llc/mean"])
+        means += [llc_estimator.sample()["llc/mean"]]
+        stds += [llc_estimator.sample()["llc/std"]]
     overall_mean = np.mean(means)
     std_dev_of_means = np.std(means)
     assert (

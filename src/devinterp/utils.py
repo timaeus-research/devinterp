@@ -55,10 +55,12 @@ def plot_trace(
 def optimal_temperature(data):
     if isinstance(data, DataLoader):
         return len(data.dataset) / np.log(len(data.dataset))
-    elif isinstance(data, Dataset):
+    elif isinstance(data, Dataset) or isinstance(data, list):
         return len(data) / np.log(len(data))
     elif isinstance(data, int):
         return data / np.log(data)
+    else:
+        raise NotImplementedError(f'Temperature for data type {type(data)} not implemented, use Dataloader or Dataset instead.')
 
 
 def get_init_loss_one_batch(dataloader, model, criterion, device):
