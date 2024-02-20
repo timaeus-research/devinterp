@@ -65,7 +65,7 @@ def optimal_temperature(data):
 
 def get_init_loss_one_batch(dataloader, model, criterion, device):
     model = model.to(device)
-    model.eval()
+    model.train() # to make sure we're using train loss, comparable to train loss of sampler()
     with torch.no_grad():
         xs, ys = next(iter(dataloader))
         xs, ys = xs.to(device), ys.to(device)
@@ -76,11 +76,16 @@ def get_init_loss_one_batch(dataloader, model, criterion, device):
 
 def get_init_loss_full_batch(dataloader, model, criterion, device):
     model = model.to(device)
-    model.eval()
-    loss = 0.0
+    model.train()
+    loss = 0.
     with torch.no_grad():
-        xs, ys = next(iter(dataloader))
-        xs, ys = xs.to(device), ys.to(device)
-        y_preds = model(xs)
-        loss += criterion(y_preds, ys).detach().item()
+        for xs, ys in dataloader:
+            xs, ys = xs.to(device), ys.to(device)
+            y_preds = model(xs)
+            loss += criterion(y_preds, ys).detach().item()
     return loss
+
+def transformers_cross_entropy(inputs, outputs):
+    return torch.nn.functional.cross_entropy(
+        inputs.logits, outputs
+    )  # transformers doesn't output a vector

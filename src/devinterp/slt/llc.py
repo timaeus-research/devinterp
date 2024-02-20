@@ -107,16 +107,17 @@ class OnlineLLCEstimator(SamplerCallback):
         self.device = device
 
     def update(self, chain: int, draw: int, loss: float, init_loss: float):
+        self.init_loss = init_loss
         self.losses[chain, draw] = loss
-        self.llcs[chain, draw] = self.temperature * (loss - init_loss)
+        self.llcs[chain, draw] = self.temperature * (loss - self.init_loss)
         if draw == 0:
-            self.moving_avg_llcs[chain, draw] = self.temperature * (loss - init_loss)
+            self.moving_avg_llcs[chain, draw] = self.temperature * (loss - self.init_loss)
         else:
             t = draw + 1
             prev_llc = self.llcs[chain, draw - 1]
             with torch.no_grad():
                 self.moving_avg_llcs[chain, draw] = (1 / t) * (
-                    (t - 1) * prev_llc + self.temperature * (loss - init_loss)
+                    (t - 1) * prev_llc + self.temperature * (loss - self.init_loss)
                 )
 
     def finalize(self):
@@ -183,7 +184,7 @@ def estimate_learning_coeff_with_summary(
         device=device,
         verbose=verbose,
         callbacks=callbacks,
-        init_loss= init_loss
+        init_loss=init_loss,
     )
 
     results = {}
@@ -228,5 +229,5 @@ def estimate_learning_coeff(
         verbose=verbose,
         callbacks=callbacks,
         online=False,
-        init_loss=init_loss
+        init_loss=init_loss,
     )["llc/mean"]
