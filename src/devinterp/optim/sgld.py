@@ -67,7 +67,7 @@ class SGLD(torch.optim.Optimizer):
         num_samples=1,
         save_noise=False,
         save_mala_vars=False,
-        device='cpu'
+        device="cpu",
     ):
         if noise_level != 1.0:
             warnings.warn(
@@ -81,7 +81,7 @@ class SGLD(torch.optim.Optimizer):
             temperature=temperature,
             bounding_box_size=bounding_box_size,
             num_samples=num_samples,
-            device=device
+            device=device,
         )
         super(SGLD, self).__init__(params, defaults)
         self.save_noise = save_noise
@@ -102,7 +102,9 @@ class SGLD(torch.optim.Optimizer):
             self.noise = []
         if self.save_mala_vars:
             self.dws = []
-            self.elasticity_loss = torch.tensor([0.0], requires_grad=False, device=self.device)
+            self.elasticity_loss = torch.tensor(
+                [0.0], requires_grad=False, device=self.device
+            )
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -118,11 +120,13 @@ class SGLD(torch.optim.Optimizer):
                     dw.add_(initial_param_distance, alpha=group["elasticity"])
                     if self.save_mala_vars:
                         self.elasticity_loss += (
-                            torch.sum(torch.pow(initial_param_distance.clone().detach(), 2))
+                            torch.sum(
+                                torch.pow(initial_param_distance.clone().detach(), 2)
+                            )
                             * group["elasticity"]
                             / 2
                         )
-                    self.dws.append(dw.clone().detach())
+                        self.dws.append(dw.clone().detach())
 
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
 
