@@ -92,7 +92,7 @@ class OnlineLLCEstimator(SamplerCallback):
             (num_chains, num_draws), dtype=torch.float32
         ).to(device)
 
-        self.temperature = torch.tensor(temperature, dtype=torch.float32).to(device)
+        self.temperature = temperature
 
         self.llc_means = torch.tensor(num_draws, dtype=torch.float32).to(device)
         self.llc_stds = torch.tensor(num_draws, dtype=torch.float32).to(device)
@@ -108,11 +108,10 @@ class OnlineLLCEstimator(SamplerCallback):
             )
         else:
             t = draw + 1
-            prev_llc = self.llcs[chain, draw - 1]
-            with torch.no_grad():
-                self.moving_avg_llcs[chain, draw] = (1 / t) * (
-                    (t - 1) * prev_llc + self.temperature * (loss - self.init_loss)
-                )
+            prev_moving_avg = self.moving_avg_llcs[chain, draw - 1]
+            self.moving_avg_llcs[chain, draw] = (1 / t) * (
+                (t - 1) * prev_moving_avg + self.temperature * (loss - self.init_loss)
+            )
 
     def finalize(self):
         self.llc_means = self.llcs.mean(dim=0)
