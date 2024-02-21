@@ -1,16 +1,8 @@
-from typing import Callable, Dict, List, Literal, Optional, Type, Union
+from typing import Union
 
 import torch
-from torch.utils.data import DataLoader
 
-from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback
-from devinterp.slt.sampler import sample
-from devinterp.utils import (
-    optimal_temperature,
-    get_init_loss_one_batch,
-    get_init_loss_full_batch,
-)
 
 
 class LLCEstimator(SamplerCallback):
@@ -40,6 +32,7 @@ class LLCEstimator(SamplerCallback):
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
         )
+        self.init_loss = 0.0
 
         self.temperature = torch.tensor(temperature, dtype=torch.float32).to(device)
         self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
@@ -48,9 +41,8 @@ class LLCEstimator(SamplerCallback):
 
         self.device = device
 
-    def update(self, chain: int, draw: int, loss: float, init_loss):
+    def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss
-        self.init_loss = init_loss  # This is clunky, sorry
 
     def finalize(self):
         avg_losses = self.losses.mean(axis=1)
@@ -69,8 +61,8 @@ class LLCEstimator(SamplerCallback):
             "loss/trace": self.losses.cpu().numpy(),
         }
 
-    def __call__(self, chain: int, draw: int, loss: float, init_loss: float):
-        self.update(chain, draw, loss, init_loss)
+    def __call__(self, chain: int, draw: int, loss: float):
+        self.update(chain, draw, loss)
 
 
 class OnlineLLCEstimator(SamplerCallback):
@@ -90,6 +82,7 @@ class OnlineLLCEstimator(SamplerCallback):
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
+        self.init_loss = 0.0
 
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
@@ -106,12 +99,13 @@ class OnlineLLCEstimator(SamplerCallback):
 
         self.device = device
 
-    def update(self, chain: int, draw: int, loss: float, init_loss: float):
-        self.init_loss = init_loss
+    def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss
         self.llcs[chain, draw] = self.temperature * (loss - self.init_loss)
         if draw == 0:
-            self.moving_avg_llcs[chain, draw] = self.temperature * (loss - self.init_loss)
+            self.moving_avg_llcs[chain, draw] = self.temperature * (
+                loss - self.init_loss
+            )
         else:
             t = draw + 1
             prev_llc = self.llcs[chain, draw - 1]
@@ -127,107 +121,11 @@ class OnlineLLCEstimator(SamplerCallback):
     def sample(self):
         return {
             "llc/means": self.llc_means.cpu().numpy(),
+            "llc/moving_avg": self.moving_avg_llcs.cpu().numpy(),
             "llc/stds": self.llc_stds.cpu().numpy(),
             "llc/trace": self.llcs.cpu().numpy(),
             "loss/trace": self.losses.cpu().numpy(),
         }
 
-    def __call__(self, chain: int, draw: int, loss: float, init_loss: float):
-        self.update(chain, draw, loss, init_loss)
-
-
-def estimate_learning_coeff_with_summary(
-    model: torch.nn.Module,
-    loader: DataLoader,
-    criterion: Callable,
-    sampling_method: Type[torch.optim.Optimizer] = SGLD,
-    optimizer_kwargs: Optional[Dict] = {},
-    num_draws: int = 100,
-    num_chains: int = 10,
-    num_burnin_steps: int = 0,
-    num_steps_bw_draws: int = 1,
-    cores: int = 1,
-    seed: Optional[Union[int, List[int]]] = None,
-    device: torch.device = torch.device("cpu"),
-    verbose: bool = True,
-    callbacks: List[Callable] = [],
-    online: bool = False,
-    init_loss: float = None,
-) -> dict:
-    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader.dataset))
-    if not init_loss:
-        init_loss = get_init_loss_one_batch(loader, model, criterion, device)
-        # alternative: init_loss = get_init_loss_full_batch(loader, model, criterion, device)
-    if online:
-        llc_estimator = OnlineLLCEstimator(
-            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
-        )
-    else:
-        llc_estimator = LLCEstimator(
-            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
-        )
-
-    callbacks = [llc_estimator, *callbacks]
-
-    sample(
-        model=model,
-        loader=loader,
-        criterion=criterion,
-        sampling_method=sampling_method,
-        optimizer_kwargs=optimizer_kwargs,
-        num_draws=num_draws,
-        num_chains=num_chains,
-        num_burnin_steps=num_burnin_steps,
-        num_steps_bw_draws=num_steps_bw_draws,
-        cores=cores,
-        seed=seed,
-        device=device,
-        verbose=verbose,
-        callbacks=callbacks,
-        init_loss=init_loss,
-    )
-
-    results = {}
-
-    for callback in callbacks:
-        if hasattr(callback, "sample"):
-            results.update(callback.sample())
-
-    return results
-
-
-def estimate_learning_coeff(
-    model: torch.nn.Module,
-    loader: DataLoader,
-    criterion: Callable,
-    sampling_method: Type[torch.optim.Optimizer] = SGLD,
-    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
-    num_draws: int = 100,
-    num_chains: int = 10,
-    num_burnin_steps: int = 0,
-    num_steps_bw_draws: int = 1,
-    cores: int = 1,
-    seed: Optional[Union[int, List[int]]] = None,
-    device: torch.device = torch.device("cpu"),
-    verbose: bool = True,
-    callbacks: List[Callable] = [],
-    init_loss: float = None,
-) -> float:
-    return estimate_learning_coeff_with_summary(
-        model=model,
-        loader=loader,
-        criterion=criterion,
-        sampling_method=sampling_method,
-        optimizer_kwargs=optimizer_kwargs,
-        num_draws=num_draws,
-        num_chains=num_chains,
-        num_burnin_steps=num_burnin_steps,
-        num_steps_bw_draws=num_steps_bw_draws,
-        cores=cores,
-        seed=seed,
-        device=device,
-        verbose=verbose,
-        callbacks=callbacks,
-        online=False,
-        init_loss=init_loss,
-    )["llc/mean"]
+    def __call__(self, chain: int, draw: int, loss: float):
+        self.update(chain, draw, loss)

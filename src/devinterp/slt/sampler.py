@@ -14,9 +14,11 @@ from devinterp.optim.sgld import SGLD
 from devinterp.utils import (
     optimal_temperature,
     get_init_loss_one_batch,
+    get_init_loss_multi_batch,
     get_init_loss_full_batch,
 )
 from devinterp.slt.callback import validate_callbacks, SamplerCallback
+from devinterp.slt.llc import OnlineLLCEstimator, LLCEstimator
 
 
 def call_with(func: Callable, **kwargs):
@@ -51,7 +53,7 @@ def sample_single_chain(
     model = deepcopy(ref_model).to(device)
 
     optimizer_kwargs = optimizer_kwargs or {}
-    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader.dataset))
+    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
     optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
 
     if seed is not None:
@@ -131,11 +133,20 @@ def sample(
         )
     if num_draws > len(loader):
         warnings.warn(
-            "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
+            "You are taking more sample batches than there are dataloader batches available, "
+            "this removes some randomness from sampling but is probably fine. (All sample batches "
+            "beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
         )
     if not init_loss:
-        init_loss = get_init_loss_one_batch(loader, model, criterion, device)
+        init_loss = get_init_loss_multi_batch(
+            loader, num_chains, model, criterion, device
+        )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, criterion, device)
+        # alternative: init_loss = get_init_loss_one_batch(loader, model, criterion, device)
+    for callback in callbacks:
+        if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
+            setattr(callback, "init_loss", init_loss)
+
     if cores is None:
         cores = min(4, cpu_count())
 
@@ -183,3 +194,103 @@ def sample(
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
+
+
+def estimate_learning_coeff_with_summary(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    criterion: Callable,
+    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    optimizer_kwargs: Optional[Dict] = {},
+    num_draws: int = 100,
+    num_chains: int = 10,
+    num_burnin_steps: int = 0,
+    num_steps_bw_draws: int = 1,
+    cores: int = 1,
+    seed: Optional[Union[int, List[int]]] = None,
+    device: torch.device = torch.device("cpu"),
+    verbose: bool = True,
+    callbacks: List[Callable] = [],
+    online: bool = False,
+    init_loss: float = None,
+) -> dict:
+    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
+    if not init_loss:
+        init_loss = get_init_loss_multi_batch(
+            loader, num_chains, model, criterion, device
+        )
+        # alternative: init_loss = get_init_loss_full_batch(loader, model, criterion, device)
+        # alternative: init_loss = get_init_loss_one_batch(loader, model, criterion, device)
+    if online:
+        llc_estimator = OnlineLLCEstimator(
+            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
+        )
+    else:
+        llc_estimator = LLCEstimator(
+            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
+        )
+
+    callbacks = [llc_estimator, *callbacks]
+
+    sample(
+        model=model,
+        loader=loader,
+        criterion=criterion,
+        sampling_method=sampling_method,
+        optimizer_kwargs=optimizer_kwargs,
+        num_draws=num_draws,
+        num_chains=num_chains,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_bw_draws=num_steps_bw_draws,
+        cores=cores,
+        seed=seed,
+        device=device,
+        verbose=verbose,
+        callbacks=callbacks,
+        init_loss=init_loss,
+    )
+
+    results = {}
+
+    for callback in callbacks:
+        if hasattr(callback, "sample"):
+            results.update(callback.sample())
+
+    return results
+
+
+def estimate_learning_coeff(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    criterion: Callable,
+    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
+    num_draws: int = 100,
+    num_chains: int = 10,
+    num_burnin_steps: int = 0,
+    num_steps_bw_draws: int = 1,
+    cores: int = 1,
+    seed: Optional[Union[int, List[int]]] = None,
+    device: torch.device = torch.device("cpu"),
+    verbose: bool = True,
+    callbacks: List[Callable] = [],
+    init_loss: float = None,
+) -> float:
+    return estimate_learning_coeff_with_summary(
+        model=model,
+        loader=loader,
+        criterion=criterion,
+        sampling_method=sampling_method,
+        optimizer_kwargs=optimizer_kwargs,
+        num_draws=num_draws,
+        num_chains=num_chains,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_bw_draws=num_steps_bw_draws,
+        cores=cores,
+        seed=seed,
+        device=device,
+        verbose=verbose,
+        callbacks=callbacks,
+        online=False,
+        init_loss=init_loss,
+    )["llc/mean"]
