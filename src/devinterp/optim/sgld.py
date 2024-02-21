@@ -71,7 +71,7 @@ class SGLD(torch.optim.Optimizer):
     ):
         if noise_level != 1.0:
             warnings.warn(
-                "Warning: noise_level in SGLD is unequal to zero, are you intending to use SGD?"
+                "Warning: noise_level in SGLD is unequal to one, this removes SGLD posterior sampling guarantees."
             )
         defaults = dict(
             lr=lr,
@@ -102,9 +102,7 @@ class SGLD(torch.optim.Optimizer):
             self.noise = []
         if self.save_mala_vars:
             self.dws = []
-            self.elasticity_loss = torch.tensor(
-                [0.0], requires_grad=False, device=self.device
-            )
+            self.elasticity_loss = 0.
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -125,7 +123,7 @@ class SGLD(torch.optim.Optimizer):
                             )
                             * group["elasticity"]
                             / 2
-                        )
+                        ).item()
                         self.dws.append(dw.clone().detach())
 
                 p.data.add_(dw, alpha=-0.5 * group["lr"])

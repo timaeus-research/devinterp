@@ -37,19 +37,22 @@ def generated_normalcrossing_dataset():
     return train_dataloader, train_data, x, y
 
 
-
 def linear_loss(y_preds, ys):
     return torch.mean(y_preds)
 
 
 MALA_CALC_TESTCASES = [
     [[0.0, 0.0], [0.0, 0.0], [0.0], [1.5, 5.5], [1.5, 5.5], [16.25], 0.1, 0.6661436],
-    [[1. ,1.], [1., 1.], 1.0, [1.5, 0.5], [1.5, 0.5], 1.25, 0.5, 0.9692332],
-    [[0., 0.], [0., 0.], 0.0, [10.5,  5.5], [10.5,  5.5], 70.25, 0.1, 0.17268492],
-    [[0., 0.], [0., 0.], 0.0, [10.5,  5.5], [10.5,  5.5], 70.25, 0.5, 0.00015359]
+    [[1.0, 1.0], [1.0, 1.0], 1.0, [1.5, 0.5], [1.5, 0.5], 1.25, 0.5, 0.9692332],
+    [[0.0, 0.0], [0.0, 0.0], 0.0, [10.5, 5.5], [10.5, 5.5], 70.25, 0.1, 0.17268492],
+    [[0.0, 0.0], [0.0, 0.0], 0.0, [10.5, 5.5], [10.5, 5.5], 70.25, 0.5, 0.00015359],
 ]
 
-@pytest.mark.parametrize("prev_point,prev_grad,prev_loss,current_point,current_grad,current_loss,learning_rate,benchmark_accept_prob", MALA_CALC_TESTCASES)
+
+@pytest.mark.parametrize(
+    "prev_point,prev_grad,prev_loss,current_point,current_grad,current_loss,learning_rate,benchmark_accept_prob",
+    MALA_CALC_TESTCASES,
+)
 def test_mala_calc(
     prev_point,
     prev_grad,
@@ -62,12 +65,12 @@ def test_mala_calc(
 ):
     mala_accept_prob = mala_acceptance_probability(
         torch.tensor(prev_point),
-         torch.tensor(prev_grad),
-         torch.tensor(prev_loss),
-         torch.tensor(current_point),
-         torch.tensor(current_grad),
-         torch.tensor(current_loss),
-         torch.tensor(learning_rate),
+        torch.tensor(prev_grad),
+        torch.tensor(prev_loss),
+        torch.tensor(current_point),
+        torch.tensor(current_grad),
+        torch.tensor(current_loss),
+        torch.tensor(learning_rate),
     )
     assert np.isclose(
         mala_accept_prob, benchmark_accept_prob, atol=0.000001
@@ -110,7 +113,7 @@ def test_mala_callback_closeness(
         num_draws = 5_000
         num_chains = 1
         mala_estimator = MalaAcceptanceRate(
-            num_chains=1,
+            num_chains=num_chains,
             num_draws=num_draws,
             num_samples=len(train_data),
             learning_rate=lr,
@@ -135,4 +138,3 @@ def test_mala_callback_closeness(
     assert np.isclose(
         mala_acceptance_rate_mean, accept_prob, atol=0.01
     ), f"MALA Rate mean {mala_acceptance_rate_mean:.2f}, not close to benchmark value {accept_prob:.2f}, lr {lr} elas {elasticity}"
-

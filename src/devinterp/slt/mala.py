@@ -30,7 +30,7 @@ def mala_acceptance_probability(
     Returns:
     float: Acceptance probability for the proposed transition.
     """
-    if torch.isnan(current_loss):
+    if np.isnan(current_loss):
         return np.nan
     # Compute the log of the proposal probabilities (using the Gaussian proposal distribution)
     log_q_current_to_prev = -torch.sum(
@@ -89,13 +89,8 @@ class MalaAcceptanceRate(SamplerCallback):
         # mala acceptance loss is different from pytorch supplied loss
         mala_loss = (
             loss * self.num_samples / np.log(self.num_samples)
-        ) + optimizer.elasticity_loss
-        # print(
-        #     loss * self.num_samples / np.log(self.num_samples),
-        #     optimizer.elasticity_loss,
-        # )
+        ).item() + optimizer.elasticity_loss
         if draw > 1:
-            # print(len(                self.current_grads), len(self.current_params))
             for current_param, current_grad, prev_param, prev_grad in zip(
                 self.current_params,
                 self.current_grads,
