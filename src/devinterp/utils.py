@@ -2,6 +2,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+from itertools import islice
 
 
 def plot_trace(
@@ -52,20 +53,20 @@ def plot_trace(
     plt.show()
 
 
-def optimal_temperature(data):
-    if isinstance(data, DataLoader):
-        return len(data.dataset) / np.log(len(data.dataset))
-    elif isinstance(data, Dataset) or isinstance(data, list):
-        return len(data) / np.log(len(data))
-    elif isinstance(data, int):
-        return data / np.log(data)
+def optimal_temperature(dataloader: DataLoader):
+    if isinstance(dataloader, DataLoader):
+        return len(dataloader) / np.log(len(dataloader))
+    elif isinstance(dataloader, int):
+        return dataloader / np.log(dataloader)
     else:
-        raise NotImplementedError(f'Temperature for data type {type(data)} not implemented, use Dataloader or Dataset instead.')
+        raise NotImplementedError(
+            f"Temperature for data type {type(dataloader)} not implemented, use DataLoader or int instead."
+        )
 
 
 def get_init_loss_one_batch(dataloader, model, criterion, device):
     model = model.to(device)
-    model.train() # to make sure we're using train loss, comparable to train loss of sampler()
+    model.train()  # to make sure we're using train loss, comparable to train loss of sampler()
     with torch.no_grad():
         xs, ys = next(iter(dataloader))
         xs, ys = xs.to(device), ys.to(device)
@@ -74,18 +75,25 @@ def get_init_loss_one_batch(dataloader, model, criterion, device):
     return loss
 
 
+def get_init_loss_multi_batch(dataloader, n_batches, model, criterion, device):
+    model = model.to(device)
+    model.train()
+    loss = 0.0
+    with torch.no_grad():
+        for xs, ys in islice(dataloader, n_batches):
+            xs, ys = xs.to(device), ys.to(device)
+            y_preds = model(xs)
+            loss += criterion(y_preds, ys).detach().item()
+    return loss / n_batches
+
+
 def get_init_loss_full_batch(dataloader, model, criterion, device):
     model = model.to(device)
     model.train()
-    loss = 0.
+    loss = 0.0
     with torch.no_grad():
         for xs, ys in dataloader:
             xs, ys = xs.to(device), ys.to(device)
             y_preds = model(xs)
             loss += criterion(y_preds, ys).detach().item()
-    return loss
-
-def transformers_cross_entropy(inputs, outputs):
-    return torch.nn.functional.cross_entropy(
-        inputs.logits, outputs
-    )  # transformers doesn't output a vector
+    return loss / len(dataloader)

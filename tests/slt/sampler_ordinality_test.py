@@ -38,7 +38,7 @@ def test_linedot_normal_crossing(
         model = model([2 for _ in range(dim)])
     else:
         model = model(dim)
-    train_dataloader, train_data, _, _ = generated_linedot_normalcrossing_dataset
+    train_dataloader, _, _, _ = generated_linedot_normalcrossing_dataset
     criterion = F.mse_loss
     lr = (
         0.0001 / dim
@@ -57,7 +57,7 @@ def test_linedot_normal_crossing(
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
-            temperature=optimal_temperature(train_data),
+            temperature=optimal_temperature(train_dataloader),
         )
         sample(
             model,
