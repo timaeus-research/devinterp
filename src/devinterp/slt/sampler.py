@@ -48,7 +48,6 @@ def sample_single_chain(
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
 ):
-
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
