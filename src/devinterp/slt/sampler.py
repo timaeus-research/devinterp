@@ -50,7 +50,6 @@ def sample_single_chain(
         warnings.warn(
             "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
         )
-
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
@@ -133,6 +132,11 @@ def sample(
         verbose (bool): whether to print sample chain progress
         callbacks (List[SamplerCallback]): list of callbacks, each of type SamplerCallback
     """
+    if num_burnin_steps:
+        warnings.warn('Burn-in is currently not implemented correctly, please set num_burnin_steps to 0.')
+    if num_draws > len(loader):
+        warnings.warn('You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)')
+      
     if cores is None:
         cores = min(4, cpu_count())
 
