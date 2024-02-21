@@ -9,12 +9,12 @@ class SGLD(torch.optim.Optimizer):
     Implements Stochastic Gradient Langevin Dynamics (SGLD) optimizer.
     
     This optimizer blends Stochastic Gradient Descent (SGD) with Langevin Dynamics,
-    introducing Gaussian noise to the gradient updates. It can also include an
+    introducing Gaussian noise to the gradient updates. It can also include a
     localization term that acts like a special form of weight decay.
 
     It follows Lau et al.'s (2023) implementation, which is a modification of 
     Welling and Teh (2011) that omits the learning rate schedule and introduces 
-    an localization term that pulls the weights towards their initial values.
+    a localization term that pulls the weights towards their initial values.
 
     The equation for the update is as follows:
 
@@ -66,11 +66,11 @@ class SGLD(torch.optim.Optimizer):
     ):
         if noise_level != 1.0:
             warnings.warn(
-                "Warning: noise_level in SGLD is unequal to zero, are you intending to use SGD?"
+                "Warning: noise_level in SGLD is unequal to one, this removes SGLD posterior sampling guarantees."
             )
         if temperature == 1.0:
             warnings.warn(
-                "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_temperature(dataset) instead"
+                "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_temperature(dataloader) instead"
             )
         defaults = dict(
             lr=lr,
