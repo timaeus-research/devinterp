@@ -55,7 +55,7 @@ def plot_trace(
 
 def optimal_temperature(dataloader: DataLoader):
     if isinstance(dataloader, DataLoader):
-        return len(dataloader) / np.log(len(dataloader))
+        return dataloader.batch_size / np.log(dataloader.batch_size)
     elif isinstance(dataloader, int):
         return dataloader / np.log(dataloader)
     else:

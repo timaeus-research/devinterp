@@ -36,7 +36,7 @@ class SGLD(torch.optim.Optimizer):
     :param noise_level: Amount of Gaussian noise introduced into gradient updates (default: 1).
     :param weight_decay: L2 regularization term, applied as weight decay (default: 0)
     :param localization: Strength of the force pulling weights back to their initial values (default: 0)
-    :param temperature: Temperature, float (default: 1., overridden to be num_samples * np.log(num_samples))
+    :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :param bounding_box_size: the size of the bounding box enclosing our trajectory (default: 0)
     :param save_noise: whether to store the per-parameter noise during optimization (default: False)
 

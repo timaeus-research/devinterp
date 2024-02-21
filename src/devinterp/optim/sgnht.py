@@ -39,7 +39,7 @@ class SGNHT(torch.optim.Optimizer):
         :param lr: Learning rate
         :param diffusion_factor: The diffusion factor of the thermostat (default: 0.01)
         :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
-        :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(datalaoder)=len(dataloader)/np.log(len(dataloader)))
+        :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
         """
         if temperature == 1.0:
             warnings.warn(
