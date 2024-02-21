@@ -85,7 +85,6 @@ def get_init_loss_multi_batch(dataloader, n_batches, model, criterion, device):
             xs, ys = xs.to(device), ys.to(device)
             y_preds = model(xs)
             loss += criterion(y_preds, ys).detach().item()
-    print(loss)
     return loss / n_batches
 
 
