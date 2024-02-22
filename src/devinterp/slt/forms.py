@@ -63,8 +63,8 @@ def get_osculate_plot_data(osculating_circles, skip, num_sharp_points, num_verti
         prev_center = center
     # Sharp turn = small radius, so sort lo->hi and take first
     top_n_smallest_radii = np.argsort(radii)[:num_sharp_points]
-    # Big cusp = High dcenter = big change, so sort lo->hi and take last
-    top_n_sharpest_cusps = np.argsort(dcenters)[-num_vertices:]
+    # Sharp cusp = low dcenter, so sort lo->hi and take first
+    top_n_sharpest_cusps = np.argsort(dcenters)[:num_vertices]
     # Convert from index w/ skips to index w/o
     top_n_smallest_radii *= skip
     top_n_sharpest_cusps *= skip
@@ -83,9 +83,9 @@ def plot_essential_dynamics_grid(
     num_sharp_points=20,
     num_vertices=35,
     osculate_start=1,
-    osculate_end_offset=0,
+    osculate_end_offset=1,
     osculate_skip=8,
-    early_smoothing=10,
+    early_smoothing=1,
     late_smoothing=60,
     late_smoothing_from=200,
 ):
@@ -94,7 +94,7 @@ def plot_essential_dynamics_grid(
     OSCULATE_SKIP = osculate_skip
 
     if len(colors) != len(transitions) != 0:
-        warnings.warn("len(colors) != len(transitions), using rainbow palette.")
+        print("len(colors) != len(transitions), using rainbow palette.")
         cm = plt.get_cmap("gist_rainbow")
         colors = [cm(1.0 * i / len(transitions)) for i in range(len(transitions))]
     if OSCULATE_END - OSCULATE_START < 10:
@@ -105,7 +105,7 @@ def plot_essential_dynamics_grid(
 
     # Make sure we have the smoothed data for each PC
     pc_combo_indices = combinations(range(num_pca_components), 2)
-    smoothed_pc_combos = combinations(
+    smooth_pc_combos = combinations(
         get_smoothed_pcs(
             samples,
             num_pca_components,
@@ -118,74 +118,16 @@ def plot_essential_dynamics_grid(
     num_subplots = num_pca_components * (num_pca_components - 1) // 2
     fig, axes = plt.subplots(1, num_subplots, figsize=figsize)
 
-    for (
-        ax,
-        (second_pc_index, first_pc_index),
-        (second_smoothed_pc, first_smoothed_pc),
-    ) in zip(axes, pc_combo_indices, smoothed_pc_combos):
-
-        # For each PC pair we first get the osculating circles, and plot those
-        print(f"Calculating osculates of PC{second_pc_index+1} vs PC{first_pc_index+1}")
-        osculating_circles = [
-            get_osculating_circle(
-                np.column_stack((first_smoothed_pc, second_smoothed_pc)), z
-            )
-            for z in range(OSCULATE_START, OSCULATE_END)
-        ]
-        # Get all circles, highest curvature points & caustic cusps
-        dcenter_indices, radius_indices, circles_to_plot = get_osculate_plot_data(
-            osculating_circles, OSCULATE_SKIP, num_sharp_points, num_vertices
-        )
-        print(f"Plotting")
-        for circle in circles_to_plot:
-            ax.add_artist(circle)
-        for i in radius_indices:
-            ax.scatter(first_smoothed_pc[i], second_smoothed_pc[i], color="red")
-        for i in dcenter_indices:
-            ax.scatter(first_smoothed_pc[i], second_smoothed_pc[i], color="gold")
-
-        # Draw the evolute
-        if plot_caustic:
-            x_lim, y_lim = ax.get_xlim(), ax.get_ylim()
-            for (center_x, center_y), _ in osculating_circles:
-                if (x_lim[0] < center_x < x_lim[1]) and (
-                    y_lim[0] < center_y < y_lim[1]
-                ):
-                    ax.scatter(center_x, center_y, color="black", s=0.5)
-        # Plot marked cusps & vertex influence, if supplied & set (resp.)
-        for marked_cusp in marked_cusp_data:
-            marked_cusp_idx = marked_cusp["idx"]
-            ax.scatter(
-                first_smoothed_pc[marked_cusp_idx],
-                second_smoothed_pc[marked_cusp_idx],
-                color="green",
-                marker="x",
-                s=40,
-            )
-            center, _ = osculating_circles[marked_cusp_idx]
-            ax.scatter(*center, color="green", marker="x", s=60)
-
-            if plot_vertex_influence:
-                vertex_influence_start = marked_cusp["influence_start"]
-                vertex_influence_end = marked_cusp["influence_end"]
-                ax.scatter(
-                    first_smoothed_pc[vertex_influence_start],
-                    second_smoothed_pc[vertex_influence_start],
-                    color="blue",
-                    marker="x",
-                    s=40,
-                )
-                ax.scatter(
-                    first_smoothed_pc[vertex_influence_end],
-                    second_smoothed_pc[vertex_influence_end],
-                    color="blue",
-                    marker="x",
-                    s=40,
-                )
+    for ax, (pc2_index, pc1_index), (smooth_pc2, smooth_pc1) in zip(
+        axes, pc_combo_indices, smooth_pc_combos
+    ):
+        print(f"Plotting PC{pc2_index+1} vs PC{pc1_index+1}")
+        ax.set_xlabel(f"PC {pc1_index+1}")
+        ax.set_ylabel(f"PC {pc2_index+1}")
         # Plot un-smoothed points in the background
         ax.scatter(
-            x=samples[OSCULATE_START:OSCULATE_END, first_pc_index],
-            y=samples[OSCULATE_START:OSCULATE_END, second_pc_index],
+            x=samples[OSCULATE_START:OSCULATE_END, pc1_index],
+            y=samples[OSCULATE_START:OSCULATE_END, pc2_index],
             alpha=0.5,
             color="lightgray",
             s=10,
@@ -203,14 +145,62 @@ def plot_essential_dynamics_grid(
             legend_ax.axis("off")
 
             for color, (start, end, _) in zip(colors, transitions):
-                ax.plot(
-                    first_smoothed_pc[start:end],
-                    second_smoothed_pc[start:end],
-                    color=color,
-                    lw=2,
+                ax.plot(smooth_pc1[start:end], smooth_pc2[start:end], color=color, lw=2)
+
+        # Osculating circle = circle with same tangent as smoothed curve at each point
+        osculating_circles = [
+            get_osculating_circle(np.column_stack((smooth_pc1, smooth_pc2)), z)
+            for z in range(OSCULATE_START, OSCULATE_END)
+        ]
+        # Draw all circles, highest curvature points & caustic cusps (change in direction of circle centers)
+        dcenter_indices, radius_indices, circles_to_plot = get_osculate_plot_data(
+            osculating_circles, OSCULATE_SKIP, num_sharp_points, num_vertices
+        )
+        for circle in circles_to_plot:
+            ax.add_artist(circle)
+        for i in radius_indices:
+            ax.scatter(smooth_pc1[i], smooth_pc2[i], color="red", marker="^", zorder=3)
+        for i in dcenter_indices:
+            ax.scatter(smooth_pc1[i], smooth_pc2[i], color="gold", marker="v", zorder=3)
+
+        # Draw the evolute (centers of osculating circles))
+        if plot_caustic:
+            x_lim_0, x_lim_1 = ax.get_xlim()
+            y_lim_0, y_lim_1 = ax.get_ylim()
+            for (center_x, center_y), _ in osculating_circles:
+                if (x_lim_0 < center_x < x_lim_1) and (y_lim_0 < center_y < y_lim_1):
+                    ax.scatter(center_x, center_y, color="black", s=0.5)
+
+        # Plot marked cusps & vertex influence, if supplied & set (resp.)
+        for marked_cusp in marked_cusp_data:
+            marked_cusp_idx = marked_cusp["idx"]  # TODO fix
+            ax.scatter(
+                smooth_pc1[marked_cusp_idx],
+                smooth_pc2[marked_cusp_idx],
+                color="green",
+                marker="x",
+                s=40,
+            )
+            center, _ = osculating_circles[marked_cusp_idx]
+            ax.scatter(*center, color="green", marker="x", s=60)
+
+            if plot_vertex_influence:
+                vertex_influence_start = marked_cusp["influence_start"]
+                vertex_influence_end = marked_cusp["influence_end"]
+                ax.scatter(
+                    smooth_pc1[vertex_influence_start],
+                    smooth_pc2[vertex_influence_start],
+                    color="blue",
+                    marker="x",
+                    s=40,
                 )
-        ax.set_xlabel(f"PC {first_pc_index+1}")
-        ax.set_ylabel(f"PC {second_pc_index+1}")
+                ax.scatter(
+                    smooth_pc1[vertex_influence_end],
+                    smooth_pc2[vertex_influence_end],
+                    color="blue",
+                    marker="x",
+                    s=40,
+                )
     # plot_explained_variance(pca, title="Explained Variance", axes[-1])
     plt.tight_layout(rect=[0, 0, 1, 1])
     fig.set_facecolor("white")
