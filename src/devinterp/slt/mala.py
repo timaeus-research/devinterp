@@ -61,14 +61,14 @@ class MalaAcceptanceRate(SamplerCallback):
         self,
         num_chains: int,
         num_draws: int,
-        num_samples: int,
+        temperature: float,
         learning_rate: float,
         device: Union[torch.device, str] = "cpu",
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
         self.learning_rate = learning_rate
-        self.num_samples = num_samples
+        self.temperature = temperature
         self.mala_acceptance_rate = torch.zeros(
             (num_chains, num_draws - 1), dtype=torch.float32
         ).to(device)
@@ -87,9 +87,7 @@ class MalaAcceptanceRate(SamplerCallback):
         # (so we update those only that after the calculation)
         self.current_grads = optimizer.dws
         # mala acceptance loss is different from pytorch supplied loss
-        mala_loss = (
-            loss * self.num_samples / np.log(self.num_samples)
-        ).item() + optimizer.elasticity_loss
+        mala_loss = (loss * self.temperature).item() + optimizer.localization_loss
         if draw > 1:
             for current_param, current_grad, prev_param, prev_grad in zip(
                 self.current_params,

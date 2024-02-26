@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import torch
 import warnings
@@ -9,10 +11,10 @@ class SGNHT(torch.optim.Optimizer):
         lr=0.01,
         diffusion_factor=0.01,
         bounding_box_size=None,
-        num_samples=1,
         save_noise=False,
         save_mala_vars=False,
-        device='cpu'
+        temperature=1.0,
+        device='cpu',
     ):
         r"""
         Initialize the Stochastic Gradient Nose Hoover Thermostat (SGNHT) Optimizer.
@@ -40,7 +42,7 @@ class SGNHT(torch.optim.Optimizer):
         :param lr: Learning rate
         :param diffusion_factor: The diffusion factor of the thermostat (default: 0.01)
         :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
-        :param num_samples: Number of samples to average over (default: 1)
+        :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
         """
         if save_noise:
             warnings.warn(
@@ -48,13 +50,16 @@ class SGNHT(torch.optim.Optimizer):
             )
         if save_mala_vars:
             warnings.warn(
-                "Warning: MALA not implemented for SGNHT! If you insist on using MALA, use SGLD instead."
+                "Warning: MALA not implemented for SGNHT! If you insist on using MALA, use SGLD instead.")
+        if temperature == 1.0:
+            warnings.warn(
+                "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_temperature(dataloader) instead"
             )
         defaults = dict(
             lr=lr,
             diffusion_factor=diffusion_factor,
             bounding_box_size=bounding_box_size,
-            num_samples=num_samples,
+            temperature=temperature,
         )
         super(SGNHT, self).__init__(params, defaults)
 
@@ -62,7 +67,6 @@ class SGNHT(torch.optim.Optimizer):
         for group in self.param_groups:
             # Default value of thermostat is the diffusion factor
             group["thermostat"] = torch.tensor(diffusion_factor)
-            group["temperature"] = np.log(group["num_samples"])
             for p in group["params"]:
                 param_state = self.state[p]
                 param_state["momentum"] = np.sqrt(lr) * torch.randn_like(p.data)
@@ -87,7 +91,7 @@ class SGNHT(torch.optim.Optimizer):
                     momentum = param_state["momentum"]
 
                     # Gradient term
-                    dw = p.grad.data * (group["num_samples"] / group["temperature"])
+                    dw = p.grad.data * group["temperature"]
 
                     momentum.sub_(group["lr"] * dw)
 

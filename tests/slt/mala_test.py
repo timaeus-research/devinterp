@@ -96,12 +96,12 @@ SETS_TO_TEST = [
 ]
 
 
-@pytest.mark.parametrize("powers,lr,elasticity,accept_prob", SETS_TO_TEST)
+@pytest.mark.parametrize("powers,lr,localization,accept_prob", SETS_TO_TEST)
 def test_mala_callback_closeness(
     generated_normalcrossing_dataset,
     powers,
     lr,
-    elasticity,
+    localization,
     accept_prob,
 ):
     seed = 0
@@ -115,7 +115,7 @@ def test_mala_callback_closeness(
         mala_estimator = MalaAcceptanceRate(
             num_chains=num_chains,
             num_draws=num_draws,
-            num_samples=len(train_data),
+            temperature=optimal_temperature(train_dataloader),
             learning_rate=lr,
         )
         sample(
@@ -123,7 +123,9 @@ def test_mala_callback_closeness(
             train_dataloader,
             criterion=criterion,
             optimizer_kwargs=dict(
-                lr=lr, elasticity=elasticity, num_samples=len(train_data)
+                lr=lr,
+                localization=localization,
+                temperature=optimal_temperature(train_dataloader),
             ),
             sampling_method=SGLD,
             num_chains=num_chains,
@@ -137,4 +139,4 @@ def test_mala_callback_closeness(
             break
     assert np.isclose(
         mala_acceptance_rate_mean, accept_prob, atol=0.01
-    ), f"MALA Rate mean {mala_acceptance_rate_mean:.2f}, not close to benchmark value {accept_prob:.2f}, lr {lr} elas {elasticity}"
+    ), f"MALA Rate mean {mala_acceptance_rate_mean:.2f}, not close to benchmark value {accept_prob:.2f}, lr {lr} elas {localization}"
