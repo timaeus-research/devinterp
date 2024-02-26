@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import torch
 
@@ -6,27 +8,50 @@ class SGNHT(torch.optim.Optimizer):
     def __init__(
         self,
         params,
-        lr=1e-3,
+        lr=0.01,
         diffusion_factor=0.01,
         bounding_box_size=None,
-        num_samples=1,
         optimize_over=None,
+        temperature=1.0,
     ):
-        """
-        Initialize the SGNHT Optimizer.
+        r"""
+        Initialize the Stochastic Gradient Nose Hoover Thermostat (SGNHT) Optimizer.
+        This optimizer blends SGD with an adaptive thermostat variable to control the magnitude of the injected noise,
+        maintaining the kinetic energy of the system.
 
-        :param params: Iterable of parameters to optimize or dicts defining parameter groups
-        :param lr: Learning rate (required)
+        It follows Ding et al.'s (2014) implementation.
+
+        The equations for the update are as follows:
+
+        $$
+        \Delta w_t = \epsilon\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right) - \xi_t w_t \right) + \sqrt{2A} N(0, \epsilon)
+        $$
+        $$
+        \Delta\xi_{t} = \epsilon \left( \frac{1}{n} \| w_t \|^2 - 1 \right)
+        $$
+
+        where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate,
+        $(\beta n)$ is the inverse temperature (we're in the tempered Bayes paradigm),
+        $n$ is the number of training samples, $m$ is the batch size,
+        $\xi_t$ is the thermostat variable at time $t$, $A$ is the diffusion factor,
+        and $N(0, A)$ represents Gaussian noise with mean 0 and variance $A$.
+
+        :param params: Iterable of parameters to optimize or dicts defining parameter groups (required)
+        :param lr: Learning rate
         :param diffusion_factor: The diffusion factor of the thermostat (default: 0.01)
         :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
-        :param num_samples: Number of samples to average over (default: 1)
+        :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
         """
+        if temperature == 1.0:
+            warnings.warn(
+                "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_temperature(dataloader) instead"
+            )
         defaults = dict(
             lr=lr,
-            diffusion_factor=0.01,
+            diffusion_factor=diffusion_factor,
             bounding_box_size=bounding_box_size,
-            num_samples=num_samples,
             optimize_over=optimize_over,
+            temperature=temperature,
         )
         super(SGNHT, self).__init__(params, defaults)
 
@@ -34,7 +59,6 @@ class SGNHT(torch.optim.Optimizer):
         for group in self.param_groups:
             # Default value of thermostat is the diffusion factor
             group["thermostat"] = torch.tensor(diffusion_factor)
-            group["temperature"] = np.log(group["num_samples"])
             for p in group["params"]:
                 param_state = self.state[p]
                 param_state["momentum"] = np.sqrt(lr) * torch.randn_like(p.data)
@@ -57,7 +81,7 @@ class SGNHT(torch.optim.Optimizer):
                     momentum = param_state["momentum"]
 
                     # Gradient term
-                    dw = p.grad.data * (group["num_samples"] / group["temperature"])
+                    dw = p.grad.data * group["temperature"]
 
                     momentum.sub_(group["lr"] * dw)
 
@@ -71,9 +95,6 @@ class SGNHT(torch.optim.Optimizer):
                     momentum.add_(
                         noise * ((group["lr"] * 2 * group["diffusion_factor"]) ** 0.5)
                     )
-
-                    if group["optimize_over"] is not None:
-                        momentum = momentum * group["optimize_over"]
 
                     # Update position
                     p.data.add_(momentum)

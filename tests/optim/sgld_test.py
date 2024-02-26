@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from devinterp.optim.sgld import SGLD
+from devinterp.utils import optimal_temperature
 
 
 @pytest.mark.parametrize("lr", [1e-1, 1e-2, 1e-3, 1e-4])
@@ -16,7 +17,11 @@ def test_SGLD_vs_SGD(lr):
 
     model2 = deepcopy(model1)
     optimizer_sgld = SGLD(
-        model2.parameters(), lr=2 * lr, noise_level=0.0, elasticity=0.0, temperature=1.0
+        model2.parameters(),
+        lr=2 * lr,
+        noise_level=0.0,
+        localization=0.0,
+        temperature=1.0,
     )
 
     criterion = nn.MSELoss()
@@ -28,7 +33,7 @@ def test_SGLD_vs_SGD(lr):
     loss.backward()
     optimizer_sgd.step()
 
-    # Using SGLD optimizer with noise=0, elasticity=0
+    # Using SGLD optimizer with noise=0, localization=0
     optimizer_sgld.zero_grad()
     output = model2(data)
     loss = criterion(output, target)

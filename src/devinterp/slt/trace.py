@@ -1,10 +1,10 @@
-import numpy as np
 import torch
 
 from devinterp.slt.callback import SamplerCallback
 
 class OnlineTraceStatistics(SamplerCallback):
-    """Derivative callback that computes mean/std statistics of a specified trace online. Must
+    """
+    Derivative callback that computes mean/std statistics of a specified trace online. Must
     be called after the base callback has been called at each draw.
     Parameters:
         base_callback (ChainCallback): Base callback that computes original trace metric online.
