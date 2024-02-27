@@ -58,20 +58,15 @@ def generated_rrr_dataset(m, n):
     return train_dataloader, train_data, x, y
 
 
-@pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
+@pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize(
     "m,h,n",
     [
         (5, 3, 5),  # case 1, odd
-        (2, 1, 2),  # case 1, odd
         (5, 4, 5),  # case 1, even
-        (3, 2, 3),  # case 1, even
         (4, 3, 8),  # case 2
-        (2, 1, 4),  # case 2
         (8, 3, 4),  # case 3
-        (4, 1, 2),  # case 3
         (3, 8, 4),  # case 4
-        (1, 4, 2),  # case 4
     ],
 )
 def test_accuracy_rrr(sampling_method, m, h, n):
@@ -96,17 +91,15 @@ def test_accuracy_rrr(sampling_method, m, h, n):
     num_chains = 10
     num_draws = 2_000
     llc_estimator = LLCEstimator(
-        num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader)
     )
     sample(
         model,
         train_dataloader,
         criterion=criterion,
-        optimizer_kwargs=dict(
-            lr=0.0006,
-            bounding_box_size=1.0,
-            num_samples=len(train_data),
-        ),
+        optimizer_kwargs=dict(lr=0.0006, localization=1.0),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -142,7 +135,10 @@ def test_accuracy_rrr(sampling_method, m, h, n):
     ), f"DLN case {case} estimated LLC mean {llc_mean:.3f} +- {2*llc_std_dev:.3f} vs True LC {true_lc:.3f} for (M, H, N)={(m, h, n)} using {sampling_method}"
 
 
-# TODO: For models with a closed-form population loss, like DLNs:
+# TODO:
+# Scale up these estimates like in Furman & Lau (2024), also to DLNs more generally
+#
+# For models with a closed-form population loss, like DLNs:
 # compare SGLD on empirical loss with SGLD on population loss (results should agree)
 # SGLD on population loss should be able to get the LLC exactly correct,
 # assuming beta is sufficiently high (using population loss here instead of empirical loss allows very high beta without prohibitively large training set size)

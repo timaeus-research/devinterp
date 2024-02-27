@@ -51,17 +51,15 @@ def test_accuracy_normalcrossing(
     num_chains = 10
     num_draws = 5_000
     llc_estimator = LLCEstimator(
-        num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
     )
     sample(
         model,
         train_dataloader,
         criterion=criterion,
-        optimizer_kwargs=dict(
-            lr=lr,
-            bounding_box_size=1.0,
-            num_samples=len(train_data),
-        ),
+        optimizer_kwargs=dict(lr=lr, bounding_box_size=1.0),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -74,6 +72,3 @@ def test_accuracy_normalcrossing(
     assert (
         llc_mean - 2 * llc_std_dev < true_lc < llc_mean + 2 * llc_std_dev
     ), f"LLC mean {llc_mean:.3f} +- {2*llc_std_dev:.3f} does not contain true value {true_lc:.3f} for powers {powers} using {sampling_method}"
-
-
-
