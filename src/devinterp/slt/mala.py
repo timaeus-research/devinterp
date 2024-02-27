@@ -52,7 +52,7 @@ class MalaAcceptanceRate(SamplerCallback):
     Attributes:
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
-        num_samples (int): size of dataset passed to sample()
+        temperature (float): Temperature used to calculate the LLC.
         learning_rate (int): Learning rate of the model.
         device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
@@ -84,7 +84,7 @@ class MalaAcceptanceRate(SamplerCallback):
 
     def update(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
         # we need the grads & loss from the pass, but the current params are from after the step
-        # (so we update those only that after the calculation)
+        # (so we update those only after the calculation)
         self.current_grads = optimizer.dws
         # mala acceptance loss is different from pytorch supplied loss
         mala_loss = (loss * self.temperature).item() + optimizer.localization_loss

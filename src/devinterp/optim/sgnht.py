@@ -14,7 +14,6 @@ class SGNHT(torch.optim.Optimizer):
         save_noise=False,
         save_mala_vars=False,
         temperature=1.0,
-        device='cpu',
     ):
         r"""
         Initialize the Stochastic Gradient Nose Hoover Thermostat (SGNHT) Optimizer.

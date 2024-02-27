@@ -62,7 +62,6 @@ def sample_single_chain(
     model = deepcopy(ref_model).to(device)
 
     optimizer_kwargs = optimizer_kwargs or {}
-    optimizer_kwargs.setdefault("device", device)
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):

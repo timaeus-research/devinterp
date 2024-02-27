@@ -59,12 +59,11 @@ class SGLD(torch.optim.Optimizer):
         lr=0.01,
         noise_level=1.0,
         weight_decay=0.0,
-        localization=0.0, 
+        localization=0.0,
         temperature: Union[Callable, float] = 1.0,
         bounding_box_size=None,
         save_noise=False,
         save_mala_vars=False,
-        device="cpu",
     ):
         if noise_level != 1.0:
             warnings.warn(
@@ -81,13 +80,11 @@ class SGLD(torch.optim.Optimizer):
             localization=localization,
             temperature=temperature,
             bounding_box_size=bounding_box_size,
-            device=device,
         )
         super(SGLD, self).__init__(params, defaults)
         self.save_noise = save_noise
         self.save_mala_vars = save_mala_vars
         self.noise = None
-        self.device = device
 
         # Save the initial parameters if the localization term is set
         for group in self.param_groups:
@@ -101,7 +98,7 @@ class SGLD(torch.optim.Optimizer):
             self.noise = []
         if self.save_mala_vars:
             self.dws = []
-            self.localization_loss = 0.
+            self.localization_loss = 0.0
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
