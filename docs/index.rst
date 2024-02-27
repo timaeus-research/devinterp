@@ -33,7 +33,7 @@ Minimal Example
    from devinterp.optim import SGLD
 
    # Assuming you have a PyTorch Module and DataLoader
-   llc_estimator = LLCEstimator(...)
+   llc_estimator = LLCEstimator(..., temperature=optimal_temperature(trainloader))
    sample(model, trainloader, ..., callbacks = [llc_estimator])
    
    llc_mean = llc_estimator.sample()["llc/mean"]
@@ -67,8 +67,6 @@ For more advanced usage, see `the Diagnostics notebook <https://www.github.com/t
 Known Issues
 =====================================
 
-- We currently calculate the LLC taking the initial loss to be the loss after one sampling step. This is slightly wrong (it should be the loss *before* sampling), and there are a bunch of other reasonable and similarly compute-friendly alternative choices that can be made. 
-- Similarly, we now sample using minibatches that are passed along from the dataloader to :func:`~devinterp.slt.sampler.sample`. This choice is obscured by the repo, and we should offer alternatives.
 - The current implementation does not work with transformers out-of-the-box. This can be fixed by adding a wrapper to your model, for example passing :python:`unpack(model)` to :func:`~devinterp.slt.sampler.sample` where :python:`unpack` is defined by:
 
 .. code-block:: python
@@ -87,7 +85,7 @@ If you run into issues not mentioned here, please first `check the GitHub issues
 Credits & Citations
 =====================================
 
-This package was created by `Timaeus <https://timaeus.co>`_. The main contributors to this package are Jesse Hoogland, Stan van Wingerden, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also made valuable contributions or provided useful advice.
+This package was created by `Timaeus <https://timaeus.co>`_. The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also made valuable contributions or provided useful advice.
 
 If this package was useful in your work, please cite it as:
 
@@ -95,7 +93,7 @@ If this package was useful in your work, please cite it as:
 
    @misc{devinterp2024,
       title = {DevInterp},
-      author = {Jesse Hoogland, Stan van Wingerden, and George Wang},
+      author = {Stan van Wingerden, Jesse Hoogland, and George Wang},
       year = {2024},
       howpublished = {\url{https://github.com/timaeus-research/devinterp}},
    }

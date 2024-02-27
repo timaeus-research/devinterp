@@ -8,7 +8,7 @@ from devinterp.slt.callback import SamplerCallback
 class OnlineWBICEstimator(SamplerCallback):
     """
     Callback for estimating the Widely Applicable Bayesian Information Criterion (WBIC) in an online fashion. 
-    The WBIC used here is just $n * (\textrm{average sampled loss})$. (Watanabe, 2013)
+    The WBIC used here is just $n * (\\textrm{average sampled loss})$. (Watanabe, 2013)
 
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_draws: int

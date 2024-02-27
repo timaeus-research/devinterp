@@ -10,7 +10,8 @@ class SamplerCallback:
     Each callback method can access parameters in :python:`locals()`, so there's no need to pass variables along explicitly.
 
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.    
-    :raises NotImplementedError: if :python: `__call__` :python: `sample` are not overwritten.
+    :type device: str | torch.device, optional
+    :raises NotImplementedError: if :python:`__call__` and :python:`sample` are not overwritten.
         
     Note:
         - :python:`mps` devices might not work for all callbacks.

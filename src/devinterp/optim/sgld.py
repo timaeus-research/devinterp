@@ -27,7 +27,6 @@ class SGLD(torch.optim.Optimizer):
 
     Example:
         >>> optimizer = SGLD(model.parameters(), lr=0.1, temperature=utils.optimal_temperature(dataloader))
-
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
         >>> optimizer.step()

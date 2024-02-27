@@ -17,7 +17,7 @@ class GradientDistribution(SamplerCallback):
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
-    :param num_chains: int
+    :type num_chains: int
     :param min_bins: Minimum number of bins for histogram approximation. Default is 20
     :type min_bins: int, optional
     :param param_names: List of parameter names to track. If None, all parameters are tracked. Default is None

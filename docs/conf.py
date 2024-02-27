@@ -13,8 +13,8 @@ import subprocess
 sys.path.insert(0, os.path.abspath("../"))
 
 project = "devinterp"
-copyright = "2024, Hoogland et al."
-author = "Hoogland et al."
+copyright = "2024, Van Wingerden et al."
+author = "Van Wingerden et al."
 release = "0.1.0"
 
 # -- General configuration ---------------------------------------------------
