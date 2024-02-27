@@ -1,5 +1,4 @@
 from typing import Union
-
 import torch
 
 from devinterp.slt.callback import SamplerCallback

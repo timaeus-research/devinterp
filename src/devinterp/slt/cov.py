@@ -2,7 +2,7 @@ from typing import Callable, Dict, List, Tuple, Union
 
 import numpy as np
 import torch
-from scipy.sparse.linalg import eigsh
+from torch.linalg import eigh
 from torch import nn
 
 from devinterp.slt.callback import SamplerCallback
@@ -69,13 +69,16 @@ class CovarianceAccumulator(SamplerCallback):
 
     def to_eigen(self, include_matrix=False):
         # Convert the covariance matrix to pairs of eigenvalues and vectors.
-        cov = self.to_matrix().detach().cpu().numpy()
-        evals, evecs = eigsh(cov, k=self.num_evals, which="LM")
+        cov = self.to_matrix().detach().cpu()
+        all_evals, all_evecs = eigh(cov)
+        evals = all_evals[-self.num_evals:].numpy()
+        evecs = all_evecs[-self.num_evals:].numpy()
+
 
         results = {"evals": evals, "evecs": evecs}
 
         if include_matrix:
-            results["matrix"] = cov
+            results["matrix"] = cov.numpy()
 
         return results
 
@@ -183,7 +186,7 @@ class WithinHeadCovarianceAccumulator:
 
     def to_eigen(self, include_matrix=False):
         # Convert the covariance matrix to pairs of eigenvalues and vectors.
-        cov = self.to_matrix().detach().cpu().numpy()
+        cov = self.to_matrix().detach().cpu()
         results = {}
 
         evals = np.zeros((self.num_evals, self.num_layers, self.num_heads))
@@ -194,7 +197,10 @@ class WithinHeadCovarianceAccumulator:
         for l in range(self.num_layers):
             for h in range(self.num_heads):
                 head_cov = cov[l, h]
-                head_evals, head_evecs = eigsh(head_cov, k=self.num_evals, which="LM")
+                all_head_evals, all_head_evecs = eigh(head_cov)
+                head_evals = all_head_evals[-self.num_evals:].numpy()
+                head_evecs = all_head_evecs[-self.num_evals:].numpy()            
+
 
                 for i in range(self.num_evals):
                     evecs[i, l, h, :] = head_evecs[:, i].reshape(
@@ -326,14 +332,15 @@ class BetweenLayerCovarianceAccumulator:
 
     def to_eigens(self, include_matrix=False):
         # Convert the covariance matrix to pairs of eigenvalues and vectors.
-        covariances = {
-            k: v.detach().cpu().numpy() for k, v in self.to_matrices().items()
-        }
+        covariances = {k: v.detach().cpu() for k, v in self.to_matrices().items()}
         results = {}
 
         for name, cov in covariances.items():
             # TODO: U, s, Vt = svds(cov, k=self.num_evals, which='LM')
-            evals, evecs = eigsh(cov, k=self.num_evals, which="LM")
+            all_evals, all_evecs = eigh(cov)
+            evals = all_evals[-self.num_evals:].numpy()
+            evecs = all_evecs[-self.num_evals:].numpy()
+
 
             # Reverse the order of the eigenvalues and vectors
             evals = evals[::-1]
@@ -342,7 +349,7 @@ class BetweenLayerCovarianceAccumulator:
             results.update({name: {"evecs": evecs, "evals": evals}})
 
             if include_matrix:
-                results[name]["matrix"] = cov
+                results[name]["matrix"] = cov.numpy()
 
         return results
 
