@@ -2,7 +2,7 @@ import warnings
 
 import numpy as np
 import torch
-
+import warnings
 
 class SGNHT(torch.optim.Optimizer):
     def __init__(
@@ -11,6 +11,8 @@ class SGNHT(torch.optim.Optimizer):
         lr=0.01,
         diffusion_factor=0.01,
         bounding_box_size=None,
+        save_noise=False,
+        save_mala_vars=False,
         temperature=1.0,
     ):
         r"""
@@ -41,6 +43,13 @@ class SGNHT(torch.optim.Optimizer):
         :param bounding_box_size: the size of the bounding box enclosing our trajectory The diffusion factor (default: None)
         :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
         """
+        if save_noise:
+            warnings.warn(
+                "Warning: NoiseNorm not implemented for SGNHT! If you insist on using NoiseNorm, use SGLD instead."
+            )
+        if save_mala_vars:
+            warnings.warn(
+                "Warning: MALA not implemented for SGNHT! If you insist on using MALA, use SGLD instead.")
         if temperature == 1.0:
             warnings.warn(
                 "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_temperature(dataloader) instead"

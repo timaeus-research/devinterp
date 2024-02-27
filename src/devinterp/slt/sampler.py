@@ -18,6 +18,8 @@ from devinterp.utils import (
     get_init_loss_full_batch,
 )
 from devinterp.slt.callback import validate_callbacks, SamplerCallback
+from devinterp.slt.mala import MalaAcceptanceRate
+from devinterp.slt.norms import NoiseNorm
 from devinterp.slt.llc import OnlineLLCEstimator, LLCEstimator
 
 
@@ -48,10 +50,22 @@ def sample_single_chain(
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
 ):
+    if num_burnin_steps:
+        warnings.warn(
+            "Burn-in is currently not implemented correctly, please set num_burnin_steps to 0."
+        )
+    if num_draws > len(loader):
+        warnings.warn(
+            "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
+        )
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
 
     optimizer_kwargs = optimizer_kwargs or {}
+    if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
+        optimizer_kwargs.setdefault("save_mala_vars", True)
+    if any(isinstance(callback, NoiseNorm) for callback in callbacks):
+        optimizer_kwargs.setdefault("save_noise", True)
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
     optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
 
@@ -59,7 +73,6 @@ def sample_single_chain(
         torch.manual_seed(seed)
 
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
-    model.train()
 
     for i, (xs, ys) in tqdm(
         zip(range(num_steps), itertools.cycle(loader)),
@@ -67,12 +80,14 @@ def sample_single_chain(
         total=num_steps,
         disable=not verbose,
     ):
+        model.train()
         optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
         loss = criterion(y_preds, ys)
 
         loss.backward()
+
         optimizer.step()
 
         if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:

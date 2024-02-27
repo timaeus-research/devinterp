@@ -59,10 +59,11 @@ class SGLD(torch.optim.Optimizer):
         lr=0.01,
         noise_level=1.0,
         weight_decay=0.0,
-        localization=0.0, 
+        localization=0.0,
         temperature: Union[Callable, float] = 1.0,
         bounding_box_size=None,
         save_noise=False,
+        save_mala_vars=False,
     ):
         if noise_level != 1.0:
             warnings.warn(
@@ -82,6 +83,7 @@ class SGLD(torch.optim.Optimizer):
         )
         super(SGLD, self).__init__(params, defaults)
         self.save_noise = save_noise
+        self.save_mala_vars = save_mala_vars
         self.noise = None
 
         # Save the initial parameters if the localization term is set
@@ -92,7 +94,11 @@ class SGLD(torch.optim.Optimizer):
                     param_state["initial_param"] = p.data.clone().detach()
 
     def step(self, closure=None):
-        self.noise = []
+        if self.save_noise:
+            self.noise = []
+        if self.save_mala_vars:
+            self.dws = []
+            self.localization_loss = 0.0
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -102,10 +108,19 @@ class SGLD(torch.optim.Optimizer):
 
                 if group["weight_decay"] != 0:
                     dw.add_(p.data, alpha=group["weight_decay"])
-
                 if group["localization"] != 0:
                     initial_param = self.state[p]["initial_param"]
-                    dw.add_((p.data - initial_param), alpha=group["localization"])
+                    initial_param_distance = p.data - initial_param
+                    dw.add_(initial_param_distance, alpha=group["localization"])
+                    if self.save_mala_vars:
+                        self.localization_loss += (
+                            torch.sum(
+                                torch.pow(initial_param_distance.clone().detach(), 2)
+                            )
+                            * group["localization"]
+                            / 2
+                        ).item()
+                        self.dws.append(dw.clone().detach())
 
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
 
