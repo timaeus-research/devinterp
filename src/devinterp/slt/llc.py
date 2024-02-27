@@ -9,9 +9,11 @@ class LLCEstimator(SamplerCallback):
     """
     Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process.
     It calculates the LLC based on the average loss across draws for each chain:
-    $$
-    TODO
-    $$
+    
+    $$LLC = \textrm{T} * (\textrm{avg_loss} - \textrm{init_loss})$$
+    
+    Note: init_loss gets set inside devinterp.slt.sample(). It can be passed as an argument to that function, 
+    and if not passed will be the average loss of the supplied model over num_chains batches.
 
     Attributes:
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
@@ -32,7 +34,7 @@ class LLCEstimator(SamplerCallback):
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
         )
-        self.init_loss = 0.0
+        self.init_loss = 0.0 # gets set by devinterp.slt.sample()
 
         self.temperature = torch.tensor(temperature, dtype=torch.float32).to(device)
         self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
@@ -69,7 +71,10 @@ class OnlineLLCEstimator(SamplerCallback):
     """
     Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.
     It calculates LLCs using the same formula as LLCEstimator, but continuously and including means and std across draws (as opposed to just across chains).
-
+    
+    Note: init_loss gets set inside devinterp.slt.sample(). It can be passed as an argument to that function, 
+    and if not passed will be the average loss of the supplied model over num_chains batches.
+    
     Attributes:
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
@@ -82,7 +87,7 @@ class OnlineLLCEstimator(SamplerCallback):
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
-        self.init_loss = 0.0
+        self.init_loss = 0.0 # gets set by devinterp.slt.sample()
 
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
