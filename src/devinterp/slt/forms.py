@@ -6,6 +6,14 @@ import warnings
 from devinterp.slt.pca import *
 
 
+def get_osculating_circles(smooth_pc1, smooth_pc2, OSCULATE_START, OSCULATE_END):
+    curve = np.column_stack((smooth_pc1, smooth_pc2))
+    return [
+        get_osculating_circle(curve, step)
+        for step in range(OSCULATE_START, OSCULATE_END)
+    ]
+
+
 def get_osculating_circle(curve, t_index):
     # Handle edge cases
     if t_index == 0:
@@ -76,7 +84,7 @@ def plot_essential_dynamics_grid(
     transitions=[],
     colors=[],
     marked_cusp_data=[],
-    num_pca_components=3,
+    num_plotted_pca_comps=3,
     plot_caustic=True,
     plot_vertex_influence=True,
     figsize=(20, 6),
@@ -104,26 +112,24 @@ def plot_essential_dynamics_grid(
     print(f"Number of samples: {len(samples)}")
 
     # Make sure we have the smoothed data for each PC
-    pc_combo_indices = combinations(range(num_pca_components), 2)
+    pc_combo_indices = combinations(range(num_plotted_pca_comps), 2)
     smooth_pc_combos = combinations(
         get_smoothed_pcs(
             samples,
-            num_pca_components,
+            num_plotted_pca_comps,
             early_smoothing,
             late_smoothing,
             late_smoothing_from,
         ),
         2,
     )
-    num_subplots = num_pca_components * (num_pca_components - 1) // 2
+    num_subplots = num_plotted_pca_comps * (num_plotted_pca_comps - 1) // 2
     fig, axes = plt.subplots(1, num_subplots, figsize=figsize)
 
     for ax, (pc2_index, pc1_index), (smooth_pc2, smooth_pc1) in zip(
         axes, pc_combo_indices, smooth_pc_combos
     ):
         print(f"Plotting PC{pc2_index+1} vs PC{pc1_index+1}")
-        ax.set_xlabel(f"PC {pc1_index+1}")
-        ax.set_ylabel(f"PC {pc2_index+1}")
         # Plot un-smoothed points in the background
         ax.scatter(
             x=samples[OSCULATE_START:OSCULATE_END, pc1_index],
@@ -131,6 +137,7 @@ def plot_essential_dynamics_grid(
             alpha=0.5,
             color="lightgray",
             s=10,
+            zorder=1,
         )
         # Plot transitions & transition color legend
         if transitions:
@@ -146,16 +153,19 @@ def plot_essential_dynamics_grid(
 
             for color, (start, end, _) in zip(colors, transitions):
                 ax.plot(smooth_pc1[start:end], smooth_pc2[start:end], color=color, lw=2)
+        else:
+            ax.plot(smooth_pc1, smooth_pc2, color="blue", lw=2)
 
         # Osculating circle = circle with same tangent as smoothed curve at each point
-        osculating_circles = [
-            get_osculating_circle(np.column_stack((smooth_pc1, smooth_pc2)), z)
-            for z in range(OSCULATE_START, OSCULATE_END)
-        ]
-        # Draw all circles, highest curvature points & caustic cusps (change in direction of circle centers)
+        osculating_circles = get_osculating_circles(
+            smooth_pc1, smooth_pc2, OSCULATE_START, OSCULATE_END
+        )
+        # Get indices in PCA series corresponding to sharpest turns & caustic cusps (=change in direction of circle centers)
+        # Also get osculates to plot (every OSCULATE_SKIP-th circle is plotted)
         dcenter_indices, radius_indices, circles_to_plot = get_osculate_plot_data(
             osculating_circles, OSCULATE_SKIP, num_sharp_points, num_vertices
         )
+        # Draw all circles, highest curvature points & caustic cusps
         for circle in circles_to_plot:
             ax.add_artist(circle)
         for i in radius_indices:
@@ -173,16 +183,17 @@ def plot_essential_dynamics_grid(
 
         # Plot marked cusps & vertex influence, if supplied & set (resp.)
         for marked_cusp in marked_cusp_data:
-            marked_cusp_idx = marked_cusp["idx"]  # TODO fix
+            marked_cusp_idx = marked_cusp["step"]  # TODO fix
             ax.scatter(
                 smooth_pc1[marked_cusp_idx],
                 smooth_pc2[marked_cusp_idx],
                 color="green",
                 marker="x",
                 s=40,
+                zorder=3,
             )
             center, _ = osculating_circles[marked_cusp_idx]
-            ax.scatter(*center, color="green", marker="x", s=60)
+            ax.scatter(*center, color="green", marker="x", s=40, zorder=3)
 
             if plot_vertex_influence:
                 vertex_influence_start = marked_cusp["influence_start"]
@@ -193,6 +204,7 @@ def plot_essential_dynamics_grid(
                     color="blue",
                     marker="x",
                     s=40,
+                    zorder=3,
                 )
                 ax.scatter(
                     smooth_pc1[vertex_influence_end],
@@ -200,7 +212,11 @@ def plot_essential_dynamics_grid(
                     color="blue",
                     marker="x",
                     s=40,
+                    zorder=3,
                 )
+
+        ax.set_xlabel(f"PC {pc1_index+1}")
+        ax.set_ylabel(f"PC {pc2_index+1}")
     # plot_explained_variance(pca, title="Explained Variance", axes[-1])
     plt.tight_layout(rect=[0, 0, 1, 1])
     fig.set_facecolor("white")
