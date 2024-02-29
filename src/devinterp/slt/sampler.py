@@ -18,11 +18,13 @@ from devinterp.utils import (
     get_init_loss_full_batch,
 )
 from devinterp.slt.callback import validate_callbacks, SamplerCallback
+from devinterp.slt.mala import MalaAcceptanceRate
+from devinterp.slt.norms import NoiseNorm
 from devinterp.slt.llc import OnlineLLCEstimator, LLCEstimator
 
 
 def call_with(func: Callable, **kwargs):
-    """Check the func annotation and call with only the necessary kwargs."""
+    # Check the func annotation and call with only the necessary kwargs.
     sig = inspect.signature(func)
 
     # Filter out the kwargs that are not in the function's signature
@@ -49,9 +51,22 @@ def sample_single_chain(
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
 ):
+    if num_burnin_steps:
+        warnings.warn(
+            "Burn-in is currently not implemented correctly, please set num_burnin_steps to 0."
+        )
+    if num_draws > len(loader):
+        warnings.warn(
+            "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
+        )
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
     optimizer_kwargs = optimizer_kwargs or {}
+    if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
+        optimizer_kwargs.setdefault("save_mala_vars", True)
+    if any(isinstance(callback, NoiseNorm) for callback in callbacks):
+        optimizer_kwargs.setdefault("save_noise", True)
+    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
     if optimize_over_per_model_param:
         optimizer = sampling_method(
             [
@@ -65,14 +80,12 @@ def sample_single_chain(
         )
     else:
         optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
-    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
-    optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
+
 
     if seed is not None:
         torch.manual_seed(seed)
 
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
-    model.train()
 
     for i, (xs, ys) in tqdm(
         zip(range(num_steps), itertools.cycle(loader)),
@@ -80,6 +93,7 @@ def sample_single_chain(
         total=num_steps,
         disable=not verbose,
     ):
+        model.train()
         optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
         y_preds = model(xs)
@@ -89,6 +103,7 @@ def sample_single_chain(
         # if optimize_over_per_model_param: # not sure this is needed tbh
         #     for param_name, optimize_over in optimize_over_per_model_param.items():
         #         getattr(model, param_name).grad = getattr(model, param_name).grad*optimize_over
+
         optimizer.step()
 
         if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
@@ -108,6 +123,7 @@ def sample(
     model: torch.nn.Module,
     loader: DataLoader,
     criterion: Callable,
+    callbacks: List[SamplerCallback],
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
@@ -120,28 +136,52 @@ def sample(
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
-    callbacks: List[SamplerCallback] = [],
 ):
     """
-    Sample model weights using a given sampling_method, supporting multiple chains.
-    See the example notebooks examples/diagnostics.ipynb and examples/sgld_calibration.ipynb for (respectively)
-    info on what callbacks to pass along and how to calibrate sampler/optimizer hyperparams.
+    Sample model weights using a given sampling_method, supporting multiple chains/cores, 
+    and calculate the observables (loss, llc, etc.) for each callback passed along. 
+    The :python:`update`, :python:`finalize` and :python:`sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called 
+    during sampling, after sampling, and at :python:`sampler_callback_object.sample()` respectively.
+    
+    After calling this function, the stats of interest live in the callback object.
 
-    Parameters:
-        model (torch.nn.Module): The neural network model.
-        loader (DataLoader): DataLoader for input data.
-        criterion (torch.nn.Module): Loss function.
-        sampling_method (torch.optim.Optimizer): Sampling method to use (really a PyTorch optimizer).
-        optimizer_kwargs (Optional[Dict[str, Union[float, Literal['adaptive']]]]): Keyword arguments for the PyTorch optimizer (used as sampler here).
-        num_draws (int): Number of samples to draw.
-        num_chains (int): Number of chains to run.
-        num_burnin_steps (int): Number of burn-in steps before sampling.
-        num_steps_bw_draws (int): Number of steps between each draw.
-        cores (Optional[int]): Number of cores for parallel execution.
-        seed (Optional[Union[int, List[int]]]): Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed.
-        device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
-        verbose (bool): whether to print sample chain progress
-        callbacks (List[SamplerCallback]): list of callbacks, each of type SamplerCallback
+    :param model: The neural network model.
+    :type model: torch.nn.Module
+    :param loader: DataLoader for input data.
+    :type loader: DataLoader
+    :param criterion: Loss function.
+    :type criterion: Callable
+    :param callbacks: list of callbacks, each of type SamplerCallback
+    :type callbacks: list[SamplerCallback]
+    :param sampling_method: Sampling method to use (a PyTorch optimizer under the hood). Default is SGLD
+    :type sampling_method: torch.optim.Optimizer, optional
+    :param optimizer_kwargs: Keyword arguments for the PyTorch optimizer (used as sampler here). Default is None (using standard SGLD parameters as defined in the SGLD class)
+    :type optimizer_kwargs: dict, optional
+    :param num_draws: Number of samples to draw. Default is 100
+    :type num_draws: int, optional
+    :param num_chains: Number of chains to run. Default is 10
+    :type num_chains: int, optional
+    :param num_burnin_steps: Number of burn-in steps before sampling. Default is 0
+    :type num_burnin_steps: int, optional
+    :param num_steps_bw_draws: Number of steps between each draw. Default is 1
+    :type num_steps_bw_draws: int, optional
+    :param init_loss: Initial loss for use in `LLCEstimator` and `OnlineLLCEstimator`
+    :type init_loss: float, optional
+    :param cores: Number of cores for parallel execution. Default is 1
+    :type cores: int, optional
+    :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed. Default is None
+    :type seed: int, optional
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :type device: str or torch.device, optional
+    :param verbose: whether to print sample chain progress. Default is True
+    :type verbose: bool, optional
+    
+    :raises ValueError: if derivative callbacks (f.e. :func:`~devinterp.slt.loss.OnlineLossStatistics`) are passed before base callbacks (f.e. :func:`~devinterp.slt.llc.OnlineLLCEstimator`)
+    :raises Warning: if num_burnin_steps < num_draws
+    :raises Warning: if num_draws > len(loader)
+    :raises Warning: if using seeded runs
+    
+    :returns: None (access LLCs or other observables through `callback_object.sample()`)
     """
     if num_burnin_steps < num_draws:
         warnings.warn(
@@ -211,7 +251,6 @@ def sample(
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
-
 
 def estimate_learning_coeff_with_summary(
     model: torch.nn.Module,

@@ -1,4 +1,5 @@
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
+from typing import Union
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -53,7 +54,7 @@ def plot_trace(
     plt.show()
 
 
-def optimal_temperature(dataloader: DataLoader):
+def optimal_temperature(dataloader: Union[DataLoader, int]):
     if isinstance(dataloader, DataLoader):
         return dataloader.batch_size / np.log(dataloader.batch_size)
     elif isinstance(dataloader, int):
