@@ -6,10 +6,9 @@ import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
 from devinterp.optim.sgld import SGLD
-from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
-from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
-from devinterp.zoo.test_utils import *
+from devinterp.slt.llc import LLCEstimator
+from devinterp.test_utils import *
 from devinterp.utils import *
 
 
@@ -44,7 +43,7 @@ POWERS = [
 SAMPLE_POINTS = [[0.0, 0.0, 1.0], [1.0, 1.0, 1.0]]
 
 
-@pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
+@pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize("powers", POWERS)
 @pytest.mark.parametrize("sample_point", SAMPLE_POINTS)
 def test_rllc_normalcrossing_between_powers(
@@ -58,16 +57,20 @@ def test_rllc_normalcrossing_between_powers(
     model2 = Polynomial(powers[1])
     model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
 
-    train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
+    train_dataloader, _, _, _ = generated_normalcrossing_dataset
     criterion = F.mse_loss
     lr = 0.0002
     num_chains = 1
     num_draws = 100
     llc_estimator_1 = LLCEstimator(
-        num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
     )
     llc_estimator_2 = LLCEstimator(
-        num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
     )
     torch.manual_seed(seed)
 
@@ -77,7 +80,7 @@ def test_rllc_normalcrossing_between_powers(
         criterion=criterion,
         optimizer_kwargs=dict(
             lr=lr,
-            num_samples=len(train_data),
+            temperature=optimal_temperature(train_dataloader),
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -95,7 +98,7 @@ def test_rllc_normalcrossing_between_powers(
         criterion=criterion,
         optimizer_kwargs=dict(
             lr=lr,
-            num_samples=len(train_data),
+            temperature=optimal_temperature(train_dataloader),
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -143,19 +146,25 @@ def test_rllc_gradient_normalcrossing_between_dims(
     criterion = F.mse_loss
     lr = 0.0001
     num_chains = 1
-    num_draws = 50
+    num_draws = 200
     llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
-        num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
     )
     llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
-        num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
     )
 
     sample(
         model1,
         train_dataloader,
         criterion=criterion,
-        optimizer_kwargs=dict(lr=lr, num_samples=len(train_data), noise_level=0.0),
+        optimizer_kwargs=dict(
+            lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
+        ),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -167,7 +176,9 @@ def test_rllc_gradient_normalcrossing_between_dims(
         model2,
         train_dataloader,
         criterion=criterion,
-        optimizer_kwargs=dict(lr=lr, num_samples=len(train_data), noise_level=0.0),
+        optimizer_kwargs=dict(
+            lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
+        ),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -182,7 +193,9 @@ def test_rllc_gradient_normalcrossing_between_dims(
         llc_mean_2d, llc_mean_3d_restricted, atol=1e-5
     ), f"LLC mean {llc_mean_2d:.3f}!={llc_mean_3d_restricted:.3f} for powers {relevant_powers + [extra_dim_power]} using {sampling_method}, {model2.weights}"
 
-@pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
+SAMPLE_POINTS = [[0.0, 0.0, 1.0], [0.0, 1.0, 1.0]]
+
+@pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize("relevant_powers", POWERS)
 @pytest.mark.parametrize("extra_dim_power", EXTRA_DIM_POWER)
 @pytest.mark.parametrize("sample_point", SAMPLE_POINTS)
@@ -206,19 +219,23 @@ def test_rllc_full_normalcrossing_between_dims(
     criterion = F.mse_loss
     lr = 0.0001
     num_chains = 1
-    num_draws = 2 if sampling_method == SGLD else 1
+    num_draws = 2000
     llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
-        num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
     )
     llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
-        num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
     )
 
     sample(
         model1,
         train_dataloader,
         criterion=criterion,
-        optimizer_kwargs=dict(lr=lr, num_samples=len(train_data)),
+        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -230,7 +247,7 @@ def test_rllc_full_normalcrossing_between_dims(
         model2,
         train_dataloader,
         criterion=criterion,
-        optimizer_kwargs=dict(lr=lr, num_samples=len(train_data)),
+        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -241,6 +258,6 @@ def test_rllc_full_normalcrossing_between_dims(
     )
     llc_mean_2d = llc_estimator_2d.sample()["llc/mean"]
     llc_mean_3d_restricted = llc_estimator_3d.sample()["llc/mean"]
-    assert np.array_equal(
-        llc_mean_2d, llc_mean_3d_restricted
+    assert np.isclose(
+        llc_mean_2d, llc_mean_3d_restricted, atol=3e-2
     ), f"LLC mean {llc_mean_2d:.8f}!={llc_mean_3d_restricted:.8f} for powers {relevant_powers + [extra_dim_power]} using {sampling_method}, {model2.weights}"

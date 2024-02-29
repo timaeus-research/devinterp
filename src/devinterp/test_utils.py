@@ -22,9 +22,7 @@ class LinePlusDot(nn.Module):
         )
 
     def forward(self, x):
-        return (
-            x * (self.weights[0] - 1) * (torch.sum(self.weights**2) ** 2)
-        )  # or should this be weights[:2]**2? Not sure
+        return x * (self.weights[0] - 1) * (torch.sum(self.weights**2) ** 2)
 
 
 class ReducedRankRegressor(nn.Module):
