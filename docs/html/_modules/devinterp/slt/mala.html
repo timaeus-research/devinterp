@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>devinterp.slt.mala &mdash; devinterp 0.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=92fd9be5" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=938c9ccc"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="../../../_static/custom.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            devinterp
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Welcome to devinterp’s documentation!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../devinterp.slt.html">SLT Observables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../devinterp.optim.html">Sampling Methods</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">devinterp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">devinterp.slt.mala</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for devinterp.slt.mala</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+
+<span class="kn">from</span> <span class="nn">devinterp.slt.callback</span> <span class="kn">import</span> <span class="n">SamplerCallback</span>
+
+
+<div class="viewcode-block" id="mala_acceptance_probability">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.mala.mala_acceptance_probability">[docs]</a>
+<span class="k">def</span> <span class="nf">mala_acceptance_probability</span><span class="p">(</span>
+    <span class="n">prev_point</span><span class="p">,</span>
+    <span class="n">prev_grad</span><span class="p">,</span>
+    <span class="n">prev_loss</span><span class="p">,</span>
+    <span class="n">current_point</span><span class="p">,</span>
+    <span class="n">current_grad</span><span class="p">,</span>
+    <span class="n">current_loss</span><span class="p">,</span>
+    <span class="n">learning_rate</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the acceptance probability for a MALA transition.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">    prev_point: The previous point in parameter space.</span>
+<span class="sd">    prev_grad: Gradient of the prev point in parameter space.</span>
+<span class="sd">    prev_loss: Loss of the previous point in parameter space.</span>
+<span class="sd">    current_grad: Gradient of the current point in parameter space.</span>
+<span class="sd">    current_point: The current point in parameter space.</span>
+<span class="sd">    current_loss: Loss of the current point in parameter space.</span>
+<span class="sd">    learning_rate (float): Learning rate of the model.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    float: Acceptance probability for the proposed transition.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">current_loss</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="c1"># Compute the log of the proposal probabilities (using the Gaussian proposal distribution)</span>
+    <span class="n">log_q_current_to_prev</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">prev_point</span> <span class="o">-</span> <span class="n">current_point</span> <span class="o">-</span> <span class="p">(</span><span class="n">learning_rate</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="o">-</span><span class="n">current_grad</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">learning_rate</span><span class="p">)</span>
+    <span class="n">log_q_prev_to_current</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">current_point</span> <span class="o">-</span> <span class="n">prev_point</span> <span class="o">-</span> <span class="p">(</span><span class="n">learning_rate</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="o">-</span><span class="n">prev_grad</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">learning_rate</span><span class="p">)</span>
+    <span class="n">acceptance_log_prob</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">log_q_current_to_prev</span> <span class="o">-</span> <span class="n">log_q_prev_to_current</span> <span class="o">+</span> <span class="n">prev_loss</span> <span class="o">-</span> <span class="n">current_loss</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">acceptance_log_prob</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="MalaAcceptanceRate">
+<a class="viewcode-back" href="../../../devinterp.slt.html#devinterp.slt.mala.MalaAcceptanceRate">[docs]</a>
+<span class="k">class</span> <span class="nc">MalaAcceptanceRate</span><span class="p">(</span><span class="n">SamplerCallback</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Callback for computing the norm of the gradients of the optimizer / sampler.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())</span>
+<span class="sd">        num_chains (int): Number of chains to run. (should be identical to param passed to sample())</span>
+<span class="sd">        temperature (float): Temperature used to calculate the LLC.</span>
+<span class="sd">        learning_rate (int): Learning rate of the model.</span>
+<span class="sd">        device (Union[torch.device, str]): Device to perform computations on, e.g., &#39;cpu&#39; or &#39;cuda&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">num_chains</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_draws</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">temperature</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_chains</span> <span class="o">=</span> <span class="n">num_chains</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_draws</span> <span class="o">=</span> <span class="n">num_draws</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span> <span class="o">=</span> <span class="n">learning_rate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">temperature</span> <span class="o">=</span> <span class="n">temperature</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mala_acceptance_rate</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">num_chains</span><span class="p">,</span> <span class="n">num_draws</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_params</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_grads</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prev_params</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prev_grads</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prev_mala_loss</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">draw</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">loss</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">draw</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">loss</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">draw</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">loss</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">):</span>
+        <span class="c1"># we need the grads &amp; loss from the pass, but the current params are from after the step</span>
+        <span class="c1"># (so we update those only after the calculation)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_grads</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">dws</span>
+        <span class="c1"># mala acceptance loss is different from pytorch supplied loss</span>
+        <span class="n">mala_loss</span> <span class="o">=</span> <span class="p">(</span><span class="n">loss</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">temperature</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="o">+</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">localization_loss</span>
+        <span class="k">if</span> <span class="n">draw</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">current_param</span><span class="p">,</span> <span class="n">current_grad</span><span class="p">,</span> <span class="n">prev_param</span><span class="p">,</span> <span class="n">prev_grad</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">current_params</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">current_grads</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">prev_params</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">prev_grads</span><span class="p">,</span>
+            <span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">mala_acceptance_rate</span><span class="p">[</span><span class="n">chain</span><span class="p">,</span> <span class="n">draw</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">mala_acceptance_probability</span><span class="p">(</span>
+                        <span class="n">prev_param</span><span class="p">,</span>
+                        <span class="n">prev_grad</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">prev_mala_loss</span><span class="p">,</span>
+                        <span class="n">current_param</span><span class="p">,</span>
+                        <span class="n">current_grad</span><span class="p">,</span>
+                        <span class="n">mala_loss</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+        <span class="c1"># move new -&gt; old, then update new after</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prev_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_params</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prev_grads</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_grads</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prev_mala_loss</span> <span class="o">=</span> <span class="n">mala_loss</span>
+        <span class="c1"># params update only at the end, as decribed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_params</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">param</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span> <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span>
+        <span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;mala_accept/trace&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">mala_acceptance_rate</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
+            <span class="s2">&quot;mala_accept/mean&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mala_acceptance_rate</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()),</span>
+            <span class="s2">&quot;mala_accept/std&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mala_acceptance_rate</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()),</span>
+        <span class="p">}</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Van Wingerden et al..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
