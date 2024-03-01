@@ -81,21 +81,19 @@ def get_osculate_plot_data(osculating_circles, skip, num_sharp_points, num_verti
 
 def plot_essential_dynamics_grid(
     samples,
+    smoothed_pcs,
     transitions=[],
     colors=[],
     marked_cusp_data=[],
     num_plotted_pca_comps=3,
     plot_caustic=True,
-    plot_vertex_influence=True,
+    plot_vertex_influence=False,
     figsize=(20, 6),
-    num_sharp_points=20,
-    num_vertices=35,
+    num_sharp_points=0,
+    num_vertices=0,
     osculate_start=1,
     osculate_end_offset=1,
     osculate_skip=8,
-    early_smoothing=1,
-    late_smoothing=60,
-    late_smoothing_from=200,
 ):
     OSCULATE_START = osculate_start
     OSCULATE_END = len(samples) - osculate_end_offset
@@ -109,22 +107,18 @@ def plot_essential_dynamics_grid(
         warnings.warn("< 10 data points for osculates, this will not be a useful plot.")
     if plot_vertex_influence and not len(marked_cusp_data):
         warnings.warn("Can't plot vertex influence when cusp data not provided")
+    if num_plotted_pca_comps < len(smoothed_pcs):
+        smoothed_pcs = smoothed_pcs[:num_plotted_pca_comps]
+    elif  num_plotted_pca_comps > len(smoothed_pcs):
+        raise ValueError('Error: plotting more PCA components than are available in smoothed_pcs')
     print(f"Number of samples: {len(samples)}")
 
-    # Make sure we have the smoothed data for each PC
     pc_combo_indices = combinations(range(num_plotted_pca_comps), 2)
-    smooth_pc_combos = combinations(
-        get_smoothed_pcs(
-            samples,
-            num_plotted_pca_comps,
-            early_smoothing,
-            late_smoothing,
-            late_smoothing_from,
-        ),
-        2,
-    )
+    smooth_pc_combos = combinations(smoothed_pcs, 2)
     num_subplots = num_plotted_pca_comps * (num_plotted_pca_comps - 1) // 2
     fig, axes = plt.subplots(1, num_subplots, figsize=figsize)
+    if num_subplots == 1:
+        axes = [axes]
 
     for ax, (pc2_index, pc1_index), (smooth_pc2, smooth_pc1) in zip(
         axes, pc_combo_indices, smooth_pc_combos
@@ -193,7 +187,10 @@ def plot_essential_dynamics_grid(
                 zorder=3,
             )
             center, _ = osculating_circles[marked_cusp_idx]
-            ax.scatter(*center, color="green", marker="x", s=40, zorder=3)
+            x_lim_0, x_lim_1 = ax.get_xlim()
+            y_lim_0, y_lim_1 = ax.get_ylim()
+            if (x_lim_0 < center_x < x_lim_1) and (y_lim_0 < center_y < y_lim_1):
+                ax.scatter(*center, color="green", marker="x", s=40, zorder=3)
 
             if plot_vertex_influence:
                 vertex_influence_start = marked_cusp["influence_start"]
