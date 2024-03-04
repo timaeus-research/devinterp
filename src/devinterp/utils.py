@@ -1,5 +1,9 @@
+from torch.utils.data import DataLoader
+from typing import Union
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
+from itertools import islice
 
 
 def plot_trace(
@@ -56,3 +60,49 @@ def sigma_helper(z, sigma_early, sigma_late, sigma_interp_end, interp_range=0.2)
         return sigma_early + (sigma_late - sigma_early) / (
             sigma_interp_end - sigma_interp_start
         ) * (z - sigma_interp_start)
+
+def optimal_temperature(dataloader: Union[DataLoader, int]):
+    if isinstance(dataloader, DataLoader):
+        return dataloader.batch_size / np.log(dataloader.batch_size)
+    elif isinstance(dataloader, int):
+        return dataloader / np.log(dataloader)
+    else:
+        raise NotImplementedError(
+            f"Temperature for data type {type(dataloader)} not implemented, use DataLoader or int instead."
+        )
+
+
+def get_init_loss_one_batch(dataloader, model, criterion, device):
+    model = model.to(device)
+    model.train()  # to make sure we're using train loss, comparable to train loss of sampler()
+    with torch.no_grad():
+        xs, ys = next(iter(dataloader))
+        xs, ys = xs.to(device), ys.to(device)
+        y_preds = model(xs)
+        loss = criterion(y_preds, ys).detach().item()
+    return loss
+
+
+def get_init_loss_multi_batch(dataloader, n_batches, model, criterion, device):
+    model = model.to(device)
+    model.train()
+    loss = 0.0
+    n_batches = min(n_batches, len(dataloader))
+    with torch.no_grad():
+        for xs, ys in islice(dataloader, n_batches):
+            xs, ys = xs.to(device), ys.to(device)
+            y_preds = model(xs)
+            loss += criterion(y_preds, ys).detach().item()
+    return loss / n_batches
+
+
+def get_init_loss_full_batch(dataloader, model, criterion, device):
+    model = model.to(device)
+    model.train()
+    loss = 0.0
+    with torch.no_grad():
+        for xs, ys in dataloader:
+            xs, ys = xs.to(device), ys.to(device)
+            y_preds = model(xs)
+            loss += criterion(y_preds, ys).detach().item()
+    return loss / len(dataloader)
