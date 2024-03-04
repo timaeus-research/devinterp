@@ -20,12 +20,10 @@ def plot_trace(
     sgld_step = list(range(num_draws))
     if true_lc:
         plt.axhline(y=true_lc, color="r", linestyle="dashed")
-    # trace
     for i in range(num_chains):
         draws = trace[i]
         plt.plot(sgld_step, draws, linewidth=1, label=f"chain {i}")
 
-    # mean
     mean = np.mean(trace, axis=0)
     plt.plot(
         sgld_step,
@@ -37,7 +35,6 @@ def plot_trace(
         zorder=3,
     )
 
-    # std
     std = np.std(trace, axis=0)
     plt.fill_between(
         sgld_step, mean - std, mean + std, color="gray", alpha=0.3, zorder=2
@@ -53,6 +50,16 @@ def plot_trace(
     plt.tight_layout()
     plt.show()
 
+def sigma_helper(z, sigma_early, sigma_late, sigma_interp_end, interp_range=0.2):
+    sigma_interp_start = interp_range * sigma_interp_end
+    if z < sigma_interp_start:
+        return sigma_early
+    elif z > sigma_interp_end:
+        return sigma_late
+    else:
+        return sigma_early + (sigma_late - sigma_early) / (
+            sigma_interp_end - sigma_interp_start
+        ) * (z - sigma_interp_start)
 
 def optimal_temperature(dataloader: Union[DataLoader, int]):
     if isinstance(dataloader, DataLoader):
