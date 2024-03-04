@@ -1,14 +1,13 @@
 import torch
 import torch.nn as nn
 
+
 class Polynomial(nn.Module):
     def __init__(self, powers=[1, 1]):
         super(Polynomial, self).__init__()
         self.powers = torch.tensor(powers)
         self.weights = nn.Parameter(
-            torch.tensor(
-                torch.zeros_like(self.powers, dtype=torch.float32), requires_grad=True
-            )
+            torch.zeros_like(self.powers, dtype=torch.float32), requires_grad=True
         )
 
     def forward(self, x):
@@ -23,7 +22,7 @@ class LinePlusDot(nn.Module):
         )
 
     def forward(self, x):
-        return x * (self.weights[0] - 1) * (torch.sum(self.weights**2) ** 2) # or should this be weights[:2]**2? Not sure
+        return x * (self.weights[0] - 1) * (torch.sum(self.weights**2) ** 2)
 
 
 class ReducedRankRegressor(nn.Module):

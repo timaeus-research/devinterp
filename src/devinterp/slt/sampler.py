@@ -38,15 +38,16 @@ def sample_single_chain(
     ref_model: nn.Module,
     loader: DataLoader,
     criterion: Callable,
-    num_draws=100,
-    num_burnin_steps=0,
-    num_steps_bw_draws=1,
+    num_draws: int = 100,
+    num_burnin_steps: int = 0,
+    num_steps_bw_draws: int = 1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
-    verbose=True,
+    verbose: bool = True,
     device: torch.device = torch.device("cpu"),
+    optimize_over_per_model_param: Optional[dict] = None,
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
 ):
@@ -56,14 +57,26 @@ def sample_single_chain(
         )
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
-
     optimizer_kwargs = optimizer_kwargs or {}
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
         optimizer_kwargs.setdefault("save_noise", True)
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
-    optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
+    if optimize_over_per_model_param:
+        optimizer = sampling_method(
+            [
+                {
+                    "params": getattr(model, param_name),
+                    "optimize_over": boolean_mask.to(device),
+                }
+                for (param_name, boolean_mask) in optimize_over_per_model_param.items()
+            ],
+            **optimizer_kwargs,
+        )
+    else:
+        optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
+
 
     if seed is not None:
         torch.manual_seed(seed)
@@ -83,6 +96,9 @@ def sample_single_chain(
         loss = criterion(y_preds, ys)
 
         loss.backward()
+        # if optimize_over_per_model_param: # not sure this is needed tbh
+        #     for param_name, optimize_over in optimize_over_per_model_param.items():
+        #         getattr(model, param_name).grad = getattr(model, param_name).grad*optimize_over
 
         optimizer.step()
 
@@ -115,6 +131,7 @@ def sample(
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
 ):
     """
     Sample model weights using a given sampling_method, supporting multiple chains/cores, 
@@ -216,6 +233,7 @@ def sample(
             device=device,
             verbose=verbose,
             callbacks=callbacks,
+            optimize_over_per_model_param=optimize_over_per_model_param,
         )
 
     if cores > 1:
