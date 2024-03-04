@@ -27,24 +27,24 @@ def get_output_for_models(models: nn.Module, dataloader: DataLoader, device):
     return outputs.reshape(len(outputs), -1)
 
 
-def get_pca_components(samples: np.array, n_components: int):
-    pca = PCA(n_components=n_components)
-    transformed_samples = pca.fit_transform(samples)
-    return pca, transformed_samples
-
-
 def get_smoothed_pcs(
-    samples, num_pca_components, early_smoothing, late_smoothing, late_smoothing_from
+    transformed_samples,
+    num_pca_components,
+    early_smoothing,
+    late_smoothing,
+    late_smoothing_from,
 ):
     smoothed_pcs = []
     for pca_component_i in range(0, num_pca_components):
         print(f"Processing smoothing for PC{pca_component_i+1}")
-        smoothed_pc = np.copy(samples[:, 0])
-        for z in range(len(samples)):
+        smoothed_pc = np.copy(transformed_samples[:, 0])
+        for z in range(len(transformed_samples)):
             sigma = sigma_helper(
                 z, early_smoothing, late_smoothing, late_smoothing_from
             )
-            smoothed_pc[z] = gaussian_filter1d(samples[:, pca_component_i], sigma)[z]
+            smoothed_pc[z] = gaussian_filter1d(
+                transformed_samples[:, pca_component_i], sigma
+            )[z]
         smoothed_pcs.append(smoothed_pc)
     return smoothed_pcs
 
