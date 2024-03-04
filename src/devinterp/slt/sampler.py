@@ -50,10 +50,6 @@ def sample_single_chain(
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
 ):
-    if num_burnin_steps:
-        warnings.warn(
-            "Burn-in is currently not implemented correctly, please set num_burnin_steps to 0."
-        )
     if num_draws > len(loader):
         warnings.warn(
             "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
