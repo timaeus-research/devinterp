@@ -5,9 +5,9 @@ import torch.nn as nn
 class Polynomial(nn.Module):
     def __init__(self, powers=[1, 1]):
         super(Polynomial, self).__init__()
-        self.powers = torch.tensor(powers).clone().detach()
+        self.powers = torch.tensor(powers)
         self.weights = nn.Parameter(
-            torch.zeros_like(self.powers.clone().detach(), dtype=torch.float32)
+            torch.zeros_like(self.powers, dtype=torch.float32), requires_grad=True
         )
 
     def forward(self, x):
