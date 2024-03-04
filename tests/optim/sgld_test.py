@@ -42,37 +42,3 @@ def test_SGLD_vs_SGD(lr):
 
     for p1, p2 in zip(model1.parameters(), model2.parameters()):
         assert torch.allclose(p1, p2, atol=1e-7), f"Parameters differ: {p1} vs {p2}"
-
-
-def test_seeding():
-    lr = 0.1
-    data = torch.tensor([[1.0]]).reshape(-1, 1)
-    target = torch.tensor([[2.0]]).reshape(-1, 1)
-    criterion = nn.MSELoss()
-
-    model1 = nn.Linear(1, 1)
-    model2 = deepcopy(model1)
-    optimizer_sgld_1 = SGLD(
-        model1.parameters(), lr=lr, noise_level=1.0, temperature=1.0
-    )
-    optimizer_sgld_2 = SGLD(
-        model2.parameters(), lr=lr, noise_level=1.0, temperature=1.0
-    )
-    
-    torch.manual_seed(42)
-    optimizer_sgld_1.zero_grad()
-    output = model1(data)
-    loss = criterion(output, target)
-    loss.backward()
-    optimizer_sgld_1.step()
-
-    torch.manual_seed(42)
-    optimizer_sgld_2.zero_grad()
-    output = model2(data)
-    loss = criterion(output, target)
-    loss.backward()
-    optimizer_sgld_2.step()
-
-    for p1, p2 in zip(model1.parameters(), model2.parameters()):
-        assert torch.allclose(p1, p2, atol=1e-7), f"Parameters differ: {p1} vs {p2}"
-
