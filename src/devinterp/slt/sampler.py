@@ -52,6 +52,7 @@ def sample_single_chain(
     init_loss: float = None,
 ):
     if grad_accum_steps > 1:
+        assert type(grad_accum_steps) == int, "grad_accum_steps must be an integer."
         num_steps_bw_draws *= grad_accum_steps
         num_burnin_steps *= grad_accum_steps
     if num_draws > len(loader):
@@ -76,39 +77,38 @@ def sample_single_chain(
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
 
     cumulative_loss = 0
-    for i, (xs, ys) in  tqdm(
-        zip(range(num_steps), itertools.cycle(loader)), 
-        desc=f"Chain {chain}", 
-        total=num_steps, 
-        disable=not verbose
-    ):
-        model.train()
-        xs, ys = xs.to(device), ys.to(device)
-        y_preds = model(xs)
-        loss = criterion(y_preds, ys)
+    with tqdm(desc=f"Chain {chain}", 
+              total=num_steps // grad_accum_steps, 
+              disable=not verbose) as pbar:
+        for i, (xs, ys) in zip(range(num_steps), itertools.cycle(loader)):
+            model.train()
+            xs, ys = xs.to(device), ys.to(device)
+            y_preds = model(xs)
+            loss = criterion(y_preds, ys)
 
-        if grad_accum_steps > 1:
-            loss = loss / grad_accum_steps
-            cumulative_loss += loss.item()
-        loss.backward()
-
-        # i+1 instead of i so that the gradient accumulates to an entire batch first
-        # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
-        if (i+1) % grad_accum_steps == 0:
-            optimizer.step()
-            optimizer.zero_grad()
-
-        if i >= num_burnin_steps and (i + 1 - num_burnin_steps) % num_steps_bw_draws == 0:
-            draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
             if grad_accum_steps > 1:
-                loss = cumulative_loss
-                cumulative_loss = 0
-            else:
-                loss = loss.item()
+                loss = loss / grad_accum_steps
+                cumulative_loss += loss.item()
+            loss.backward()
 
-            with torch.no_grad():
-                for callback in callbacks:
-                    call_with(callback, **locals())  # Cursed. This is the way.
+            # i+1 instead of i so that the gradient accumulates to an entire batch first
+            # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
+            if (i+1) % grad_accum_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                pbar.update(1)
+
+            if i >= num_burnin_steps and (i + 1 - num_burnin_steps) % num_steps_bw_draws == 0:
+                draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
+                if grad_accum_steps > 1:
+                    loss = cumulative_loss
+                    cumulative_loss = 0
+                else:
+                    loss = loss.item()
+
+                with torch.no_grad():
+                    for callback in callbacks:
+                        call_with(callback, **locals())  # Cursed. This is the way.
 
 
 def _sample_single_chain(kwargs):
