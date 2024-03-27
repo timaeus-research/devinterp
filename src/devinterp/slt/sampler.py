@@ -68,14 +68,16 @@ def sample_single_chain(
         optimizer_kwargs.setdefault("save_noise", True)
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
     if optimize_over_per_model_param:
-        optimizer = sampling_method(
-            [
+        param_groups = []
+        for name, parameter in model.named_parameters():
+            param_groups.append(
                 {
-                    "params": getattr(model, param_name),
-                    "optimize_over": boolean_mask.to(device),
+                    "params": parameter,
+                    "optimize_over": optimize_over_per_model_param[name].to(device),
                 }
-                for (param_name, boolean_mask) in optimize_over_per_model_param.items()
-            ],
+            )
+        optimizer = sampling_method(
+            param_groups,
             **optimizer_kwargs,
         )
     else:
