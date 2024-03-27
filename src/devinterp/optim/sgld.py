@@ -143,7 +143,6 @@ class SGLD(torch.optim.Optimizer):
                 if group["optimize_over"] is not None:
                     dw = dw * group["optimize_over"]
                     noise = noise * group["optimize_over"]
-                # print(p, dw, noise)
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
                 p.data.add_(noise, alpha=group["lr"] ** 0.5)
                 # Rebound if exceeded bounding box size
