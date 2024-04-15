@@ -48,6 +48,7 @@ def sample_single_chain(
     verbose: bool = True,
     device: torch.device = torch.device("cpu"),
     optimize_over_per_model_param: Optional[dict] = None,
+    ablation_hooks: Optional[List[tuple]] = None,
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
 ):
@@ -98,8 +99,15 @@ def sample_single_chain(
         model.train()
         optimizer.zero_grad()
         xs, ys = xs.to(device), ys.to(device)
-        y_preds = model(xs)
-        loss = criterion(y_preds, ys)
+        if ablation_hooks is None:
+            y_preds = model(xs)
+            loss = criterion(y_preds, ys)
+        else:
+            loss = model.run_with_hooks(
+                xs, 
+                return_type="loss", 
+                fwd_hooks=ablation_hooks
+            )
 
         loss.backward()
         # if optimize_over_per_model_param: # not sure this is needed tbh
@@ -138,6 +146,7 @@ def sample(
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
+    ablation_hooks: Optional[List[tuple]] = None,
 ):
     """
     Sample model weights using a given sampling_method, supporting multiple chains/cores, 
@@ -197,7 +206,7 @@ def sample(
         )
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
-            loader, num_chains, model, criterion, device
+            loader, num_chains, model, criterion, device, ablation_hooks=ablation_hooks
         )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, criterion, device)
         # alternative: init_loss = get_init_loss_one_batch(loader, model, criterion, device)
@@ -240,6 +249,7 @@ def sample(
             verbose=verbose,
             callbacks=callbacks,
             optimize_over_per_model_param=optimize_over_per_model_param,
+            ablation_hooks=ablation_hooks,
         )
 
     if cores > 1:
@@ -271,12 +281,13 @@ def estimate_learning_coeff_with_summary(
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
+    ablation_hooks: Optional[List[tuple]] = None,
     online: bool = False,
 ) -> dict:
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
-            loader, num_chains, model, criterion, device
+            loader, num_chains, model, criterion, device, ablation_hooks=ablation_hooks
         )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, criterion, device)
         # alternative: init_loss = get_init_loss_one_batch(loader, model, criterion, device)
@@ -308,6 +319,7 @@ def estimate_learning_coeff_with_summary(
         callbacks=callbacks,
         init_loss=init_loss,
         optimize_over_per_model_param=optimize_over_per_model_param,
+        ablation_hooks=ablation_hooks,
     )
 
     results = {}

@@ -76,7 +76,7 @@ def get_init_loss_one_batch(dataloader, model, criterion, device):
     return loss
 
 
-def get_init_loss_multi_batch(dataloader, n_batches, model, criterion, device):
+def get_init_loss_multi_batch(dataloader, n_batches, model, criterion, device, ablation_hooks=None):
     model = model.to(device)
     model.train()
     loss = 0.0
@@ -84,8 +84,16 @@ def get_init_loss_multi_batch(dataloader, n_batches, model, criterion, device):
     with torch.no_grad():
         for xs, ys in islice(dataloader, n_batches):
             xs, ys = xs.to(device), ys.to(device)
-            y_preds = model(xs)
-            loss += criterion(y_preds, ys).detach().item()
+            if ablation_hooks is None:
+                y_preds = model(xs)
+                loss += criterion(y_preds, ys).detach().item()
+            else:
+                ablated_loss = model.run_with_hooks(
+                    xs, 
+                    return_type="loss", 
+                    fwd_hooks=ablation_hooks
+                )
+                loss += ablated_loss.detach().item()
     return loss / n_batches
 
 
