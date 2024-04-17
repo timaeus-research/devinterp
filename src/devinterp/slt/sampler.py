@@ -70,12 +70,13 @@ def sample_single_chain(
     if optimize_over_per_model_param:
         param_groups = []
         for name, parameter in model.named_parameters():
-            param_groups.append(
-                {
-                    "params": parameter,
-                    "optimize_over": optimize_over_per_model_param[name].to(device),
-                }
-            )
+            if name in optimize_over_per_model_param:
+                param_groups.append(
+                    {
+                        "params": parameter,
+                        "optimize_over": optimize_over_per_model_param[name].to(device),
+                    }
+                )
         optimizer = sampling_method(
             param_groups,
             **optimizer_kwargs,
