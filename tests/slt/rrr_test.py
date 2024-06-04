@@ -2,14 +2,14 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
 from devinterp.slt.llc import LLCEstimator
 from devinterp.test_utils import *
-from devinterp.utils import *
+from devinterp.utils import evaluate_mse, optimal_temperature
 
 
 def make_pop_loss_fn(true_model):
@@ -93,12 +93,12 @@ def test_accuracy_rrr(sampling_method, m, h, n):
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader)
+        temperature=optimal_temperature(train_dataloader),
     )
     sample(
         model,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=0.0006, localization=1.0),
         sampling_method=sampling_method,
         num_chains=num_chains,

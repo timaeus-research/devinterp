@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
+from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 
@@ -151,3 +152,18 @@ def get_init_loss_full_batch(dataloader, model, evaluate, device):
             data = prepare_input(data, device=device)
             loss += evaluate(model, data).loss.detach().item()
     return loss / len(dataloader)
+
+
+def make_evaluate(
+    criterion: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
+) -> EvaluateFn:
+    def evaluate(model, data):
+        x, y = data
+        y_pred = model(x)
+        return Outputs(criterion(y_pred, y))
+
+    return evaluate
+
+
+evaluate_mse = make_evaluate(F.mse_loss)
+evaluate_ce = make_evaluate(F.cross_entropy)
