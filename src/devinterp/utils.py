@@ -1,5 +1,5 @@
 from itertools import islice
-from typing import Any, Callable, Mapping, NamedTuple, Union
+from typing import Any, Callable, Dict, Mapping, NamedTuple, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,7 +14,11 @@ class Outputs(NamedTuple):
     # Add more outputs here if needed
 
 
-EvaluateFn = Callable[[nn.Module, torch.Tensor], Outputs]
+EvalResults = Union[
+    Outputs, Dict[str, torch.Tensor], Tuple[torch.Tensor, ...], torch.Tensor
+]
+
+EvaluateFn = Callable[[nn.Module, torch.Tensor], EvalResults]
 
 
 def plot_trace(

@@ -80,8 +80,22 @@ def sample_single_chain(
         optimizer.zero_grad()
         data = prepare_input(data, device)
 
-        outputs = evaluate(model, data)
-        loss = outputs.loss
+        results = evaluate(model, data)
+
+        if isinstance(results, dict):
+            loss = results.pop("loss")
+        elif isinstance(results, tuple):
+            loss = results[0]
+            if len(results) > 1:
+                results = loss[1:]
+        elif isinstance(results, torch.Tensor):
+            loss = results
+            results = None
+        elif hasattr(results, "loss"):
+            loss = results.loss
+        else:
+            raise ValueError("compute_loss must return a dict, tuple, or torch.Tensor")
+
         mean_loss = loss.mean()
         mean_loss.backward()
 
