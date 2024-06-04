@@ -3,7 +3,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from devinterp.slt.cov import (
+from devinterp.backends.default.slt.cov import (
     BetweenLayerCovarianceAccumulator,
     CovarianceAccumulator,
     WithinHeadCovarianceAccumulator,

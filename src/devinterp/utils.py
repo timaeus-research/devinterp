@@ -1,3 +1,5 @@
+import inspect
+import os
 from itertools import islice
 from typing import Any, Callable, Dict, Mapping, NamedTuple, Tuple, Union
 
@@ -7,6 +9,16 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+
+try:
+    import torch_xla.core.xla_model as xm
+
+    PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "TPU")
+    USE_TPU_BACKEND = (
+        os.environ.get("USE_TPU_BACKEND", "1" if (PJRT_DEVICE == "TPU") else "0") == "1"
+    )
+except ImportError:
+    USE_TPU_BACKEND = False
 
 
 class Outputs(NamedTuple):
@@ -171,3 +183,14 @@ def make_evaluate(
 
 evaluate_mse = make_evaluate(F.mse_loss)
 evaluate_ce = make_evaluate(F.cross_entropy)
+
+
+def call_with(func: Callable, **kwargs):
+    # Check the func annotation and call with only the necessary kwargs.
+    sig = inspect.signature(func)
+
+    # Filter out the kwargs that are not in the function's signature
+    filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+
+    # Call the function with the filtered kwargs
+    return func(**filtered_kwargs)
