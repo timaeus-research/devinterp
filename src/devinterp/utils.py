@@ -1,9 +1,19 @@
-from torch.utils.data import DataLoader
-from typing import Union
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
 from itertools import islice
+from typing import Any, Callable, Mapping, NamedTuple, Union
+
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from torch import nn
+from torch.utils.data import DataLoader
+
+
+class Outputs(NamedTuple):
+    loss: torch.Tensor
+    # Add more outputs here if needed
+
+
+EvaluateFn = Callable[[nn.Module, torch.Tensor], Outputs]
 
 
 def plot_trace(
@@ -65,37 +75,79 @@ def optimal_temperature(dataloader: Union[DataLoader, int]):
         )
 
 
-def get_init_loss_one_batch(dataloader, model, criterion, device):
+def prepare_input(
+    data: Union[torch.Tensor, Any], device, is_deepspeed_enabled=False, accelerator=None
+) -> Union[torch.Tensor, Any]:
+    """
+    Prepares one `data` before feeding it to the model, be it a tensor or a nested list/dictionary of tensors.
+
+    Adapted from HuggingFace's transformers's Trainer._prepare_input().
+    """
+    if isinstance(data, Mapping):
+        return type(data)(
+            {
+                k: prepare_input(
+                    v,
+                    device=device,
+                    is_deepspeed_enabled=is_deepspeed_enabled,
+                    accelerator=accelerator,
+                )
+                for k, v in data.items()
+            }
+        )
+    elif isinstance(data, (tuple, list)):
+        return type(data)(
+            prepare_input(
+                v,
+                device=device,
+                is_deepspeed_enabled=is_deepspeed_enabled,
+                accelerator=accelerator,
+            )
+            for v in data
+        )
+    elif isinstance(data, torch.Tensor):
+        kwargs = {"device": device}
+        if is_deepspeed_enabled and (
+            torch.is_floating_point(data) or torch.is_complex(data)
+        ):
+            # NLP models inputs are int/uint and those get adjusted to the right dtype of the
+            # embedding. Other models such as wav2vec2's inputs are already float and thus
+            # may need special handling to match the dtypes of the model
+            kwargs.update(
+                {"dtype": accelerator.state.deepspeed_plugin.hf_ds_config.dtype()}
+            )
+        return data.to(**kwargs)
+    return data
+
+
+def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device):
     model = model.to(device)
     model.train()  # to make sure we're using train loss, comparable to train loss of sampler()
     with torch.no_grad():
-        xs, ys = next(iter(dataloader))
-        xs, ys = xs.to(device), ys.to(device)
-        y_preds = model(xs)
-        loss = criterion(y_preds, ys).detach().item()
+        data = next(iter(dataloader))
+        data = prepare_input(data, device=device)
+        loss = evaluate(model, data).loss.detach().item()
     return loss
 
 
-def get_init_loss_multi_batch(dataloader, n_batches, model, criterion, device):
+def get_init_loss_multi_batch(dataloader, n_batches, model, evaluate, device):
     model = model.to(device)
     model.train()
     loss = 0.0
     n_batches = min(n_batches, len(dataloader))
     with torch.no_grad():
-        for xs, ys in islice(dataloader, n_batches):
-            xs, ys = xs.to(device), ys.to(device)
-            y_preds = model(xs)
-            loss += criterion(y_preds, ys).detach().item()
+        for data in islice(dataloader, n_batches):
+            data = prepare_input(data, device=device)
+            loss += evaluate(model, data).loss.detach().item()
     return loss / n_batches
 
 
-def get_init_loss_full_batch(dataloader, model, criterion, device):
+def get_init_loss_full_batch(dataloader, model, evaluate, device):
     model = model.to(device)
     model.train()
     loss = 0.0
     with torch.no_grad():
-        for xs, ys in dataloader:
-            xs, ys = xs.to(device), ys.to(device)
-            y_preds = model(xs)
-            loss += criterion(y_preds, ys).detach().item()
+        for data in dataloader:
+            data = prepare_input(data, device=device)
+            loss += evaluate(model, data).loss.detach().item()
     return loss / len(dataloader)
