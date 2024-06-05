@@ -1,9 +1,8 @@
 import inspect
 import os
 from itertools import islice
-from typing import Any, Callable, Dict, Mapping, NamedTuple, Tuple, Union
+from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Tuple, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
@@ -43,6 +42,8 @@ def plot_trace(
     fig_size=(12, 9),
     true_lc=None,
 ):
+    import matplotlib.pyplot as plt
+
     num_chains, num_draws = trace.shape
     sgld_step = list(range(num_draws))
     if true_lc:
@@ -194,3 +195,36 @@ def call_with(func: Callable, **kwargs):
 
     # Call the function with the filtered kwargs
     return func(**filtered_kwargs)
+
+
+def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):
+    """
+    Sets the seed for the Learner.
+
+    Args:
+        seed (int): Seed to set.
+    """
+    import random
+
+    torch.manual_seed(seed)
+    random.seed(seed)
+
+    try:
+        import numpy as np
+        np.random.seed(seed)
+    except ImportError:
+        pass
+
+    try:
+        import torch_xla.core.xla_model as xm
+
+        if device is None:
+            xm.set_rng_state(seed)
+        elif "xla" in str(device):
+            xm.set_rng_state(seed, device=device)
+
+    except (ImportError, RuntimeError):
+        pass
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)

@@ -22,7 +22,7 @@ classifiers = [
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-dev = ["pytest==7.4.3"]
+dev = ["pytest==7.4.3", "transformers", "datasets", "transformer_lens"]
 tpu = ["torch-xla>=2.0.1"]
 
 [project.urls]

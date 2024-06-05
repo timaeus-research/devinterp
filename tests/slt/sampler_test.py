@@ -39,12 +39,12 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
     llc_estimator_1 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_temperature(train_dataloader),
     )
     llc_estimator_2 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_temperature(train_dataloader),
     )
     torch.manual_seed(42)
 
@@ -101,7 +101,7 @@ def unused_test_batch_size_convergence(
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
-            temperature=optimal_temperature(train_dataloader),
+            nbeta=optimal_temperature(train_dataloader),
         )
         sample(
             model,

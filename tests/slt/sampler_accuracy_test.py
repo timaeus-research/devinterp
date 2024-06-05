@@ -52,7 +52,7 @@ def test_accuracy_normalcrossing(
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_temperature(train_dataloader),
     )
     sample(
         model,
