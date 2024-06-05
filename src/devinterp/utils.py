@@ -56,9 +56,9 @@ def plot_trace(
 
 def optimal_temperature(dataloader: Union[DataLoader, int]):
     if isinstance(dataloader, DataLoader):
-        return dataloader.batch_size / np.log(dataloader.batch_size)
+        return np.log(dataloader.batch_size) / dataloader.batch_size
     elif isinstance(dataloader, int):
-        return dataloader / np.log(dataloader)
+        return np.log(dataloader) / dataloader
     else:
         raise NotImplementedError(
             f"Temperature for data type {type(dataloader)} not implemented, use DataLoader or int instead."

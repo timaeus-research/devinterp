@@ -31,14 +31,14 @@ class SGLD(torch.optim.Optimizer):
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
         >>> optimizer.step()
-        
-    .. |colab6| image:: https://colab.research.google.com/assets/colab-badge.svg 
+
+    .. |colab6| image:: https://colab.research.google.com/assets/colab-badge.svg
         :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb
-        
+
     Note:
         - :python:`localization` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
         - :python:`noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.
-        - Although this class is a subclass of :python:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point. 
+        - Although this class is a subclass of :python:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.
         - Hyperparameter optimization is more of an art than a science. Check out `the calibration notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab6| for how to go about it in a simple case.
     :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :python:`model.parameters()` or something more fancy, just like other :python:`torch.optim.Optimizer` classes.
     :type params: Iterable
@@ -56,7 +56,7 @@ class SGLD(torch.optim.Optimizer):
     :type temperature: int, optional
     :param save_noise: Whether to store the per-parameter noise during optimization. Default is False
     :type save_noise: bool, optional
-    
+
     :raises Warning: if :python:`noise_level` is set to anything other than 1
     :raises Warning: if :python:`temperature` is set to 1
     """
@@ -80,7 +80,6 @@ class SGLD(torch.optim.Optimizer):
         if temperature == 1.0:
             warnings.warn(
                 "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_temperature(dataloader) instead"
-
             )
         defaults = dict(
             lr=lr,
@@ -113,7 +112,7 @@ class SGLD(torch.optim.Optimizer):
                 if p.grad is None:
                     continue
                 param_state = self.state[p]
-                dw = p.grad.data * group["temperature"]
+                dw = p.grad.data / group["temperature"]
 
                 if group["weight_decay"] != 0:
                     dw.add_(p.data, alpha=group["weight_decay"])

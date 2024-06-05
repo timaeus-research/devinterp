@@ -87,7 +87,7 @@ class MalaAcceptanceRate(SamplerCallback):
         # (so we update those only after the calculation)
         self.current_grads = optimizer.dws
         # mala acceptance loss is different from pytorch supplied loss
-        mala_loss = (loss * self.temperature).item() + optimizer.localization_loss
+        mala_loss = (loss / self.temperature).item() + optimizer.localization_loss
         if draw > 1:
             for current_param, current_grad, prev_param, prev_grad in zip(
                 self.current_params,
