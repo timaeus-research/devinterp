@@ -20,6 +20,7 @@ from devinterp.utils import (
     get_init_loss_multi_batch,
     optimal_temperature,
     prepare_input,
+    split_results,
 )
 
 
@@ -81,20 +82,7 @@ def sample_single_chain(
         data = prepare_input(data, device)
 
         results = evaluate(model, data)
-
-        if isinstance(results, dict):
-            loss = results.pop("loss")
-        elif isinstance(results, tuple):
-            loss = results[0]
-            if len(results) > 1:
-                results = loss[1:]
-        elif isinstance(results, torch.Tensor):
-            loss = results
-            results = None
-        elif hasattr(results, "loss"):
-            loss = results.loss
-        else:
-            raise ValueError("compute_loss must return a dict, tuple, or torch.Tensor")
+        loss, results = split_results(results)
 
         mean_loss = loss.mean()
         mean_loss.backward()

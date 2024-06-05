@@ -125,13 +125,33 @@ def prepare_input(
     return data
 
 
+def split_results(results: EvalResults) -> Tuple[torch.Tensor, Any]:
+    if isinstance(results, dict):
+        loss = results.pop("loss")
+    elif isinstance(results, tuple):
+        loss = results[0]
+        if len(results) > 1:
+            results = loss[1:]
+    elif isinstance(results, torch.Tensor):
+        loss = results
+        results = None
+    elif hasattr(results, "loss"):
+        loss = results.loss
+    else:
+        raise ValueError("compute_loss must return a dict, tuple, or torch.Tensor")
+
+    return loss, results
+
+
 def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device):
     model = model.to(device)
     model.train()  # to make sure we're using train loss, comparable to train loss of sampler()
+
     with torch.no_grad():
         data = next(iter(dataloader))
         data = prepare_input(data, device=device)
-        loss = evaluate(model, data).loss.detach().item()
+        loss = split_results(evaluate(model, data))[0].detach().item()
+
     return loss
 
 
@@ -140,10 +160,12 @@ def get_init_loss_multi_batch(dataloader, n_batches, model, evaluate, device):
     model.train()
     loss = 0.0
     n_batches = min(n_batches, len(dataloader))
+
     with torch.no_grad():
         for data in islice(dataloader, n_batches):
             data = prepare_input(data, device=device)
-            loss += evaluate(model, data).loss.detach().item()
+            loss += split_results(evaluate(model, data))[0].detach().item()
+
     return loss / n_batches
 
 
@@ -151,20 +173,23 @@ def get_init_loss_full_batch(dataloader, model, evaluate, device):
     model = model.to(device)
     model.train()
     loss = 0.0
+
     with torch.no_grad():
         for data in dataloader:
             data = prepare_input(data, device=device)
-            loss += evaluate(model, data).loss.detach().item()
+            loss += split_results(evaluate(model, data))[0].detach().item()
+
     return loss / len(dataloader)
 
 
 def make_evaluate(
     criterion: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 ) -> EvaluateFn:
+
     def evaluate(model, data):
         x, y = data
         y_pred = model(x)
-        return Outputs(criterion(y_pred, y))
+        return criterion(y_pred, y)
 
     return evaluate
 
