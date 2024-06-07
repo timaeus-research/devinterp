@@ -1,5 +1,5 @@
 einops>=0.6.1
-matplotlib>=3.8.0
+matplotlib>=3.7.5
 numpy>=1.23.5
 pandas>=1.5.3
 scipy>=1.11.3
