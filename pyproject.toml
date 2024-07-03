@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0.0", "wheel"]
 
 [project]
 name = "devinterp"
-version = "0.2.0"
+version = "0.2.2"
 description = "A library for doing research on developmental interpretability"
 # license = "LICENSE"
 readme = "README.md"
