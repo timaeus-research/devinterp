@@ -50,7 +50,6 @@ class SGNHT(torch.optim.Optimizer):
         lr=0.01,
         diffusion_factor=0.01,
         bounding_box_size=None,
-        optimize_over=None,
         save_noise=False,
         save_mala_vars=False,
         temperature=1.0,
@@ -62,9 +61,6 @@ class SGNHT(torch.optim.Optimizer):
         if save_mala_vars:
             warnings.warn(
                 "Warning: MALA not implemented for SGNHT! If you insist on using MALA, use SGLD instead.")
-        if optimize_over:
-            warnings.warn(
-                "Warning: optimizer_over not implemented for SGNHT! If you insist on restricting your LLC estimates, use SGLD instead.")
         if temperature == 1.0:
             warnings.warn(
                 "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_temperature(dataloader) instead"
@@ -74,7 +70,6 @@ class SGNHT(torch.optim.Optimizer):
             lr=lr,
             diffusion_factor=diffusion_factor,
             bounding_box_size=bounding_box_size,
-            optimize_over=optimize_over,
             temperature=temperature,
         )
         super(SGNHT, self).__init__(params, defaults)
@@ -93,6 +88,8 @@ class SGNHT(torch.optim.Optimizer):
     def step(self, closure=None):
         with torch.no_grad():
             for group in self.param_groups:
+                if group["optimize_over"] is not None:
+                    raise NotImplementedError
                 group_energy_sum = 0.0
                 group_energy_size = 0
                 for p in group["params"]:
@@ -142,6 +139,7 @@ class SGNHT(torch.optim.Optimizer):
                             + group["bounding_box_size"],
                         )
                         momentum.mul_(reflection_coefs)
+
                 # Update thermostat based on average kinetic energy
                 d_thermostat = (group_energy_sum / group_energy_size) - group["lr"]
                 group["thermostat"].add_(d_thermostat.to(group["thermostat"].device))

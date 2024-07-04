@@ -102,9 +102,6 @@ def sample_single_chain(
         loss = criterion(y_preds, ys)
 
         loss.backward()
-        # if optimize_over_per_model_param: # not sure this is needed tbh
-        #     for param_name, optimize_over in optimize_over_per_model_param.items():
-        #         getattr(model, param_name).grad = getattr(model, param_name).grad*optimize_over
 
         optimizer.step()
 
