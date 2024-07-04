@@ -66,14 +66,14 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on how to contribute.
 
 ## Credits & Citations
 
-This package was created by [Timaeus](https://timaeus.co). The main contributors to this package are Jesse Hoogland, Stan van Wingerden, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also made valuable contributions or provided useful advice.
+This package was created by [Timaeus](https://timaeus.co). The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also made valuable contributions or provided useful advice.
 
 If this package was useful in your work, please cite it as:
 
 ```BibTeX
    @misc{devinterp2024,
       title = {DevInterp},
-      author = {Jesse Hoogland, Stan van Wingerden, and George Wang},
+      author = {Stan van Wingerden, Jesse Hoogland, and George Wang},
       year = {2024},
       howpublished = {\url{https://github.com/timaeus-research/devinterp}},
    }
