@@ -138,7 +138,7 @@ class SGLD(torch.optim.Optimizer):
                 if self.save_noise:
                     self.noise.append(noise)
 
-                if group["optimize_over"] is not None:
+                if group.get("optimize_over") is not None:
                     dw = dw * group["optimize_over"]
                     noise = noise * group["optimize_over"]
                 p.data.add_(dw, alpha=-0.5 * group["lr"])
