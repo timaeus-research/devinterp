@@ -2,14 +2,14 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.test_utils import *
-from devinterp.utils import *
+from devinterp.utils import evaluate_mse, optimal_temperature
 
 
 @pytest.fixture
@@ -46,7 +46,6 @@ def test_accuracy_normalcrossing(
     seed = 42
     model = Polynomial(powers)
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = 0.0002
     num_chains = 10
     num_draws = 5_000
@@ -58,7 +57,7 @@ def test_accuracy_normalcrossing(
     sample(
         model,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=lr, bounding_box_size=1.0),
         sampling_method=sampling_method,
         num_chains=num_chains,
