@@ -46,8 +46,9 @@ def sample_single_chain(
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
-    verbose=True,
+    verbose: bool = True,
     device: torch.device = torch.device("cpu"),
+    optimize_over_per_model_param: Optional[dict] = None,
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
 ):
@@ -57,14 +58,28 @@ def sample_single_chain(
         )
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
-
     optimizer_kwargs = optimizer_kwargs or {}
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
         optimizer_kwargs.setdefault("save_noise", True)
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
-    optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
+    if optimize_over_per_model_param:
+        param_groups = []
+        for name, parameter in model.named_parameters():
+            param_groups.append(
+                {
+                    "params": parameter,
+                    "optimize_over": optimize_over_per_model_param[name].to(device),
+                }
+            )
+        optimizer = sampling_method(
+            param_groups,
+            **optimizer_kwargs,
+        )
+    else:
+        optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
+
 
     if seed is not None:
         torch.manual_seed(seed)
@@ -118,6 +133,7 @@ def sample(
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
 ):
     """
     Sample model weights using a given sampling_method, supporting multiple chains/cores,
@@ -224,6 +240,7 @@ def sample(
             device=device,
             verbose=verbose,
             callbacks=callbacks,
+            optimize_over_per_model_param=optimize_over_per_model_param,
         )
 
     if cores > 1:
@@ -242,20 +259,21 @@ def sample(
 def estimate_learning_coeff_with_summary(
     model: torch.nn.Module,
     loader: DataLoader,
+    callbacks: List[Callable] = [],
     evaluate: Optional[EvaluateFn] = None,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
-    optimizer_kwargs: Optional[Dict] = {},
+    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
+    init_loss: float = None,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    device: torch.device = torch.device("cpu"),
+    device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[Callable] = [],
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
     online: bool = False,
-    init_loss: float = None,
 ) -> dict:
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
     if not init_loss:
@@ -291,6 +309,7 @@ def estimate_learning_coeff_with_summary(
         verbose=verbose,
         callbacks=callbacks,
         init_loss=init_loss,
+        optimize_over_per_model_param=optimize_over_per_model_param,
     )
 
     results = {}
@@ -305,6 +324,7 @@ def estimate_learning_coeff_with_summary(
 def estimate_learning_coeff(
     model: torch.nn.Module,
     loader: DataLoader,
+    callbacks: List[Callable] = [],
     evaluate: Optional[EvaluateFn] = None,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
@@ -312,12 +332,12 @@ def estimate_learning_coeff(
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
+    init_loss: float = None,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    device: torch.device = torch.device("cpu"),
+    device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[Callable] = [],
-    init_loss: float = None,
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None
 ) -> float:
     return estimate_learning_coeff_with_summary(
         model=model,
@@ -336,4 +356,5 @@ def estimate_learning_coeff(
         callbacks=callbacks,
         online=False,
         init_loss=init_loss,
+        optimize_over_per_model_param=optimize_over_per_model_param,
     )["llc/mean"]

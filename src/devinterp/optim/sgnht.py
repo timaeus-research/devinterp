@@ -88,13 +88,13 @@ class SGNHT(torch.optim.Optimizer):
     def step(self, closure=None):
         with torch.no_grad():
             for group in self.param_groups:
+                if group.get("optimize_over") is not None:
+                    raise NotImplementedError
                 group_energy_sum = 0.0
                 group_energy_size = 0
-
                 for p in group["params"]:
                     if p.grad is None:
                         continue
-
                     param_state = self.state[p]
                     momentum = param_state["momentum"]
 
