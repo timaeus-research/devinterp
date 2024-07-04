@@ -2,14 +2,14 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
-from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
+from devinterp.slt.llc import LLCEstimator
 from devinterp.test_utils import *
-from devinterp.utils import *
+from devinterp.utils import evaluate_mse, optimal_temperature
 
 
 @pytest.fixture
@@ -33,23 +33,25 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
     model = Polynomial()
 
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = 0.0001
     num_chains = 3
     num_draws = 100
     llc_estimator_1 = LLCEstimator(
-        num_chains=num_chains, num_draws=num_draws, temperature=optimal_temperature(train_dataloader)
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
     )
     llc_estimator_2 = LLCEstimator(
-        num_chains=num_chains, num_draws=num_draws, temperature=optimal_temperature(train_dataloader)
-
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
     )
     torch.manual_seed(42)
 
     sample(
         model,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=lr),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -63,7 +65,7 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
     sample(
         model,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=lr),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -104,7 +106,7 @@ def unused_test_batch_size_convergence(
         sample(
             model,
             train_dataloader,
-            criterion=criterion,
+            evaluate=evaluate_mse,
             optimizer_kwargs=dict(lr=lr, localization=1.0),
             sampling_method=sampling_method,
             num_chains=num_chains,
