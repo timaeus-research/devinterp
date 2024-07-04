@@ -58,7 +58,6 @@ def test_rllc_normalcrossing_between_powers(
     model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
 
     train_dataloader, _, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = 0.0002
     num_chains = 1
     num_draws = 100
@@ -77,7 +76,7 @@ def test_rllc_normalcrossing_between_powers(
     sample(
         model1,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
             temperature=optimal_temperature(train_dataloader),
@@ -95,7 +94,7 @@ def test_rllc_normalcrossing_between_powers(
     sample(
         model2,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
             temperature=optimal_temperature(train_dataloader),
@@ -143,7 +142,6 @@ def test_restricted_gradient_normalcrossing_between_dims(
     model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
 
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = 0.0001
     num_chains = 1
     num_draws = 200
@@ -161,7 +159,7 @@ def test_restricted_gradient_normalcrossing_between_dims(
     sample(
         model1,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
         ),
@@ -175,7 +173,7 @@ def test_restricted_gradient_normalcrossing_between_dims(
     sample(
         model2,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
         ),
@@ -218,7 +216,6 @@ def test_rllc_full_normalcrossing_between_dims(
     model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
 
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = 0.0001
     num_chains = 1
     num_draws = 2000
@@ -236,7 +233,7 @@ def test_rllc_full_normalcrossing_between_dims(
     sample(
         model1,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -248,7 +245,7 @@ def test_rllc_full_normalcrossing_between_dims(
     sample(
         model2,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -280,7 +277,6 @@ def test_rllc_different_from_full_llc_between_dims(
     model.weights = torch.nn.Parameter(torch.tensor([0., 1.]))
 
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = 0.001
     num_chains = 1
     num_draws = 200
@@ -298,7 +294,7 @@ def test_rllc_different_from_full_llc_between_dims(
     sample(
         model,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -310,7 +306,7 @@ def test_rllc_different_from_full_llc_between_dims(
     sample(
         model,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
