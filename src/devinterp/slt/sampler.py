@@ -1,263 +1,382 @@
-import numpy as np
-import pytest
+import inspect
+import itertools
+import warnings
+from copy import deepcopy
+from typing import Callable, Dict, List, Literal, Optional, Type, Union
+
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from devinterp.optim.sgld import SGLD
-from devinterp.slt import sample
-from devinterp.slt.llc import LLCEstimator
-from devinterp.test_utils import *
-from devinterp.utils import *
+from devinterp.slt.callback import SamplerCallback, validate_callbacks
+from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
+from devinterp.slt.mala import MalaAcceptanceRate
+from devinterp.slt.norms import NoiseNorm
+from devinterp.utils import (
+    EvaluateFn,
+    get_init_loss_multi_batch,
+    optimal_temperature,
+    prepare_input,
+    split_results,
+)
 
 
-@pytest.fixture
-def generated_normalcrossing_dataset():
-    torch.manual_seed(42)
-    np.random.seed(42)
-    sigma = 0.25
-    num_samples = 1000
-    x = torch.normal(0, 2, size=(num_samples,))
-    y = sigma * torch.normal(0, 1, size=(num_samples,))
-    train_data = TensorDataset(x, y)
-    train_dataloader = DataLoader(train_data, batch_size=num_samples, shuffle=True)
-    return train_dataloader, train_data, x, y
+def call_with(func: Callable, **kwargs):
+    # Check the func annotation and call with only the necessary kwargs.
+    sig = inspect.signature(func)
+
+    # Filter out the kwargs that are not in the function's signature
+    filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+
+    # Call the function with the filtered kwargs
+    return func(**filtered_kwargs)
 
 
-POWERS = [
-    [
-        [1, 1, 0],
-        [1, 1, 10],
-    ],
-    [
-        [2, 2, 10],
-        [2, 2, 3],
-    ],
-    [
-        [3, 3, 6.1],
-        [3, 3, 1.2],
-    ],
-]
-
-SAMPLE_POINTS = [[0.0, 0.0, 1.0], [1.0, 1.0, 1.0]]
-
-
-@pytest.mark.parametrize("sampling_method", [SGLD])
-@pytest.mark.parametrize("powers", POWERS)
-@pytest.mark.parametrize("sample_point", SAMPLE_POINTS)
-def test_rllc_normalcrossing_between_powers(
-    generated_normalcrossing_dataset, sampling_method, powers, sample_point
+def sample_single_chain(
+    ref_model: nn.Module,
+    loader: DataLoader,
+    evaluate: EvaluateFn,
+    num_draws=100,
+    num_burnin_steps=0,
+    num_steps_bw_draws=1,
+    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    optimizer_kwargs: Optional[Dict] = None,
+    chain: int = 0,
+    seed: Optional[int] = None,
+    verbose: bool = True,
+    device: torch.device = torch.device("cpu"),
+    optimize_over_per_model_param: Optional[dict] = None,
+    callbacks: List[SamplerCallback] = [],
+    init_loss: float = None,
 ):
-    seed = 42
-    torch.manual_seed(seed)
-
-    model1 = Polynomial(powers[0])
-    model1.weights = torch.nn.Parameter(torch.tensor(sample_point))
-    model2 = Polynomial(powers[1])
-    model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
-
-    train_dataloader, _, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
-    lr = 0.0002
-    num_chains = 1
-    num_draws = 100
-    llc_estimator_1 = LLCEstimator(
-        num_chains=num_chains,
-        num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
-    )
-    llc_estimator_2 = LLCEstimator(
-        num_chains=num_chains,
-        num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
-    )
-    torch.manual_seed(seed)
-
-    sample(
-        model1,
-        train_dataloader,
-        criterion=criterion,
-        optimizer_kwargs=dict(
-            lr=lr,
-            temperature=optimal_temperature(train_dataloader),
-        ),
-        sampling_method=sampling_method,
-        num_chains=num_chains,
-        num_draws=num_draws,
-        callbacks=[llc_estimator_1],
-        verbose=False,
-        seed=seed,
-        optimize_over_per_model_param={"weights": torch.tensor([1, 1, 0])},
-    )
-    torch.manual_seed(seed)
-
-    sample(
-        model2,
-        train_dataloader,
-        criterion=criterion,
-        optimizer_kwargs=dict(
-            lr=lr,
-            temperature=optimal_temperature(train_dataloader),
-        ),
-        sampling_method=sampling_method,
-        num_chains=num_chains,
-        num_draws=num_draws,
-        callbacks=[llc_estimator_2],
-        verbose=False,
-        seed=seed,
-        optimize_over_per_model_param={"weights": torch.tensor([1, 1, 0])},
-    )
-    llc_mean_1 = llc_estimator_1.sample()["llc/mean"]
-    llc_mean_2 = llc_estimator_2.sample()["llc/mean"]
-    assert np.isclose(
-        llc_mean_1, llc_mean_2, atol=1e-5
-    ), f"LLC mean {llc_mean_1:.3f}!={llc_mean_2:.3f} for powers {powers} using {sampling_method}"
+    if grad_accum_steps > 1:
+        assert type(grad_accum_steps) == int, "grad_accum_steps must be an integer."
+        num_steps_bw_draws *= grad_accum_steps
+        num_burnin_steps *= grad_accum_steps
+    if num_draws > len(loader):
+        warnings.warn(
+            "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
+        )
+        
+    # Initialize new model and optimizer for this chain
+    model = deepcopy(ref_model).to(device)
+    optimizer_kwargs = optimizer_kwargs or {}
+    if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
+        optimizer_kwargs.setdefault("save_mala_vars", True)
+    if any(isinstance(callback, NoiseNorm) for callback in callbacks):
+        optimizer_kwargs.setdefault("save_noise", True)
+    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
+    if optimize_over_per_model_param:
+        param_groups = []
+        for name, parameter in model.named_parameters():
+            param_groups.append(
+                {
+                    "params": parameter,
+                    "optimize_over": optimize_over_per_model_param[name].to(device),
+                }
+            )
+        optimizer = sampling_method(
+            param_groups,
+            **optimizer_kwargs,
+        )
+    else:
+        optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
 
 
-POWERS = [
-    [1, 1],
-    [2, 10],
-]
-EXTRA_DIM_POWER = [3, 10, 100]
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
+
+    cumulative_loss = 0
+    for i, data in tqdm(
+        zip(range(num_steps), itertools.cycle(loader)),
+        desc=f"Chain {chain}",
+        total=num_steps // grad_accum_steps,
+        disable=not verbose,
+    ):
+        model.train()
+        data = prepare_input(data, device)
+
+        results = evaluate(model, data)
+        loss, results = split_results(results)
+
+        if grad_accum_steps > 1:
+            loss = loss / grad_accum_steps
+            cumulative_loss += loss.item()
+        loss.backward()
+
+        # i+1 instead of i so that the gradient accumulates to an entire batch first
+        # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
+        if (i+1) % grad_accum_steps == 0:
+            optimizer.step()
+            optimizer.zero_grad()
+            pbar.update(1)
+
+        if i >= num_burnin_steps and (i + 1 - num_burnin_steps) % num_steps_bw_draws == 0:
+            draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
+            if grad_accum_steps > 1:
+                loss = cumulative_loss
+                cumulative_loss = 0
+            else:
+                loss = loss.item()
+
+            with torch.no_grad():
+                for callback in callbacks:
+                    call_with(callback, **locals())  # Cursed. This is the way.
 
 
-@pytest.mark.parametrize("sampling_method", [SGLD])
-@pytest.mark.parametrize("relevant_powers", POWERS)
-@pytest.mark.parametrize("extra_dim_power", EXTRA_DIM_POWER)
-@pytest.mark.parametrize("sample_point", SAMPLE_POINTS)
-def test_rllc_gradient_normalcrossing_between_dims(
-    generated_normalcrossing_dataset,
-    sampling_method,
-    relevant_powers,
-    extra_dim_power,
-    sample_point,
+def _sample_single_chain(kwargs):
+    return sample_single_chain(**kwargs)
+
+
+def sample(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    callbacks: List[SamplerCallback],
+    evaluate: Optional[EvaluateFn] = None,
+    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
+    num_draws: int = 100,
+    num_chains: int = 10,
+    num_burnin_steps: int = 0,
+    num_steps_bw_draws: int = 1,
+    init_loss: float = None,
+    grad_accum_steps: int = 1,
+    cores: int = 1,
+    seed: Optional[Union[int, List[int]]] = None,
+    device: Union[torch.device, str] = torch.device("cpu"),
+    verbose: bool = True,
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
 ):
-    torch.manual_seed(42)
-    seed = 42
+    """
+    Sample model weights using a given sampling_method, supporting multiple chains/cores,
+    and calculate the observables (loss, llc, etc.) for each callback passed along.
+    The :python:`update`, :python:`finalize` and :python:`sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called
+    during sampling, after sampling, and at :python:`sampler_callback_object.sample()` respectively.
 
-    model1 = Polynomial(relevant_powers)
-    model2 = Polynomial(relevant_powers + [extra_dim_power])
+    After calling this function, the stats of interest live in the callback object.
 
-    model1.weights = torch.nn.Parameter(torch.tensor(sample_point[:-1]))
-    model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
+    :param model: The neural network model.
+    :type model: torch.nn.Module
+    :param loader: DataLoader for input data.
+    :type loader: DataLoader
+    :param evaluate: Maps a model and batch of data to an object with a loss attribute.
+    :type evaluate: EvaluateFn
+    :param callbacks: list of callbacks, each of type SamplerCallback
+    :type callbacks: list[SamplerCallback]
+    :param sampling_method: Sampling method to use (a PyTorch optimizer under the hood). Default is SGLD
+    :type sampling_method: torch.optim.Optimizer, optional
+    :param optimizer_kwargs: Keyword arguments for the PyTorch optimizer (used as sampler here). Default is None (using standard SGLD parameters as defined in the SGLD class)
+    :type optimizer_kwargs: dict, optional
+    :param num_draws: Number of samples to draw. Default is 100
+    :type num_draws: int, optional
+    :param num_chains: Number of chains to run. Default is 10
+    :type num_chains: int, optional
+    :param num_burnin_steps: Number of burn-in steps before sampling. Default is 0
+    :type num_burnin_steps: int, optional
+    :param num_steps_bw_draws: Number of steps between each draw. Default is 1
+    :type num_steps_bw_draws: int, optional
+    :param init_loss: Initial loss for use in `LLCEstimator` and `OnlineLLCEstimator`
+    :type init_loss: float, optional
+    :param cores: Number of cores for parallel execution. Default is 1
+    :type cores: int, optional
+    :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed. Default is None
+    :type seed: int, optional
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :type device: str or torch.device, optional
+    :param verbose: whether to print sample chain progress. Default is True
+    :type verbose: bool, optional
 
-    train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
-    lr = 0.0001
-    num_chains = 1
-    num_draws = 200
-    llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
-        num_chains=num_chains,
-        num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
-    )
-    llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
-        num_chains=num_chains,
-        num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
-    )
+    :raises ValueError: if derivative callbacks (f.e. :func:`~devinterp.slt.loss.OnlineLossStatistics`) are passed before base callbacks (f.e. :func:`~devinterp.slt.llc.OnlineLLCEstimator`)
+    :raises Warning: if num_burnin_steps < num_draws
+    :raises Warning: if num_draws > len(loader)
+    :raises Warning: if using seeded runs
+
+    :returns: None (access LLCs or other observables through `callback_object.sample()`)
+    """
+    if num_burnin_steps < num_draws:
+        warnings.warn(
+            "You are taking more draws than burn-in steps, your LLC estimates will likely be underestimates. Please check LLC chain convergence."
+        )
+    if num_draws > len(loader):
+        warnings.warn(
+            "You are taking more sample batches than there are dataloader batches available, "
+            "this removes some randomness from sampling but is probably fine. (All sample batches "
+            "beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
+        )
+    if not init_loss:
+        init_loss = get_init_loss_multi_batch(
+            loader, num_chains, model, evaluate, device
+        )
+        # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
+        # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
+    for callback in callbacks:
+        if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
+            setattr(callback, "init_loss", init_loss)
+
+    if cores is None:
+        cores = min(4, cpu_count())
+
+    if seed is not None:
+        warnings.warn(
+            "You are using seeded runs, for full reproducibility check https://pytorch.org/docs/stable/notes/randomness.html"
+        )
+        if isinstance(seed, int):
+            seeds = [seed + i for i in range(num_chains)]
+        elif len(seed) != num_chains:
+            raise ValueError("Length of seed list must match number of chains")
+        else:
+            seeds = seed
+    else:
+        seeds = [None] * num_chains
+
+    if evaluate is None:
+
+        def evaluate(model, data):
+            return model(data)
+
+    validate_callbacks(callbacks)
+
+    def get_args(i):
+        return dict(
+            chain=i,
+            seed=seeds[i],
+            ref_model=model,
+            loader=loader,
+            evaluate=evaluate,
+            num_draws=num_draws,
+            num_burnin_steps=num_burnin_steps,
+            num_steps_bw_draws=num_steps_bw_draws,
+            init_loss=init_loss,
+            grad_accum_steps=grad_accum_steps,
+            sampling_method=sampling_method,
+            optimizer_kwargs=optimizer_kwargs,
+            device=device,
+            verbose=verbose,
+            callbacks=callbacks,
+            optimize_over_per_model_param=optimize_over_per_model_param,
+        )
+
+    if cores > 1:
+        ctx = get_context("spawn")
+        with ctx.Pool(cores) as pool:
+            pool.map(_sample_single_chain, [get_args(i) for i in range(num_chains)])
+    else:
+        for i in range(num_chains):
+            _sample_single_chain(get_args(i))
+
+    for callback in callbacks:
+        if hasattr(callback, "finalize"):
+            callback.finalize()
+
+
+def estimate_learning_coeff_with_summary(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    callbacks: List[Callable] = [],
+    evaluate: Optional[EvaluateFn] = None,
+    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
+    num_draws: int = 100,
+    num_chains: int = 10,
+    num_burnin_steps: int = 0,
+    num_steps_bw_draws: int = 1,
+    init_loss: float = None,
+    grad_accum_steps: int = 1,
+    cores: int = 1,
+    seed: Optional[Union[int, List[int]]] = None,
+    device: Union[torch.device, str] = torch.device("cpu"),
+    verbose: bool = True,
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
+    online: bool = False,
+) -> dict:
+    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
+    if not init_loss:
+        init_loss = get_init_loss_multi_batch(
+            loader, num_chains, model, evaluate, device
+        )
+        # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
+        # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
+    if online:
+        llc_estimator = OnlineLLCEstimator(
+            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
+        )
+    else:
+        llc_estimator = LLCEstimator(
+            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
+        )
+
+    callbacks = [llc_estimator, *callbacks]
 
     sample(
-        model1,
-        train_dataloader,
-        criterion=criterion,
-        optimizer_kwargs=dict(
-            lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
-        ),
+        model=model,
+        loader=loader,
+        evaluate=evaluate,
         sampling_method=sampling_method,
-        num_chains=num_chains,
+        optimizer_kwargs=optimizer_kwargs,
         num_draws=num_draws,
-        callbacks=[llc_estimator_2d],
-        verbose=False,
+        num_chains=num_chains,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_bw_draws=num_steps_bw_draws,
+        grad_accum_steps=grad_accum_steps,
+        cores=cores,
         seed=seed,
+        device=device,
+        verbose=verbose,
+        callbacks=callbacks,
+        init_loss=init_loss,
+        optimize_over_per_model_param=optimize_over_per_model_param,
     )
-    sample(
-        model2,
-        train_dataloader,
-        criterion=criterion,
-        optimizer_kwargs=dict(
-            lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
-        ),
+
+    results = {}
+
+    for callback in callbacks:
+        if hasattr(callback, "sample"):
+            results.update(callback.sample())
+
+    return results
+
+
+def estimate_learning_coeff(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    callbacks: List[Callable] = [],
+    evaluate: Optional[EvaluateFn] = None,
+    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
+    num_draws: int = 100,
+    num_chains: int = 10,
+    num_burnin_steps: int = 0,
+    num_steps_bw_draws: int = 1,
+    init_loss: float = None,
+    grad_accum_steps: int = 1,
+    cores: int = 1,
+    seed: Optional[Union[int, List[int]]] = None,
+    device: Union[torch.device, str] = torch.device("cpu"),
+    verbose: bool = True,
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None
+) -> float:
+    return estimate_learning_coeff_with_summary(
+        model=model,
+        loader=loader,
+        evaluate=evaluate,
         sampling_method=sampling_method,
-        num_chains=num_chains,
+        optimizer_kwargs=optimizer_kwargs,
         num_draws=num_draws,
-        callbacks=[llc_estimator_3d],
-        verbose=False,
+        num_chains=num_chains,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_bw_draws=num_steps_bw_draws,
+        grad_accum_steps=grad_accum_steps,
+        cores=cores,
         seed=seed,
-        optimize_over_per_model_param={"weights": torch.tensor([1, 1, 0])},
-    )
-    llc_mean_2d = llc_estimator_2d.sample()["llc/mean"]
-    llc_mean_3d_restricted = llc_estimator_3d.sample()["llc/mean"]
-    assert np.isclose(
-        llc_mean_2d, llc_mean_3d_restricted, atol=1e-5
-    ), f"LLC mean {llc_mean_2d:.3f}!={llc_mean_3d_restricted:.3f} for powers {relevant_powers + [extra_dim_power]} using {sampling_method}, {model2.weights}"
-
-SAMPLE_POINTS = [[0.0, 0.0, 1.0], [0.0, 1.0, 1.0]]
-
-@pytest.mark.parametrize("sampling_method", [SGLD])
-@pytest.mark.parametrize("relevant_powers", POWERS)
-@pytest.mark.parametrize("extra_dim_power", EXTRA_DIM_POWER)
-@pytest.mark.parametrize("sample_point", SAMPLE_POINTS)
-def test_rllc_full_normalcrossing_between_dims(
-    generated_normalcrossing_dataset,
-    sampling_method,
-    relevant_powers,
-    extra_dim_power,
-    sample_point,
-):
-    torch.manual_seed(42)
-    seed = 42
-
-    model1 = Polynomial(relevant_powers)
-    model2 = Polynomial(relevant_powers + [extra_dim_power])
-
-    model1.weights = torch.nn.Parameter(torch.tensor(sample_point[:-1]))
-    model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
-
-    train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
-    lr = 0.0001
-    num_chains = 1
-    num_draws = 2000
-    llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
-        num_chains=num_chains,
-        num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
-    )
-    llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
-        num_chains=num_chains,
-        num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
-    )
-
-    sample(
-        model1,
-        train_dataloader,
-        criterion=criterion,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
-        sampling_method=sampling_method,
-        num_chains=num_chains,
-        num_draws=num_draws,
-        callbacks=[llc_estimator_2d],
-        verbose=False,
-        seed=seed,
-    )
-    sample(
-        model2,
-        train_dataloader,
-        criterion=criterion,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
-        sampling_method=sampling_method,
-        num_chains=num_chains,
-        num_draws=num_draws,
-        callbacks=[llc_estimator_3d],
-        verbose=False,
-        seed=seed,
-        optimize_over_per_model_param={"weights": torch.tensor([1, 1, 0])},
-    )
-    llc_mean_2d = llc_estimator_2d.sample()["llc/mean"]
-    llc_mean_3d_restricted = llc_estimator_3d.sample()["llc/mean"]
-    assert np.isclose(
-        llc_mean_2d, llc_mean_3d_restricted, atol=3e-2
-    ), f"LLC mean {llc_mean_2d:.8f}!={llc_mean_3d_restricted:.8f} for powers {relevant_powers + [extra_dim_power]} using {sampling_method}, {model2.weights}"
+        device=device,
+        verbose=verbose,
+        callbacks=callbacks,
+        online=False,
+        init_loss=init_loss,
+        optimize_over_per_model_param=optimize_over_per_model_param,
+    )["llc/mean"]
