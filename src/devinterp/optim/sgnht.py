@@ -139,7 +139,6 @@ class SGNHT(torch.optim.Optimizer):
                             + group["bounding_box_size"],
                         )
                         momentum.mul_(reflection_coefs)
-
                 # Update thermostat based on average kinetic energy
                 d_thermostat = (group_energy_sum / group_energy_size) - group["lr"]
                 group["thermostat"].add_(d_thermostat.to(group["thermostat"].device))
