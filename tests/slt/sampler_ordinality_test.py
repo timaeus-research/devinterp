@@ -3,7 +3,7 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
@@ -27,7 +27,9 @@ def generated_linedot_normalcrossing_dataset():
 
 
 @pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
-@pytest.mark.parametrize("model", [Polynomial, LinePlusDot]) #LinePlusDot currently not tested, TODO
+@pytest.mark.parametrize(
+    "model", [Polynomial, LinePlusDot]
+)  # LinePlusDot currently not tested, TODO
 @pytest.mark.parametrize("dim", [2, 10, 100])
 def test_linedot_normal_crossing(
     generated_linedot_normalcrossing_dataset, sampling_method, model, dim
@@ -39,7 +41,6 @@ def test_linedot_normal_crossing(
     else:
         model = model(dim)
     train_dataloader, _, _, _ = generated_linedot_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = (
         0.0001 / dim
     )  # to account for smaller steps in higher D. might not work well for SGNHT?
@@ -62,7 +63,7 @@ def test_linedot_normal_crossing(
         sample(
             model,
             train_dataloader,
-            criterion=criterion,
+            evaluate=evaluate_mse,
             optimizer_kwargs=dict(
                 lr=lr,
                 bounding_box_size=0.5,  # to prevent accidental movement from [1, 0, ...] to origin

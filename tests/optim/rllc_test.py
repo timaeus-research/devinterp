@@ -58,7 +58,6 @@ def test_rllc_normalcrossing_between_powers(
     model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
 
     train_dataloader, _, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = 0.0002
     num_chains = 1
     num_draws = 100
@@ -77,7 +76,7 @@ def test_rllc_normalcrossing_between_powers(
     sample(
         model1,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
             temperature=optimal_temperature(train_dataloader),
@@ -95,7 +94,7 @@ def test_rllc_normalcrossing_between_powers(
     sample(
         model2,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
             temperature=optimal_temperature(train_dataloader),
@@ -126,7 +125,7 @@ EXTRA_DIM_POWER = [3, 10, 100]
 @pytest.mark.parametrize("relevant_powers", POWERS)
 @pytest.mark.parametrize("extra_dim_power", EXTRA_DIM_POWER)
 @pytest.mark.parametrize("sample_point", SAMPLE_POINTS)
-def test_rllc_gradient_normalcrossing_between_dims(
+def test_restricted_gradient_normalcrossing_between_dims(
     generated_normalcrossing_dataset,
     sampling_method,
     relevant_powers,
@@ -143,7 +142,6 @@ def test_rllc_gradient_normalcrossing_between_dims(
     model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
 
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = 0.0001
     num_chains = 1
     num_draws = 200
@@ -161,7 +159,7 @@ def test_rllc_gradient_normalcrossing_between_dims(
     sample(
         model1,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
         ),
@@ -175,7 +173,7 @@ def test_rllc_gradient_normalcrossing_between_dims(
     sample(
         model2,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
         ),
@@ -193,7 +191,9 @@ def test_rllc_gradient_normalcrossing_between_dims(
         llc_mean_2d, llc_mean_3d_restricted, atol=1e-5
     ), f"LLC mean {llc_mean_2d:.3f}!={llc_mean_3d_restricted:.3f} for powers {relevant_powers + [extra_dim_power]} using {sampling_method}, {model2.weights}"
 
+
 SAMPLE_POINTS = [[0.0, 0.0, 1.0], [0.0, 1.0, 1.0]]
+
 
 @pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize("relevant_powers", POWERS)
@@ -216,7 +216,6 @@ def test_rllc_full_normalcrossing_between_dims(
     model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
 
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    criterion = F.mse_loss
     lr = 0.0001
     num_chains = 1
     num_draws = 2000
@@ -234,7 +233,7 @@ def test_rllc_full_normalcrossing_between_dims(
     sample(
         model1,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -246,7 +245,7 @@ def test_rllc_full_normalcrossing_between_dims(
     sample(
         model2,
         train_dataloader,
-        criterion=criterion,
+        evaluate=evaluate_mse,
         optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -261,3 +260,64 @@ def test_rllc_full_normalcrossing_between_dims(
     assert np.isclose(
         llc_mean_2d, llc_mean_3d_restricted, atol=3e-2
     ), f"LLC mean {llc_mean_2d:.8f}!={llc_mean_3d_restricted:.8f} for powers {relevant_powers + [extra_dim_power]} using {sampling_method}, {model2.weights}"
+
+
+POWERS = [[0, 1], [1, 2], [0, 3]]
+
+
+@pytest.mark.parametrize("sampling_method", [SGLD])
+@pytest.mark.parametrize("relevant_powers", POWERS)
+def test_rllc_different_from_full_llc_between_dims(
+    generated_normalcrossing_dataset, sampling_method, relevant_powers
+):
+    torch.manual_seed(42)
+    seed = 42
+
+    model = Polynomial(relevant_powers)
+    model.weights = torch.nn.Parameter(torch.tensor([0., 1.]))
+
+    train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
+    lr = 0.001
+    num_chains = 1
+    num_draws = 200
+    llc_estimator = LLCEstimator(
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
+    )
+    rllc_estimator = LLCEstimator(
+        num_chains=num_chains,
+        num_draws=num_draws,
+        temperature=optimal_temperature(train_dataloader),
+    )
+
+    sample(
+        model,
+        train_dataloader,
+        evaluate=evaluate_mse,
+        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        sampling_method=sampling_method,
+        num_chains=num_chains,
+        num_draws=num_draws,
+        callbacks=[llc_estimator],
+        verbose=False,
+        seed=seed,
+    )
+    sample(
+        model,
+        train_dataloader,
+        evaluate=evaluate_mse,
+        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        sampling_method=sampling_method,
+        num_chains=num_chains,
+        num_draws=num_draws,
+        callbacks=[rllc_estimator],
+        verbose=False,
+        seed=seed,
+        optimize_over_per_model_param={"weights": torch.tensor([1, 0])},
+    )
+    llc_mean = llc_estimator.sample()["llc/mean"]
+    rllc_mean = rllc_estimator.sample()["llc/mean"]
+    assert not np.isclose(
+        llc_mean, rllc_mean, atol=1e-2
+    ), f"LLC {llc_mean:.3f} too close to RLLC {rllc_mean:.3f} for powers {relevant_powers} using {sampling_method}"
