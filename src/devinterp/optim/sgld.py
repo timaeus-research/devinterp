@@ -71,7 +71,6 @@ class SGLD(torch.optim.Optimizer):
         temperature: Union[Callable, float] = 1.0,
         bounding_box_size=None,
         save_noise=False,
-        optimize_over=None,
         save_mala_vars=False,
     ):
         if noise_level != 1.0:
@@ -90,7 +89,6 @@ class SGLD(torch.optim.Optimizer):
             localization=localization,
             temperature=temperature,
             bounding_box_size=bounding_box_size,
-            optimize_over=optimize_over,
         )
         super(SGLD, self).__init__(params, defaults)
         self.save_noise = save_noise

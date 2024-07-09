@@ -132,7 +132,6 @@ def test_grad_accum_convergence(
 ):
     GRAD_ACCUMS = [1, 4, 16, 64]
     model = model(model_dims)
-    criterion = F.mse_loss
     lr = 0.0002
     num_chains = 1
     means = []
@@ -149,7 +148,7 @@ def test_grad_accum_convergence(
         sample(
             model,
             train_dataloader,
-            criterion=criterion,
+            evaluate=evaluate_mse,
             optimizer_kwargs=dict(lr=lr, localization=1.0),
             sampling_method=sampling_method,
             num_chains=num_chains,
