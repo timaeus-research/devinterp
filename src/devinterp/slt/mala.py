@@ -1,29 +1,32 @@
-from typing import Union
+from typing import Union, List
 import numpy as np
 import torch
 import torch.nn as nn
+from torch import Tensor
 
 from devinterp.slt.callback import SamplerCallback
 
 
 def mala_acceptance_probability(
-    prev_point,
-    prev_grad,
-    prev_loss,
-    current_point,
-    current_grad,
-    current_loss,
-    learning_rate,
+    prev_params: Union[Tensor, List[Tensor]],
+    prev_grads: Union[Tensor, List[Tensor]],
+    prev_loss: Tensor,
+    current_params: Union[Tensor, List[Tensor]],
+    current_grads: Union[Tensor, List[Tensor]],
+    current_loss: Tensor,
+    learning_rate: float,
 ):
     """
-    Calculate the acceptance probability for a MALA transition.
+    Calculate the acceptance probability for a MALA transition. Parameters and 
+    gradients can either all be given as a tensor (all of the same shape) or 
+    all as lists of tensors (eg the parameters of a Module).
 
     Args:
-    prev_point: The previous point in parameter space.
-    prev_grad: Gradient of the prev point in parameter space.
+    prev_params: The previous point in parameter space.
+    prev_grads: Gradient of the prev point in parameter space.
     prev_loss: Loss of the previous point in parameter space.
-    current_grad: Gradient of the current point in parameter space.
-    current_point: The current point in parameter space.
+    current_params: The current point in parameter space.
+    current_grads: Gradient of the current point in parameter space.
     current_loss: Loss of the current point in parameter space.
     learning_rate (float): Learning rate of the model.
 
@@ -32,16 +35,37 @@ def mala_acceptance_probability(
     """
     if np.isnan(current_loss):
         return np.nan
-    # Compute the log of the proposal probabilities (using the Gaussian proposal distribution)
-    log_q_current_to_prev = -torch.sum(
-        (prev_point - current_point - (learning_rate * 0.5 * -current_grad)) ** 2
-    ) / (2 * learning_rate)
-    log_q_prev_to_current = -torch.sum(
-        (current_point - prev_point - (learning_rate * 0.5 * -prev_grad)) ** 2
-    ) / (2 * learning_rate)
+    
+    # convert tensors to lists with one element
+    if not isinstance(prev_params, list): 
+        prev_params = [prev_params]
+    if not isinstance(prev_grads, list): 
+        prev_grads = [prev_grads]
+    if not isinstance(current_params, list): 
+        current_params = [current_params]
+    if not isinstance(current_grads, list): 
+        current_grads = [current_grads]
+
+    log_q_current_to_prev = 0
+    log_q_prev_to_current = 0
+    for current_point, current_grad, prev_point, prev_grad in zip(
+        current_params,
+        current_grads,
+        prev_params,
+        prev_grads,
+    ):
+        # Compute the log of the proposal probabilities (using the Gaussian proposal distribution)
+        log_q_current_to_prev += -torch.sum(
+            (prev_point - current_point - (learning_rate * 0.5 * -current_grad)) ** 2
+        ) / (2 * learning_rate)
+        log_q_prev_to_current += -torch.sum(
+            (current_point - prev_point - (learning_rate * 0.5 * -prev_grad)) ** 2
+        ) / (2 * learning_rate)
+
     acceptance_log_prob = (
         log_q_current_to_prev - log_q_prev_to_current + prev_loss - current_loss
     )
+
     return min(1.0, torch.exp(acceptance_log_prob))
 
 
@@ -89,23 +113,17 @@ class MalaAcceptanceRate(SamplerCallback):
         # mala acceptance loss is different from pytorch supplied loss
         mala_loss = (loss * self.temperature).item() + optimizer.localization_loss
         if draw > 1:
-            for current_param, current_grad, prev_param, prev_grad in zip(
-                self.current_params,
-                self.current_grads,
-                self.prev_params,
-                self.prev_grads,
-            ):
-                self.mala_acceptance_rate[chain, draw - 1] = (
-                    mala_acceptance_probability(
-                        prev_param,
-                        prev_grad,
-                        self.prev_mala_loss,
-                        current_param,
-                        current_grad,
-                        mala_loss,
-                        self.learning_rate,
-                    )
+            self.mala_acceptance_rate[chain, draw - 1] = (
+                mala_acceptance_probability(
+                    self.prev_params,
+                    self.prev_grads,
+                    self.prev_mala_loss,
+                    self.current_params,
+                    self.current_grads,
+                    mala_loss,
+                    self.learning_rate,
                 )
+            )
         # move new -> old, then update new after
         self.prev_params = self.current_params
         self.prev_grads = self.current_grads
