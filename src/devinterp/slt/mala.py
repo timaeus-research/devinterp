@@ -130,7 +130,7 @@ class MalaAcceptanceRate(SamplerCallback):
         self.prev_mala_loss = mala_loss
         # params update only at the end, as decribed
         self.current_params = [
-            param.clone().detach() for param in list(model.parameters())
+            param.clone().detach() for param in model.parameters() if param.requires_grad
         ]
 
     def sample(self):
