@@ -71,7 +71,7 @@ def mala_acceptance_probability(
 
 class MalaAcceptanceRate(SamplerCallback):
     """
-    Callback for computing the norm of the gradients of the optimizer / sampler.
+    Callback for computing MALA acceptance rate.
 
     Attributes:
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
