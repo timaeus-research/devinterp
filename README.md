@@ -5,7 +5,7 @@
 
 ## A Python Library for Developmental Interpretability Research
 
-DevInterp is a python library for conducting research on developmental interpretability, a novel AI safety research agenda rooted in Singular Learning Theory (SLT). DevInterp proposes tools for detecting, locating, and ultimately _controlling_ the development of structure over training.
+DevInterp is a python library for conducting research on developmental interpretability, a novel AI safety research agenda rooted in [Singular Learning Theory]([url](https://edmundlth.github.io/posts/overview-of-singular-learning-theory/)) (SLT). DevInterp proposes tools for detecting, locating, and ultimately _controlling_ the development of structure over training.
 
 [Read more about developmental interpretability](https://www.lesswrong.com/posts/TjaeCWvLZtEDAS5Ex/towards-developmental-interpretability).
 
@@ -14,7 +14,7 @@ DevInterp is a python library for conducting research on developmental interpret
 
 ## Installation
 
- To install `devinterp`, simply run `pip install devinterp`.
+ To install `devinterp`, simply run `pip install devinterp`. Around 800 MB of disk space will be needed.
 
 ### Minimal Example
 
@@ -24,7 +24,7 @@ from devinterp.slt import sample, LLCEstimator
 from devinterp.optim import SGLD
 from devinterp.utils import optimal_temperature
 
-# Assuming you have a PyTorch Module and DataLoader
+# Assuming you have a PyTorch Module and DataLoader assigned to trainloader variable:
 llc_estimator = LLCEstimator(..., temperature=optimal_temperature(trainloader))
 sample(model, trainloader, ..., callbacks = [llc_estimator])
 
