@@ -137,15 +137,16 @@ class EpsilonBetaAnalyzer:
         with tqdm(total=len(epsilon_range) * len(beta_range)) as pbar:
             for epsilon in epsilon_range:
                 for beta in beta_range:
-                    sweep_stats = llc_estimator(
-                        epsilon = epsilon,
-                        beta = beta,
-                        **llc_estimator_kwargs
-                    )
-                    sweep_stats = dict(sweep_stats, epsilon=epsilon, beta=beta)
-                    all_sweep_stats.append(sweep_stats)
-                    # except Exception as e:
-                        # warnings.warn(f"Error encountered for epsilon={epsilon}, beta={beta}. Skipping. Warning: {e}")
+                    try:
+                        sweep_stats = llc_estimator(
+                            epsilon = epsilon,
+                            beta = beta,
+                            **llc_estimator_kwargs
+                        )
+                        sweep_stats = dict(sweep_stats, epsilon=epsilon, beta=beta)
+                        all_sweep_stats.append(sweep_stats)
+                    except RuntimeError as e:
+                        warnings.warn(f"Error encountered for epsilon={epsilon}, beta={beta}. Skipping. Warning: {e}")
                     pbar.update(1)
 
         sweep_df = pd.DataFrame(all_sweep_stats)
