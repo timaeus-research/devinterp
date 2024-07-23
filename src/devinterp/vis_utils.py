@@ -145,7 +145,7 @@ class EpsilonBetaAnalyzer:
                         )
                         sweep_stats = dict(sweep_stats, epsilon=epsilon, beta=beta)
                         all_sweep_stats.append(sweep_stats)
-                    except Exception as e:
+                    except RuntimeError as e:
                         warnings.warn(f"Error encountered for epsilon={epsilon}, beta={beta}. Skipping. Warning: {e}")
                     pbar.update(1)
 
