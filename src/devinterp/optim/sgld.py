@@ -130,16 +130,18 @@ class SGLD(torch.optim.Optimizer):
                         ).item()
                         self.dws.append(dw.clone().detach())
 
-                p.data.add_(dw, alpha=-0.5 * group["lr"])
-
                 # Add Gaussian noise
                 noise = torch.normal(
                     mean=0.0, std=group["noise_level"], size=dw.size(), device=dw.device
                 )
                 if self.save_noise:
                     self.noise.append(noise)
-                p.data.add_(noise, alpha=group["lr"] ** 0.5)
 
+                if group.get("optimize_over") is not None:
+                    dw = dw * group["optimize_over"]
+                    noise = noise * group["optimize_over"]
+                p.data.add_(dw, alpha=-0.5 * group["lr"])
+                p.data.add_(noise, alpha=group["lr"] ** 0.5)
                 # Rebound if exceeded bounding box size
                 if group["bounding_box_size"]:
                     torch.clamp_(
