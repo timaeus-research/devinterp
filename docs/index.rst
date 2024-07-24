@@ -74,7 +74,7 @@ If you run into issues not mentioned here, please first `check the GitHub issues
 Credits & Citations
 =====================================
 
-This package was created by `Timaeus <https://timaeus.co>`_. The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts, William Zhou, and Edmund Lau also made valuable contributions or provided useful advice.
+This package was created by `Timaeus <https://timaeus.co>`_. The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts, William Zhou, Rohan Hitchcock and Edmund Lau also made valuable contributions or provided useful advice.
 
 If this package was useful in your work, please cite it as:
 
