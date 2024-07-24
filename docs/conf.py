@@ -69,7 +69,7 @@ rst_prolog = """
     :language: bash
     :class: highlight
 """
-html_static_path = ["static"]
+html_static_path = ["_static"]
 
 
 def run_apidoc(_):
