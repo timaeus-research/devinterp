@@ -8,10 +8,10 @@ class OnlineTraceStatistics(SamplerCallback):
     """
     Derivative callback that computes mean/std statistics of a specified trace online. Must be called after the base callback has been called at each draw.
 
-    .. |colab5| image:: https://colab.research.google.com/assets/colab-badge.svg 
+    .. |colab6| image:: https://colab.research.google.com/assets/colab-badge.svg 
         :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb
         
-    See `the diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| for examples on how to use this to diagnose your sample health.
+    See `the diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab6| for examples on how to use this to diagnose your sample health.
         
     :param base_callback: Base callback that computes some metric.
     :type base_callback: :func:`~devinterp.slt.callback.SamplerCallback`

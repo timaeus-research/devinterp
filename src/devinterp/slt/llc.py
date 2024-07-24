@@ -15,7 +15,7 @@ class LLCEstimator(SamplerCallback):
     For use with :func:`devinterp.slt.sampler.sample`.
     
     Note: 
-        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function, 
+        `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function, 
         and if not passed will be the average loss of the supplied model over `num_chains` batches.
 
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
@@ -82,7 +82,7 @@ class OnlineLLCEstimator(SamplerCallback):
     For use with :func:`devinterp.slt.sampler.sample`.
     
     Note: 
-        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function, 
+        `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function, 
         and if not passed will be the average loss of the supplied model over `num_chains` batches.
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_draws: int

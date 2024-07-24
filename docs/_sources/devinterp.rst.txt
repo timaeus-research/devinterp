@@ -29,6 +29,14 @@ devinterp.utils module
    :undoc-members:
    :show-inheritance:
 
+devinterp.vis\_utils module
+---------------------------
+
+.. automodule:: devinterp.vis_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

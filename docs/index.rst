@@ -107,3 +107,4 @@ Table of Contents
    self
    SLT Observables <devinterp.slt>
    Sampling Methods <devinterp.optim>
+   Utils & Visualisation Methods <devinterp.utils>

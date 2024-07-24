@@ -69,7 +69,7 @@ class EpsilonBetaAnalyzer:
     """
     A class for analyzing and visualizing the local learning coefficient (LLC) across different epsilon and beta values.
 
-    Includes methods to configure, run, and visualize sweeps of the local learning coefficient over epsilon and beta.
+    This class provides methods to configure, run, and visualize sweeps of the local learning coefficient over epsilon and beta.
     """
     def __init__(self):
         self.sweep_config = None
@@ -91,22 +91,39 @@ class EpsilonBetaAnalyzer:
                         dataloader: Optional[torch.utils.data.DataLoader] = None) -> None:
         """
         Configure the sampling parameters for the LLC analysis.
-        :param llc_estimator: Callable function to estimate the local learning coefficient. 
-            Note: The estimator function expected by EpsilonBetaAnalyzer must have the following signature:
-            def estimator(epsilon: float, beta: float, **kwargs) -> dict
-            where kwargs are the arguments to estimate_learning_coeff_with_summary
-            The return value must be a dict with a "llc/trace" key corresponding to a numpy array of shape (num_chains, num_draws)
-            Additional keys can represent other values of interest (e.g. acceptance rates, true LLC.)
-        :param llc_estimator_kwargs: Keyword arguments for the llc_estimator function.
-        :param min_epsilon: Minimum value for epsilon range (if epsilon_range not provided).
-        :param max_epsilon: Maximum value for epsilon range (if epsilon_range not provided).
-        :param epsilon_samples: Number of samples in epsilon range (if epsilon_range not provided).
+    
+        :param llc_estimator: Callable function to estimate the local learning coefficient.
+            Must have the signature:
+            
+            .. code-block:: python
+
+                def estimator(epsilon: float, beta: float, **kwargs) -> Dict[str, Any]
+            
+            where kwargs are the arguments to ``estimate_learning_coeff_with_summary``.
+            
+            The return value must be a dict with a ``"llc/trace"`` key corresponding to a numpy array of shape ``(num_chains, num_draws)``
+            Additional keys can represent other values of interest (e.g. acceptance rates, true LLC, etc.)
+        :type llc_estimator: Callable
+        :param llc_estimator_kwargs: Keyword arguments for the ``llc_estimator`` function.
+        :type llc_estimator_kwargs: Dict[str, Any]
+        :param min_epsilon: Minimum value for epsilon range (if ``epsilon_range`` not provided).
+        :type min_epsilon: Optional[float]
+        :param max_epsilon: Maximum value for epsilon range (if ``epsilon_range`` not provided).
+        :type max_epsilon: Optional[float]
+        :param epsilon_samples: Number of samples in epsilon range (if ``epsilon_range`` not provided).
+        :type epsilon_samples: int
         :param epsilon_range: Explicit range of epsilon values to use (overrides min/max_epsilon).
-        :param min_beta: Minimum value for beta range (if beta_range not provided).
-        :param max_beta: Maximum value for beta range (if beta_range not provided).
-        :param beta_samples: Number of samples in beta range (if beta_range not provided).
+        :type epsilon_range: Optional[List[float]]
+        :param min_beta: Minimum value for beta range (if ``beta_range`` not provided).
+        :type min_beta: Optional[float]
+        :param max_beta: Maximum value for beta range (if ``beta_range`` not provided).
+        :type max_beta: Optional[float]
+        :param beta_samples: Number of samples in beta range (if ``beta_range`` not provided).
+        :type beta_samples: int
         :param beta_range: Explicit range of beta values to use (overrides min/max_beta).
+        :type beta_range: Optional[List[float]]
         :param dataloader: Optional dataloader for calculating optimal beta.
+        :type dataloader: Optional[torch.utils.data.DataLoader]
         """
 
         self.sweep_config = SweepConfig.setup(llc_estimator, llc_estimator_kwargs,
@@ -121,6 +138,8 @@ class EpsilonBetaAnalyzer:
 
         :param add_to_existing: If True, adds new sweep results to existing ones. If False, replaces existing results.
             Useful for sweeping over multiple models or datasets.
+        :type add_to_existing: bool
+        :raises AssertionError: If sweep configuration is not set.
         """
         assert self.sweep_config is not None, "Sweep configuration is not set. Please call configure_sweep() first."
 
@@ -171,13 +190,20 @@ class EpsilonBetaAnalyzer:
 
         :param true_lambda: True value of lambda for comparison (optional). Can be a scalar, a list, or a string column name of sweep_df.
             Will plot a horizontal plane at the true_lambda value.
+        :type true_lambda: float | int | str | Container
         :param num_last_steps_to_average: Number of last steps to average for final LLC value.
+        :type num_last_steps_to_average: int
         :param color: Column name to use for coloring the scatter points.
+        :type color: Optional[str]
         :param slider: Column name to use for creating a slider in the plot.
+        :type slider: Optional[str]
         :param slider_plane: If True, adds a plane for each slider value.
-        :param kwargs: Additional keyword arguments to pass to the plotting function.
-            Example: range_color=[0, 0.15] to set the color range.
+        :type slider_plane: bool
+        :param kwargs: Additional keyword arguments to pass to the plotting function f.e. ``range_color=[0, 0.15]``.
+        :type kwargs: Any
         :return: A plotly Figure object containing the LLC sweep visualization.
+        :rtype: go.Figure
+        :raises AssertionError: If no data is available to plot.
         """
         plot_config = {
                 "title": "Local learning coefficient vs. epsilon and beta",
@@ -333,7 +359,10 @@ class EpsilonBetaAnalyzer:
     def save_fig(self, path: str) -> None:
         """
         Save the current figure to a file.
+        
         :param path: Path to save the figure to.
+        :type path: str
+        :raises AssertionError: If no figure is available to save.
         """
         assert self.fig is not None, "No figure to save. Please call plot() first."
         self.fig.write_html(path)
