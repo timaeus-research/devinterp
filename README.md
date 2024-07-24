@@ -57,7 +57,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on how to contribute.
 
 ## Credits & Citations
 
-This package was created by [Timaeus](https://timaeus.co). The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts, William Zhou, and Edmund Lau also made valuable contributions or provided useful advice.
+This package was created by [Timaeus](https://timaeus.co). The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts, William Zhou, Rohan Hitchcock, and Edmund Lau also made valuable contributions or provided useful advice.
 
 If this package was useful in your work, please cite it as:
 
