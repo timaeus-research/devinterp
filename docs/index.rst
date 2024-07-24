@@ -67,17 +67,6 @@ For more advanced usage, see `the Diagnostics notebook <https://www.github.com/t
 Known Issues
 =====================================
 
-- The current implementation does not work with transformers out-of-the-box. This can be fixed by adding a wrapper to your model, for example passing :python:`unpack(model)` to :func:`~devinterp.slt.sampler.sample` where :python:`unpack` is defined by:
-
-.. code-block:: python
-
-   class unpack(nn.Module):
-    def __init__(model: nn.Module):
-         self.model = model
-
-    def forward(data: Tuple[torch.Tensor, torch.Tensor]):
-         return self.model(*data)
-
 - LLC Estimation is currently more of an art than a science. It will take some time and pain to get it work reliably.
 
 If you run into issues not mentioned here, please first `check the GitHub issues <https://github.com/timaeus-research/devinterp/issues>`_, then `ask in the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_, and only then make a new github issue.
@@ -85,7 +74,7 @@ If you run into issues not mentioned here, please first `check the GitHub issues
 Credits & Citations
 =====================================
 
-This package was created by `Timaeus <https://timaeus.co>`_. The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also made valuable contributions or provided useful advice.
+This package was created by `Timaeus <https://timaeus.co>`_. The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts, William Zhou, and Edmund Lau also made valuable contributions or provided useful advice.
 
 If this package was useful in your work, please cite it as:
 
