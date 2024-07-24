@@ -32,7 +32,8 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_math_dollar",
     "sphinx.ext.autosectionlabel",
-]
+    'sphinx.ext.githubpages',
+    ]
 autosectionlabel_prefix_document = True
 mathjax_config = {
     "tex2jax": {
