@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>devinterp package &mdash; devinterp 0.3.0 documentation</title>
+  <title>devinterp.vis_utils package &mdash; devinterp 0.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=92fd9be5" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
 
@@ -21,7 +21,8 @@
         <script src="_static/custom.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" /> 
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="devinterp.optim package" href="devinterp.optim.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -43,11 +44,23 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
+              <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="index.html">Welcome to devinterp’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devinterp.slt.html">SLT Observables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="devinterp.optim.html">Sampling Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="devinterp.utils.html">Utils &amp; Visualisation Methods</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Utils &amp; Visualisation Methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-devinterp.vis_utils">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#devinterp.vis_utils.EpsilonBetaAnalyzer"><code class="docutils literal notranslate"><span class="pre">EpsilonBetaAnalyzer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#devinterp.vis_utils.EpsilonBetaAnalyzer.configure_sweep"><code class="docutils literal notranslate"><span class="pre">EpsilonBetaAnalyzer.configure_sweep()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#devinterp.vis_utils.EpsilonBetaAnalyzer.plot"><code class="docutils literal notranslate"><span class="pre">EpsilonBetaAnalyzer.plot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#devinterp.vis_utils.EpsilonBetaAnalyzer.save_fig"><code class="docutils literal notranslate"><span class="pre">EpsilonBetaAnalyzer.save_fig()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#devinterp.vis_utils.EpsilonBetaAnalyzer.sweep"><code class="docutils literal notranslate"><span class="pre">EpsilonBetaAnalyzer.sweep()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -64,9 +77,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">devinterp package</li>
+      <li class="breadcrumb-item active">devinterp.vis_utils package</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="_sources/devinterp.rst.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/devinterp.utils.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -74,159 +87,10 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="devinterp-package">
-<h1>devinterp package<a class="headerlink" href="#devinterp-package" title="Link to this heading"></a></h1>
-<section id="subpackages">
-<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="devinterp.optim.html">devinterp.optim package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.optim.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.optim.html#module-devinterp.optim.sgld">devinterp.optim.sgld module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.optim.html#devinterp.optim.sgld.SGLD"><code class="docutils literal notranslate"><span class="pre">SGLD</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.optim.html#module-devinterp.optim.sgnht">devinterp.optim.sgnht module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.optim.html#devinterp.optim.sgnht.SGNHT"><code class="docutils literal notranslate"><span class="pre">SGNHT</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.optim.html#module-devinterp.optim">Module contents</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="devinterp.slt.html">devinterp.slt package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.callback">devinterp.slt.callback module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.callback.SamplerCallback"><code class="docutils literal notranslate"><span class="pre">SamplerCallback</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.callback.SamplerCallback.finalize"><code class="docutils literal notranslate"><span class="pre">SamplerCallback.finalize()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.callback.SamplerCallback.sample"><code class="docutils literal notranslate"><span class="pre">SamplerCallback.sample()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.cov">devinterp.slt.cov module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.cov.BetweenLayerCovarianceAccumulator"><code class="docutils literal notranslate"><span class="pre">BetweenLayerCovarianceAccumulator</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.cov.BetweenLayerCovarianceAccumulator.sample"><code class="docutils literal notranslate"><span class="pre">BetweenLayerCovarianceAccumulator.sample()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.cov.CovarianceAccumulator"><code class="docutils literal notranslate"><span class="pre">CovarianceAccumulator</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.cov.CovarianceAccumulator.sample"><code class="docutils literal notranslate"><span class="pre">CovarianceAccumulator.sample()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.cov.WithinHeadCovarianceAccumulator"><code class="docutils literal notranslate"><span class="pre">WithinHeadCovarianceAccumulator</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.cov.WithinHeadCovarianceAccumulator.sample"><code class="docutils literal notranslate"><span class="pre">WithinHeadCovarianceAccumulator.sample()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.gradient">devinterp.slt.gradient module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.gradient.GradientDistribution"><code class="docutils literal notranslate"><span class="pre">GradientDistribution</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.gradient.GradientDistribution.plot"><code class="docutils literal notranslate"><span class="pre">GradientDistribution.plot()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.gradient.GradientDistribution.sample"><code class="docutils literal notranslate"><span class="pre">GradientDistribution.sample()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.llc">devinterp.slt.llc module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.llc.LLCEstimator"><code class="docutils literal notranslate"><span class="pre">LLCEstimator</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.llc.LLCEstimator.sample"><code class="docutils literal notranslate"><span class="pre">LLCEstimator.sample()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.llc.OnlineLLCEstimator"><code class="docutils literal notranslate"><span class="pre">OnlineLLCEstimator</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.llc.OnlineLLCEstimator.sample"><code class="docutils literal notranslate"><span class="pre">OnlineLLCEstimator.sample()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.loss">devinterp.slt.loss module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics"><code class="docutils literal notranslate"><span class="pre">OnlineLossStatistics</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics.loss_hist_by_draw"><code class="docutils literal notranslate"><span class="pre">OnlineLossStatistics.loss_hist_by_draw()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.loss.OnlineLossStatistics.sample"><code class="docutils literal notranslate"><span class="pre">OnlineLossStatistics.sample()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.mala">devinterp.slt.mala module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.mala.MalaAcceptanceRate"><code class="docutils literal notranslate"><span class="pre">MalaAcceptanceRate</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.mala.MalaAcceptanceRate.num_draws"><code class="docutils literal notranslate"><span class="pre">MalaAcceptanceRate.num_draws</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.mala.MalaAcceptanceRate.num_chains"><code class="docutils literal notranslate"><span class="pre">MalaAcceptanceRate.num_chains</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.mala.MalaAcceptanceRate.temperature"><code class="docutils literal notranslate"><span class="pre">MalaAcceptanceRate.temperature</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.mala.MalaAcceptanceRate.learning_rate"><code class="docutils literal notranslate"><span class="pre">MalaAcceptanceRate.learning_rate</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.mala.MalaAcceptanceRate.device"><code class="docutils literal notranslate"><span class="pre">MalaAcceptanceRate.device</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.mala.mala_acceptance_probability"><code class="docutils literal notranslate"><span class="pre">mala_acceptance_probability()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.norms">devinterp.slt.norms module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.norms.GradientNorm"><code class="docutils literal notranslate"><span class="pre">GradientNorm</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.norms.GradientNorm.sample"><code class="docutils literal notranslate"><span class="pre">GradientNorm.sample()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.norms.NoiseNorm"><code class="docutils literal notranslate"><span class="pre">NoiseNorm</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.norms.NoiseNorm.sample"><code class="docutils literal notranslate"><span class="pre">NoiseNorm.sample()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.norms.WeightNorm"><code class="docutils literal notranslate"><span class="pre">WeightNorm</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.norms.WeightNorm.sample"><code class="docutils literal notranslate"><span class="pre">WeightNorm.sample()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.sampler">devinterp.slt.sampler module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.sampler.sample"><code class="docutils literal notranslate"><span class="pre">sample()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.trace">devinterp.slt.trace module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.trace.OnlineTraceStatistics"><code class="docutils literal notranslate"><span class="pre">OnlineTraceStatistics</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.trace.OnlineTraceStatistics.sample"><code class="docutils literal notranslate"><span class="pre">OnlineTraceStatistics.sample()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.trace.OnlineTraceStatistics.sample_at_draw"><code class="docutils literal notranslate"><span class="pre">OnlineTraceStatistics.sample_at_draw()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt.wbic">devinterp.slt.wbic module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.wbic.OnlineWBICEstimator"><code class="docutils literal notranslate"><span class="pre">OnlineWBICEstimator</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="devinterp.slt.html#devinterp.slt.wbic.OnlineWBICEstimator.sample"><code class="docutils literal notranslate"><span class="pre">OnlineWBICEstimator.sample()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="devinterp.slt.html#module-devinterp.slt">Module contents</a></li>
-</ul>
-</li>
-</ul>
-</div>
-</section>
-<section id="submodules">
-<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
-</section>
-<section id="module-devinterp.test_utils">
-<span id="devinterp-test-utils-module"></span><h2>devinterp.test_utils module<a class="headerlink" href="#module-devinterp.test_utils" title="Link to this heading"></a></h2>
-</section>
-<section id="module-devinterp.utils">
-<span id="devinterp-utils-module"></span><h2>devinterp.utils module<a class="headerlink" href="#module-devinterp.utils" title="Link to this heading"></a></h2>
-<dl class="py class">
-<dt class="sig sig-object py" id="devinterp.utils.Outputs">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.utils.</span></span><span class="sig-name descname"><span class="pre">Outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loss</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/devinterp/utils.html#Outputs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.utils.Outputs" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="devinterp.utils.Outputs.loss">
-<span class="sig-name descname"><span class="pre">loss</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tensor</span></em><a class="headerlink" href="#devinterp.utils.Outputs.loss" title="Link to this definition"></a></dt>
-<dd><p>Alias for field number 0</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="devinterp.utils.prepare_input">
-<span class="sig-prename descclassname"><span class="pre">devinterp.utils.</span></span><span class="sig-name descname"><span class="pre">prepare_input</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_deepspeed_enabled</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accelerator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Any</span></span></span><a class="reference internal" href="_modules/devinterp/utils.html#prepare_input"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.utils.prepare_input" title="Link to this definition"></a></dt>
-<dd><p>Prepares one <cite>data</cite> before feeding it to the model, be it a tensor or a nested list/dictionary of tensors.</p>
-<p>Adapted from HuggingFace’s transformers’s Trainer._prepare_input().</p>
-</dd></dl>
-
-</section>
+  <section id="devinterp-vis-utils-package">
+<h1>devinterp.vis_utils package<a class="headerlink" href="#devinterp-vis-utils-package" title="Link to this heading"></a></h1>
 <section id="module-devinterp.vis_utils">
-<span id="devinterp-vis-utils-module"></span><h2>devinterp.vis_utils module<a class="headerlink" href="#module-devinterp.vis_utils" title="Link to this heading"></a></h2>
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-devinterp.vis_utils" title="Link to this heading"></a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="devinterp.vis_utils.EpsilonBetaAnalyzer">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">devinterp.vis_utils.</span></span><span class="sig-name descname"><span class="pre">EpsilonBetaAnalyzer</span></span><a class="reference internal" href="_modules/devinterp/vis_utils.html#EpsilonBetaAnalyzer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#devinterp.vis_utils.EpsilonBetaAnalyzer" title="Link to this definition"></a></dt>
@@ -326,15 +190,14 @@ Useful for sweeping over multiple models or datasets.</p>
 </dd></dl>
 
 </section>
-<section id="module-devinterp">
-<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-devinterp" title="Link to this heading"></a></h2>
-</section>
 </section>
 
 
            </div>
           </div>
-          <footer>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="devinterp.optim.html" class="btn btn-neutral float-left" title="devinterp.optim package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
 
   <hr/>
 
