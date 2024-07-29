@@ -1,3 +1,4 @@
+import gc
 import inspect
 import itertools
 import warnings
@@ -127,6 +128,9 @@ def sample_single_chain(
                 with torch.no_grad():
                     for callback in callbacks:
                         call_with(callback, **locals())  # Cursed. This is the way.
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
 
 
 def _sample_single_chain(kwargs):
