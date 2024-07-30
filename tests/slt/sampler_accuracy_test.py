@@ -63,7 +63,8 @@ def test_accuracy_normalcrossing(
         num_chains=num_chains,
         num_draws=num_draws,
         callbacks=[llc_estimator],
-        verbose=False,
+        verbose=True,
+        cores=4,
         seed=seed,
     )
     llc_mean = llc_estimator.sample()["llc/mean"]

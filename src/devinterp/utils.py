@@ -194,5 +194,16 @@ def make_evaluate(
     return evaluate
 
 
-evaluate_mse = make_evaluate(F.mse_loss)
-evaluate_ce = make_evaluate(F.cross_entropy)
+# evaluate_mse = make_evaluate(F.mse_loss)
+# evaluate_ce = make_evaluate(F.cross_entropy)
+
+def evaluate_mse(model, data):
+    x, y = data
+    y_pred = model(x)
+    return F.mse_loss(y_pred, y)
+
+
+def evaluate_ce(model, data):
+    x, y = data
+    y_pred = model(x)
+    return F.cross_entropy(y_pred, y)
