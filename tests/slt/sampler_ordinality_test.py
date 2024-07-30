@@ -3,13 +3,14 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
 from devinterp.slt.llc import LLCEstimator
 from devinterp.test_utils import *
+from devinterp.utils import *
 
 
 @pytest.fixture
@@ -26,9 +27,11 @@ def generated_linedot_normalcrossing_dataset():
 
 
 @pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
-@pytest.mark.parametrize("model", [Polynomial])
+@pytest.mark.parametrize(
+    "model", [Polynomial, LinePlusDot]
+)  # LinePlusDot currently not tested, TODO
 @pytest.mark.parametrize("dim", [2, 10, 100])
-def test_ordinality_linedot_normal_crossing(
+def test_linedot_normal_crossing(
     generated_linedot_normalcrossing_dataset, sampling_method, model, dim
 ):
     seed = 42
@@ -37,8 +40,7 @@ def test_ordinality_linedot_normal_crossing(
         model = model([2 for _ in range(dim)])
     else:
         model = model(dim)
-    train_dataloader, train_data, _, _ = generated_linedot_normalcrossing_dataset
-    criterion = F.mse_loss
+    train_dataloader, _, _, _ = generated_linedot_normalcrossing_dataset
     lr = (
         0.0001 / dim
     )  # to account for smaller steps in higher D. might not work well for SGNHT?
@@ -54,16 +56,17 @@ def test_ordinality_linedot_normal_crossing(
             torch.tensor(sample_point, dtype=torch.float32, requires_grad=True)
         )
         llc_estimator = LLCEstimator(
-            num_chains=num_chains, num_draws=num_draws, n=len(train_data)
+            num_chains=num_chains,
+            num_draws=num_draws,
+            temperature=optimal_temperature(train_dataloader),
         )
         sample(
             model,
             train_dataloader,
-            criterion=criterion,
+            evaluate=evaluate_mse,
             optimizer_kwargs=dict(
                 lr=lr,
                 bounding_box_size=0.5,  # to prevent accidental movement from [1, 0, ...] to origin
-                num_samples=len(train_data),
             ),
             sampling_method=sampling_method,
             num_chains=num_chains,
