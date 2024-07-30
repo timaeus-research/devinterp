@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
 from torch.utils.data import DataLoader
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
@@ -52,8 +52,8 @@ def sample_single_chain(
     device: torch.device = torch.device("cpu"),
     optimize_over_per_model_param: Optional[dict] = None,
     callbacks: List[SamplerCallback] = [],
+    tqdm_kwargs: dict = {},
     init_loss: float = None,
-    
 ):
     if grad_accum_steps > 1:
         assert type(grad_accum_steps) == int, "grad_accum_steps must be an integer."
@@ -95,9 +95,12 @@ def sample_single_chain(
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
 
     cumulative_loss = 0
-    with tqdm(desc=f"Chain {chain}",
+    with tqdm(
+        desc=f"Chain {chain}",
         total=num_steps // grad_accum_steps,
-        disable=not verbose) as pbar:
+        disable=not verbose,
+        **tqdm_kwargs
+    ) as pbar:
         for i, data in zip(range(num_steps), itertools.cycle(loader)):
             model.train()
             data = prepare_input(data, device)
@@ -154,6 +157,7 @@ def sample(
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
+    tqdm_kwargs: dict = {},
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
 ):
     """
@@ -245,8 +249,9 @@ def sample(
 
     validate_callbacks(callbacks)
 
-    def get_args(i):
-        return dict(
+    tqdm_kwargs = {**tqdm_kwargs, "position": tqdm_kwargs.get("position", 0)}
+    def get_args(i, *, is_parallel: bool):
+        args = dict(
             chain=i,
             seed=seeds[i],
             ref_model=model,
@@ -264,20 +269,33 @@ def sample(
             callbacks=callbacks,
             optimize_over_per_model_param=optimize_over_per_model_param,
         )
+        if is_parallel:
+            # every progress bar should have a separate position since they update simultaneously
+            args["tqdm_kwargs"] = {**tqdm_kwargs,
+                "position": tqdm_kwargs.get("position", 0)+1+i,
+                "leave": True, # this might help with async updates
+            }
+        else:
+            # only one position, but we need to leave the bar in place on the last iteration
+            args["tqdm_kwargs"] = {**tqdm_kwargs,
+                "position": tqdm_kwargs.get("position", 0)+1,
+                "leave": tqdm_kwargs.get("leave", True) and (i == num_chains - 1),
+            }
+        return args
 
     if cores > 1:
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
-            pool.map(_sample_single_chain, [get_args(i) for i in range(num_chains)])
+            pool.map(_sample_single_chain, [get_args(i, is_parallel=True) for i in range(num_chains)])
     else:
-        for i in range(num_chains):
-            _sample_single_chain(get_args(i))
+        for i in tqdm(range(num_chains), desc="Chain", **tqdm_kwargs):
+            _sample_single_chain(get_args(i, is_parallel=False))
 
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
 
-
+            
 def estimate_learning_coeff_with_summary(
     model: torch.nn.Module,
     loader: DataLoader,
@@ -297,6 +315,7 @@ def estimate_learning_coeff_with_summary(
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
     online: bool = False,
+    tqdm_kwargs: dict = {},
 ) -> dict:
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
     if not init_loss:
@@ -334,6 +353,7 @@ def estimate_learning_coeff_with_summary(
         callbacks=callbacks,
         init_loss=init_loss,
         optimize_over_per_model_param=optimize_over_per_model_param,
+        tqdm_kwargs=tqdm_kwargs,
     )
 
     results = {}
@@ -362,7 +382,8 @@ def estimate_learning_coeff(
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
+    tqdm_kwargs: dict = {}
 ) -> float:
     return estimate_learning_coeff_with_summary(
         model=model,
@@ -383,4 +404,6 @@ def estimate_learning_coeff(
         online=False,
         init_loss=init_loss,
         optimize_over_per_model_param=optimize_over_per_model_param,
+        tqdm_kwargs=tqdm_kwargs,
     )["llc/mean"]
+

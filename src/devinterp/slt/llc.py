@@ -78,6 +78,7 @@ class LLCEstimator(SamplerCallback):
 class OnlineLLCEstimator(SamplerCallback):
     """
     Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.
+
     It calculates LLCs using the same formula as :func:`devinterp.slt.llc.LLCEstimator`, but continuously and including means and std across draws (as opposed to just across chains).
     For use with :func:`devinterp.slt.sampler.sample`.
     
@@ -149,3 +150,4 @@ class OnlineLLCEstimator(SamplerCallback):
 
     def __call__(self, chain: int, draw: int, loss: float):
         self.update(chain, draw, loss)
+
