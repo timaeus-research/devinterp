@@ -4,6 +4,12 @@ import torch
 
 from devinterp.slt.callback import SamplerCallback
 
+# TPU support
+try:
+    import torch_xla.core.xla_model as xm
+    USING_XLA = True
+except ImportError:
+    USING_XLA = False
 
 class LLCEstimator(SamplerCallback):
     r"""
@@ -22,8 +28,8 @@ class LLCEstimator(SamplerCallback):
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
-    :type temperature: int
+    :param nbeta: Reparameterized inverse temperature, float (default: 1., set by sample() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :type nbeta: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     :type device: str | torch.device, optional
     """
@@ -31,34 +37,68 @@ class LLCEstimator(SamplerCallback):
         self,
         num_chains: int,
         num_draws: int,
-        temperature: float,
+        nbeta: float,
+        eval_field: str,
+        init_loss: torch.Tensor = None,
         device: Union[torch.device, str] = "cpu",
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
-        self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
-            device
-        )
-        self.init_loss = 0.0 # gets set by devinterp.slt.sample()
 
-        self.temperature = torch.tensor(temperature, dtype=torch.float32).to(device)
-        self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
-        self.llc_mean = torch.tensor(0.0, dtype=torch.float32).to(device)
-        self.llc_std = torch.tensor(0.0, dtype=torch.float32).to(device)
+        self.loss = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
 
+        if init_loss is not None:
+            self.init_loss = init_loss.to(torch.float32).to(device)
+
+        self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
+        self.eval_field = eval_field
         self.device = device
+        self.count = 0.0
 
-    def update(self, chain: int, draw: int, loss: float):
-        self.losses[chain, draw] = loss
+    def update(self, chain: int, draw: int, loss: torch.Tensor, **kwargs):
+        """
+        Called at each step of sampling.
+
+        Order of operations: 
+        1. update() is called at each draw.
+        2. finalize() is called at the end of sampling.
+        3. get_results() is called after finalize().
+
+        :param draw: The current draw index.
+        :type draw: int
+        :param loss: The loss at the current draw.
+        :type loss: float
+        :param chain: The chain index. Note that this is not used here at all.
+        :type chain: int
+        """
+        self.loss[chain, draw] = loss
+        self.count += 1.0
 
     def finalize(self):
-        avg_losses = self.losses.mean(axis=1)
-        self.llc_per_chain = self.temperature * (avg_losses - self.init_loss)
-        self.llc_mean = self.llc_per_chain.mean()
-        self.llc_std = self.llc_per_chain.std()
+        """Called once at the end of sampling."""
 
-    def sample(self):
+        # If using TPUs, aggregate the loss across all devices.
+        if USING_XLA:
+            if self.count == 0:
+                self.count = 1
+            scale = 1.0 / (self.count * xm.xrt_world_size())
+            self.loss = xm.all_reduce(xm.REDUCE_SUM, self.loss, scale=scale)
+
+        avg_loss = self.loss.mean(axis=1) # [num_chains]. Average loss across draws for each chain.
+    
+        # In the default case, we take the initial loss to be the model's loss across chains and draws.
+        if self.init_loss is None:
+            self.init_loss = avg_loss.mean()
+
+        self.llc_per_chain = self.nbeta * (avg_loss - self.init_loss) # [num_chains]. A single LLC value for each chain.
+        self.sq_loss = torch.square(self.loss)
+        self.llc_mean = self.llc_per_chain.mean() # Mean LLC across chains.
+        self.llc_std = self.llc_per_chain.std() # Standard deviation of LLC across chains.
+
+    def get_results(self):
         """
+        Method to return results. Called after finalize().
+
         :returns: A dict :python:`{"llc/mean": llc_mean, "llc/std": llc_std, "llc-chain/{i}": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
         """
         return {
@@ -68,11 +108,14 @@ class LLCEstimator(SamplerCallback):
                 f"llc-chain/{i}": self.llc_per_chain[i].cpu().numpy().item()
                 for i in range(self.num_chains)
             },
-            "loss/trace": self.losses.cpu().numpy(),
+            "loss/trace": self.loss.cpu().numpy(),
+            "loss/init_loss": self.init_loss.cpu().item(),
+            "loss/sq_loss": self.sq_loss.cpu().numpy(),
         }
 
-    def __call__(self, chain: int, draw: int, loss: float):
-        self.update(chain, draw, loss)
+    def __call__(self, chain: int, draw: int, **kwargs):
+        """Calls self.update."""            
+        self.update(chain, draw, kwargs[self.eval_field])
 
 
 class OnlineLLCEstimator(SamplerCallback):
@@ -95,27 +138,29 @@ class OnlineLLCEstimator(SamplerCallback):
     """
 
     def __init__(
-        self, num_chains: int, num_draws: int, temperature: float, device="cpu"
+        self, 
+        num_chains: int, 
+        num_draws: int, 
+        nbeta: float,
+        init_loss: torch.Tensor,
+        device="cpu",
+        eval_field="loss",
     ):
-        self.num_chains = num_chains
         self.num_draws = num_draws
-        self.init_loss = 0.0 # gets set by devinterp.slt.sample()
+        self.init_loss = init_loss
 
-        self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
-            device
-        )
-        self.llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
-        self.moving_avg_llcs = torch.zeros(
-            (num_chains, num_draws), dtype=torch.float32
-        ).to(device)
-
-        self.temperature = temperature
+        self.losses = [[] for _ in range(num_chains)]
+        self.llcs = torch.zeros((num_chains, num_draws)).to(device)
+        self.nbeta = nbeta
+        self.device = device
+        self.eval_field = eval_field
 
         self.llc_means = torch.tensor(num_draws, dtype=torch.float32).to(device)
         self.llc_stds = torch.tensor(num_draws, dtype=torch.float32).to(device)
-
-        self.device = device
-
+        self.moving_avg_llcs = torch.zeros(
+            (num_chains, num_draws), dtype=torch.float32
+        ).to(device)
+        
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss
         self.llcs[chain, draw] = self.temperature * (loss - self.init_loss)
@@ -129,7 +174,6 @@ class OnlineLLCEstimator(SamplerCallback):
             self.moving_avg_llcs[chain, draw] = (1 / t) * (
                 (t - 1) * prev_moving_avg + self.temperature * (loss - self.init_loss)
             )
-
 
     def finalize(self):
         self.llc_means = self.llcs.mean(dim=0)
@@ -147,5 +191,5 @@ class OnlineLLCEstimator(SamplerCallback):
             "loss/trace": self.losses.cpu().numpy(),
         }
 
-    def __call__(self, chain: int, draw: int, loss: float):
-        self.update(chain, draw, loss)
+    def __call__(self, chain: int, draw: int, **kwargs):
+        self.update(chain, draw, kwargs[self.eval_field])
