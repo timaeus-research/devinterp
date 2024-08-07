@@ -42,7 +42,7 @@ class LLCEstimator(SamplerCallback):
         self.num_draws = num_draws
         self.loss = torch.zeros(1, dtype=torch.float32).to(device)
         self.sq_loss = torch.zeros(1, dtype=torch.float32).to(device)
-        self.init_loss = (init_loss or torch.zeros(1, dtype=torch.float32)).to(device)
+        self.init_loss = init_loss or torch.zeros(1, dtype=torch.float32).to(device)
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
         self.device = device
         self.count = 0.0
