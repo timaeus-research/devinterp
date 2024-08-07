@@ -71,7 +71,7 @@ class LLCEstimator(SamplerCallback):
             "loss/trace": self.losses.cpu().numpy(),
         }
 
-    def __call__(self, chain: int, draw: int, loss: float):
+    def __call__(self, chain: int, draw: int, loss: float, **kwargs):
         self.update(chain, draw, loss)
 
 
@@ -148,5 +148,5 @@ class OnlineLLCEstimator(SamplerCallback):
             "loss/trace": self.losses.cpu().numpy(),
         }
 
-    def __call__(self, chain: int, draw: int, loss: float):
+    def __call__(self, chain: int, draw: int, loss: float, **kwargs):
         self.update(chain, draw, loss)

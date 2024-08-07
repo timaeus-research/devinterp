@@ -208,6 +208,7 @@ def sample_single_chain(
                             loss=loss,
                             draw=draw,
                             chain=chain,
+                            model=model,
                             **results,
                         )
 

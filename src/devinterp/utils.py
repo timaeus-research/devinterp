@@ -202,7 +202,7 @@ def make_evaluate(
     def evaluate(model, data):
         x, y = data
         y_pred = model(x)
-        return criterion(y_pred, y)
+        return criterion(y_pred, y), {'output': y_pred}
 
     return evaluate
 
