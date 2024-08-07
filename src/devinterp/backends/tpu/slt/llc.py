@@ -1,14 +1,9 @@
 from typing import Union
-from slms.analysis.slt.sampler import ChainHealthError
-
 
 import numpy as np
 import torch
 import torch_xla.core.xla_model as xm
 from devinterp.slt.callback import SamplerCallback
-
-
-import warnings
 
 
 class LLCEstimator(SamplerCallback):
@@ -76,7 +71,7 @@ class LLCEstimator(SamplerCallback):
             "sq_loss": self.sq_loss.cpu().item(),
         }
 
-    def __call__(self, chain: int, draw: int, **kwargs):
+    def __call__(self, chain: int, draw: int, *args, **kwargs):
         self.update(chain, draw, kwargs[self.eval_field])
 
 
@@ -127,21 +122,21 @@ class OnlineLLCEstimator(SamplerCallback):
         cum_loss_avgs = np.cumsum(np.mean(self.losses, axis=0), axis=0) / np.arange(
             1, self.num_draws + 1
         )
-        self.llcs = self.nbeta * (cum_loss_avgs - self.init_loss.cpu().numpy())
+        self.llcs = self.nbeta * (cum_loss_avgs - self.init_loss)
 
     def sample(self):
         """
         :returns: A dict :python:`{"llc/means": llc_means, "llc/stds": llc_stds, "llc/trace": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
         """
         return {
-            "init_loss": self.init_loss.item(),
+            "init_loss": self.init_loss,
             "llc": self.llcs[-1],
             "loss": self.losses[-1],
             "llcs": self.llcs,
             "losses": self.losses,
         }
 
-    def __call__(self, chain: int, draw: int, **kwargs):
+    def __call__(self, chain: int, draw: int, *args, **kwargs):
         self.update(chain, draw, kwargs[self.eval_field])
 
 
@@ -166,15 +161,15 @@ def llc_estimator_factory(
             device=device,
             eval_field=eval_field,
         )
-    elif per_token:
-        return PerTokenLLCEstimator(
-            num_chains=num_chains,
-            num_draws=num_draws,
-            nbeta=nbeta,
-            init_loss=init_loss,
-            device=device,
-            eval_field=eval_field,
-        )
+    # elif per_token:
+    #     return PerTokenLLCEstimator(
+    #         num_chains=num_chains,
+    #         num_draws=num_draws,
+    #         nbeta=nbeta,
+    #         init_loss=init_loss,
+    #         device=device,
+    #         eval_field=eval_field,
+    #     )
     else:
         return LLCEstimator(
             num_chains=num_chains,

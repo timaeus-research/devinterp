@@ -144,7 +144,7 @@ def split_results(results: EvalResults) -> Tuple[torch.Tensor, Any]:
     elif isinstance(results, tuple):
         loss = results[0]
         if len(results) > 1:
-            results = loss[1:]
+            results = results[1:]
     elif isinstance(results, torch.Tensor):
         loss = results
         results = None

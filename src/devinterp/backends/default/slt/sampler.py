@@ -1,3 +1,4 @@
+import inspect
 import itertools
 import warnings
 from copy import deepcopy
@@ -9,18 +10,29 @@ from torch.multiprocessing import cpu_count, get_context
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from devinterp.optim.sgld import SGLD
+from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.backends.default.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.backends.default.slt.mala import MalaAcceptanceRate
 from devinterp.backends.default.slt.norms import NoiseNorm
-from devinterp.optim.sgld import SGLD
-from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.utils import (
     EvaluateFn,
-    call_with,
     get_init_loss_multi_batch,
     optimal_temperature,
     prepare_input,
+    split_results,
 )
+
+
+def call_with(func: Callable, **kwargs):
+    # Check the func annotation and call with only the necessary kwargs.
+    sig = inspect.signature(func)
+
+    # Filter out the kwargs that are not in the function's signature
+    filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+
+    # Call the function with the filtered kwargs
+    return func(**filtered_kwargs)
 
 
 def sample_single_chain(
@@ -30,74 +42,91 @@ def sample_single_chain(
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
+    grad_accum_steps=1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
-    verbose=True,
+    verbose: bool = True,
     device: torch.device = torch.device("cpu"),
+    optimize_over_per_model_param: Optional[dict] = None,
     callbacks: List[SamplerCallback] = [],
     init_loss: float = None,
+    
 ):
+    if grad_accum_steps > 1:
+        assert type(grad_accum_steps) == int, "grad_accum_steps must be an integer."
+        num_steps_bw_draws *= grad_accum_steps
+        num_burnin_steps *= grad_accum_steps
     if num_draws > len(loader):
         warnings.warn(
             "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
         )
-
+        
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
-
     optimizer_kwargs = optimizer_kwargs or {}
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
         optimizer_kwargs.setdefault("save_noise", True)
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
-    optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
+    if optimize_over_per_model_param:
+        param_groups = []
+        for name, parameter in model.named_parameters():
+            param_groups.append(
+                {
+                    "params": parameter,
+                    "optimize_over": optimize_over_per_model_param[name].to(device),
+                }
+            )
+        optimizer = sampling_method(
+            param_groups,
+            **optimizer_kwargs,
+        )
+    else:
+        optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
+
 
     if seed is not None:
         torch.manual_seed(seed)
 
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
 
-    for i, data in tqdm(
-        zip(range(num_steps), itertools.cycle(loader)),
-        desc=f"Chain {chain}",
-        total=num_steps,
-        disable=not verbose,
-    ):
-        model.train()
-        optimizer.zero_grad()
-        data = prepare_input(data, device)
+    cumulative_loss = 0
+    with tqdm(desc=f"Chain {chain}",
+        total=num_steps // grad_accum_steps,
+        disable=not verbose) as pbar:
+        for i, data in zip(range(num_steps), itertools.cycle(loader)):
+            model.train()
+            data = prepare_input(data, device)
 
-        results = evaluate(model, data)
+            results = evaluate(model, data)
+            loss, results = split_results(results)
 
-        if isinstance(results, dict):
-            loss = results.pop("loss")
-        elif isinstance(results, tuple):
-            loss = results[0]
-            if len(results) > 1:
-                results = loss[1:]
-        elif isinstance(results, torch.Tensor):
-            loss = results
-            results = None
-        elif hasattr(results, "loss"):
-            loss = results.loss
-        else:
-            raise ValueError("compute_loss must return a dict, tuple, or torch.Tensor")
+            if grad_accum_steps > 1:
+                loss = loss / grad_accum_steps
+                cumulative_loss += loss.item()
+            loss.backward()
 
-        mean_loss = loss.mean()
-        mean_loss.backward()
+            # i+1 instead of i so that the gradient accumulates to an entire batch first
+            # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
+            if (i+1) % grad_accum_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                pbar.update(1)
 
-        optimizer.step()
+            if i >= num_burnin_steps and (i + 1 - num_burnin_steps) % num_steps_bw_draws == 0:
+                draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
+                if grad_accum_steps > 1:
+                    loss = cumulative_loss
+                    cumulative_loss = 0
+                else:
+                    loss = loss.item()
 
-        if i >= num_burnin_steps and (i - num_burnin_steps) % num_steps_bw_draws == 0:
-            draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
-            loss = loss.item()
-
-            with torch.no_grad():
-                for callback in callbacks:
-                    call_with(callback, **locals())  # Cursed. This is the way.
+                with torch.no_grad():
+                    for callback in callbacks:
+                        call_with(callback, **locals())  # Cursed. This is the way.
 
 
 def _sample_single_chain(kwargs):
@@ -116,10 +145,12 @@ def sample(
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
+    grad_accum_steps: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
 ):
     """
     Sample model weights using a given sampling_method, supporting multiple chains/cores,
@@ -204,7 +235,9 @@ def sample(
         seeds = [None] * num_chains
 
     if evaluate is None:
-        evaluate = lambda model, data: model(data)
+
+        def evaluate(model, data):
+            return model(data)
 
     validate_callbacks(callbacks)
 
@@ -219,11 +252,13 @@ def sample(
             num_burnin_steps=num_burnin_steps,
             num_steps_bw_draws=num_steps_bw_draws,
             init_loss=init_loss,
+            grad_accum_steps=grad_accum_steps,
             sampling_method=sampling_method,
             optimizer_kwargs=optimizer_kwargs,
             device=device,
             verbose=verbose,
             callbacks=callbacks,
+            optimize_over_per_model_param=optimize_over_per_model_param,
         )
 
     if cores > 1:
@@ -237,4 +272,3 @@ def sample(
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
-

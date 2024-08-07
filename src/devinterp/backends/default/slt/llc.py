@@ -9,13 +9,13 @@ class LLCEstimator(SamplerCallback):
     r"""
     Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process.
     It calculates the LLC based on the average loss across draws for each chain:
-
+    
     $$LLC = \textrm{T} * (\textrm{avg_loss} - \textrm{init_loss})$$
 
     For use with :func:`devinterp.slt.sampler.sample`.
-
-    Note:
-        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function,
+    
+    Note: 
+        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function, 
         and if not passed will be the average loss of the supplied model over `num_chains` batches.
 
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
@@ -27,7 +27,6 @@ class LLCEstimator(SamplerCallback):
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     :type device: str | torch.device, optional
     """
-
     def __init__(
         self,
         num_chains: int,
@@ -40,7 +39,7 @@ class LLCEstimator(SamplerCallback):
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
         )
-        self.init_loss = 0.0  # gets set by devinterp.slt.sample()
+        self.init_loss = 0.0 # gets set by devinterp.slt.sample()
 
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
         self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
@@ -81,9 +80,9 @@ class OnlineLLCEstimator(SamplerCallback):
     Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.
     It calculates LLCs using the same formula as :func:`devinterp.slt.llc.LLCEstimator`, but continuously and including means and std across draws (as opposed to just across chains).
     For use with :func:`devinterp.slt.sampler.sample`.
-
-    Note:
-        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function,
+    
+    Note: 
+        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function, 
         and if not passed will be the average loss of the supplied model over `num_chains` batches.
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_draws: int
@@ -100,7 +99,7 @@ class OnlineLLCEstimator(SamplerCallback):
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
-        self.init_loss = 0.0  # gets set by devinterp.slt.sample()
+        self.init_loss = 0.0 # gets set by devinterp.slt.sample()
 
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
@@ -131,12 +130,13 @@ class OnlineLLCEstimator(SamplerCallback):
                 (t - 1) * prev_moving_avg + self.temperature * (loss - self.init_loss)
             )
 
+
     def finalize(self):
         self.llc_means = self.llcs.mean(dim=0)
         self.llc_stds = self.llcs.std(dim=0)
 
     def sample(self):
-        """
+        """    
         :returns: A dict :python:`{"llc/means": llc_means, "llc/stds": llc_stds, "llc/trace": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
         """
         return {

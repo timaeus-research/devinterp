@@ -1,33 +1,27 @@
-import itertools
-import warnings
-from copy import deepcopy
+
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
 import torch
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
-from devinterp.backends.default.slt.llc import LLCEstimator, OnlineLLCEstimator
-from devinterp.backends.default.slt.mala import MalaAcceptanceRate
-from devinterp.backends.default.slt.norms import NoiseNorm
+
 from devinterp.optim.sgld import SGLD
-from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.utils import (
     USE_TPU_BACKEND,
     EvaluateFn,
-    call_with,
     get_init_loss_multi_batch,
-    optimal_temperature,
-    prepare_input,
-    split_results,
+    optimal_temperature
 )
 
 if USE_TPU_BACKEND:
+    print('USING TPU BACKEND')
     from devinterp.backends.tpu.slt.sampler import sample
+    from devinterp.backends.tpu.slt.llc import LLCEstimator, OnlineLLCEstimator
+
 else:
     from devinterp.backends.default.slt.sampler import sample
+    from devinterp.backends.default.slt.llc import LLCEstimator, OnlineLLCEstimator
+
 
 
 def estimate_learning_coeff_with_summary(
@@ -59,11 +53,11 @@ def estimate_learning_coeff_with_summary(
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
     if online:
         llc_estimator = OnlineLLCEstimator(
-            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
+            num_chains, num_draws, optimizer_kwargs["temperature"], init_loss=init_loss, device=device
         )
     else:
         llc_estimator = LLCEstimator(
-            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
+            num_chains, num_draws, optimizer_kwargs["temperature"], init_loss=init_loss, device=device
         )
 
     callbacks = [llc_estimator, *callbacks]
@@ -84,7 +78,6 @@ def estimate_learning_coeff_with_summary(
         device=device,
         verbose=verbose,
         callbacks=callbacks,
-        init_loss=init_loss,
         optimize_over_per_model_param=optimize_over_per_model_param,
     )
 

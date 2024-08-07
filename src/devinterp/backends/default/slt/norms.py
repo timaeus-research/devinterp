@@ -41,7 +41,7 @@ class WeightNorm(SamplerCallback):
     def update(self, chain: int, draw: int, model: nn.Module):
         total_norm = torch.tensor(0.0).to(self.device)
         for param in model.parameters():
-            total_norm += torch.square(torch.linalg.vector_norm(param, ord=2)).to(
+            total_norm += torch.square(torch.linalg.vector_norm(param, ord=self.p_norm)).to(
                 self.device
             )
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
@@ -90,7 +90,7 @@ class GradientNorm(SamplerCallback):
     def update(self, chain: int, draw: int, model: nn.Module):
         total_norm = torch.tensor(0.0).to(self.device)
         for param in model.parameters():
-            total_norm += torch.square(torch.linalg.vector_norm(param.grad, ord=2)).to(
+            total_norm += torch.square(torch.linalg.vector_norm(param.grad, ord=self.p_norm)).to(
                 self.device
             )
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
@@ -139,7 +139,7 @@ class NoiseNorm(SamplerCallback):
     def update(self, chain: int, draw: int, optimizer: SGLD):
         total_norm = torch.tensor(0.0).to(self.device)
         for noise in optimizer.noise:
-            total_norm += torch.square(torch.linalg.vector_norm(noise, ord=2)).to(
+            total_norm += torch.square(torch.linalg.vector_norm(noise, ord=self.p_norm)).to(
                 self.device
             )
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
