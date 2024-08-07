@@ -64,12 +64,12 @@ def test_rllc_normalcrossing_between_powers(
     llc_estimator_1 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        temperature=optimal_nbeta(train_dataloader),
     )
     llc_estimator_2 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        temperature=optimal_nbeta(train_dataloader),
     )
     torch.manual_seed(seed)
 
@@ -79,7 +79,7 @@ def test_rllc_normalcrossing_between_powers(
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
-            temperature=optimal_temperature(train_dataloader),
+            temperature=optimal_nbeta(train_dataloader),
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -97,7 +97,7 @@ def test_rllc_normalcrossing_between_powers(
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
-            temperature=optimal_temperature(train_dataloader),
+            temperature=optimal_nbeta(train_dataloader),
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -148,12 +148,12 @@ def test_restricted_gradient_normalcrossing_between_dims(
     llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        temperature=optimal_nbeta(train_dataloader),
     )
     llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        temperature=optimal_nbeta(train_dataloader),
     )
 
     sample(
@@ -161,7 +161,7 @@ def test_restricted_gradient_normalcrossing_between_dims(
         train_dataloader,
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
-            lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
+            lr=lr, temperature=optimal_nbeta(train_dataloader), noise_level=0.0
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -175,7 +175,7 @@ def test_restricted_gradient_normalcrossing_between_dims(
         train_dataloader,
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
-            lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
+            lr=lr, temperature=optimal_nbeta(train_dataloader), noise_level=0.0
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -222,19 +222,19 @@ def test_rllc_full_normalcrossing_between_dims(
     llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        temperature=optimal_nbeta(train_dataloader),
     )
     llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        temperature=optimal_nbeta(train_dataloader),
     )
 
     sample(
         model1,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, temperature=optimal_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -246,7 +246,7 @@ def test_rllc_full_normalcrossing_between_dims(
         model2,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, temperature=optimal_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -283,19 +283,19 @@ def test_rllc_different_from_full_llc_between_dims(
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        temperature=optimal_nbeta(train_dataloader),
     )
     rllc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        temperature=optimal_nbeta(train_dataloader),
     )
 
     sample(
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, temperature=optimal_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -307,7 +307,7 @@ def test_rllc_different_from_full_llc_between_dims(
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, temperature=optimal_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,

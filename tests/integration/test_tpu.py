@@ -14,7 +14,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from datasets import load_dataset
 
-from devinterp.utils import optimal_temperature, set_seed, prepare_input
+from devinterp.utils import optimal_nbeta, set_seed, prepare_input
 from devinterp.optim.sgld import SGLD
 
 

@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from devinterp.optim.sgld import SGLD
-from devinterp.utils import optimal_temperature
+from devinterp.utils import optimal_nbeta
 
 
 @pytest.mark.parametrize("lr", [1e-1, 1e-2, 1e-3, 1e-4])

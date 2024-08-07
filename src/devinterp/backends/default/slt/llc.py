@@ -10,7 +10,7 @@ class LLCEstimator(SamplerCallback):
     Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process.
     It calculates the LLC based on the average loss across draws for each chain:
     
-    $$LLC = \textrm{T} * (\textrm{avg_loss} - \textrm{init_loss})$$
+    $$LLC = \textrm{n \beta} * (\textrm{avg_loss} - \textrm{init_loss})$$
 
     For use with :func:`devinterp.slt.sampler.sample`.
     
@@ -22,7 +22,7 @@ class LLCEstimator(SamplerCallback):
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param nbeta: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     :type device: str | torch.device, optional
@@ -32,6 +32,7 @@ class LLCEstimator(SamplerCallback):
         num_chains: int,
         num_draws: int,
         nbeta: float,
+        init_loss: torch.Tensor = None,
         device: Union[torch.device, str] = "cpu",
     ):
         self.num_chains = num_chains
@@ -39,8 +40,7 @@ class LLCEstimator(SamplerCallback):
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
         )
-        self.init_loss = 0.0 # gets set by devinterp.slt.sample()
-
+        self.init_loss = (init_loss or torch.zeros(1, dtype=torch.float32)).to(device)
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
         self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
         self.llc_mean = torch.tensor(0.0, dtype=torch.float32).to(device)
@@ -88,18 +88,19 @@ class OnlineLLCEstimator(SamplerCallback):
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
-    :type temperature: int
+    :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :type nbeta: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
     :type device: str | torch.device, optional
     """
 
     def __init__(
-        self, num_chains: int, num_draws: int, temperature: float, device="cpu"
+        self, num_chains: int, num_draws: int, nbeta: float, init_loss,
+ device="cpu"
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
-        self.init_loss = 0.0 # gets set by devinterp.slt.sample()
+        self.init_loss = init_loss # gets set by devinterp.slt.sample()
 
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
@@ -109,7 +110,7 @@ class OnlineLLCEstimator(SamplerCallback):
             (num_chains, num_draws), dtype=torch.float32
         ).to(device)
 
-        self.temperature = temperature
+        self.nbeta = nbeta
 
         self.llc_means = torch.tensor(num_draws, dtype=torch.float32).to(device)
         self.llc_stds = torch.tensor(num_draws, dtype=torch.float32).to(device)
@@ -118,16 +119,16 @@ class OnlineLLCEstimator(SamplerCallback):
 
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss
-        self.llcs[chain, draw] = self.temperature * (loss - self.init_loss)
+        self.llcs[chain, draw] = self.nbeta * (loss - self.init_loss)
         if draw == 0:
-            self.moving_avg_llcs[chain, draw] = self.temperature * (
+            self.moving_avg_llcs[chain, draw] = self.nbeta * (
                 loss - self.init_loss
             )
         else:
             t = draw + 1
             prev_moving_avg = self.moving_avg_llcs[chain, draw - 1]
             self.moving_avg_llcs[chain, draw] = (1 / t) * (
-                (t - 1) * prev_moving_avg + self.temperature * (loss - self.init_loss)
+                (t - 1) * prev_moving_avg + self.nbeta * (loss - self.init_loss)
             )
 
 

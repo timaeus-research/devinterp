@@ -10,7 +10,7 @@ from devinterp.utils import (
     USE_TPU_BACKEND,
     EvaluateFn,
     get_init_loss_multi_batch,
-    optimal_temperature
+    optimal_nbeta
 )
 
 if USE_TPU_BACKEND:
@@ -44,7 +44,7 @@ def estimate_learning_coeff_with_summary(
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
     online: bool = False,
 ) -> dict:
-    optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
+    optimizer_kwargs.setdefault("temperature", optimal_nbeta(loader))
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
             loader, num_chains, model, evaluate, device

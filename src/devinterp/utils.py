@@ -82,7 +82,7 @@ def plot_trace(
     plt.show()
 
 
-def optimal_temperature(dataloader: Union[DataLoader, int]):
+def optimal_nbeta(dataloader: Union[DataLoader, int]):
     if isinstance(dataloader, DataLoader):
         return dataloader.batch_size / np.log(dataloader.batch_size)
     elif isinstance(dataloader, int):

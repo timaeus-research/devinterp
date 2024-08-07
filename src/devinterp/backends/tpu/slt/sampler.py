@@ -26,7 +26,7 @@ from devinterp.utils import (
     EvaluateFn,
     call_with,
     get_init_loss_multi_batch,
-    optimal_temperature,
+    optimal_nbeta,
     prepare_input,
     set_seed
 )

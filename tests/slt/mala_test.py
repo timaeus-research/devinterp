@@ -8,7 +8,7 @@ from devinterp.optim.sgld import SGLD
 from devinterp.slt import sample
 from devinterp.backends.default.slt.mala import MalaAcceptanceRate, mala_acceptance_probability
 from devinterp.test_utils import *
-from devinterp.utils import make_evaluate, optimal_temperature
+from devinterp.utils import make_evaluate, optimal_nbeta
 
 
 class Polynomial(nn.Module):
@@ -115,7 +115,7 @@ def test_mala_callback_closeness(
         mala_estimator = MalaAcceptanceRate(
             num_chains=num_chains,
             num_draws=num_draws,
-            temperature=optimal_temperature(train_dataloader),
+            temperature=optimal_nbeta(train_dataloader),
             learning_rate=lr,
         )
         sample(
@@ -125,7 +125,7 @@ def test_mala_callback_closeness(
             optimizer_kwargs=dict(
                 lr=lr,
                 localization=localization,
-                temperature=optimal_temperature(train_dataloader),
+                temperature=optimal_nbeta(train_dataloader),
             ),
             sampling_method=SGLD,
             num_chains=num_chains,

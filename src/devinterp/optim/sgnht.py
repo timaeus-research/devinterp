@@ -37,7 +37,7 @@ class SGNHT(torch.optim.Optimizer):
     :type diffusion_factor: float, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory. Default is None
     :type bounding_box_size: float, optional
-    :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type temperature: int, optional
     
     :raises Warning: if :python:`temperature` is set to 1
@@ -63,7 +63,7 @@ class SGNHT(torch.optim.Optimizer):
                 "Warning: MALA not implemented for SGNHT! If you insist on using MALA, use SGLD instead.")
         if temperature == 1.0:
             warnings.warn(
-                "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_temperature(dataloader) instead"
+                "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_nbeta(dataloader) instead"
             )
 
         defaults = dict(

@@ -26,7 +26,7 @@ class SGLD(torch.optim.Optimizer):
     and $\sigma$ is the noise term.
 
     Example:
-        >>> optimizer = SGLD(model.parameters(), lr=0.1, temperature=utils.optimal_temperature(dataloader))
+        >>> optimizer = SGLD(model.parameters(), lr=0.1, temperature=utils.optimal_nbeta(dataloader))
 
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
@@ -52,7 +52,7 @@ class SGLD(torch.optim.Optimizer):
     :type localization: float, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory. Default is None
     :type bounding_box_size: float, optional
-    :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type temperature: int, optional
     :param save_noise: Whether to store the per-parameter noise during optimization. Default is False
     :type save_noise: bool, optional
@@ -79,7 +79,7 @@ class SGLD(torch.optim.Optimizer):
             )
         if temperature == 1.0:
             warnings.warn(
-                "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_temperature(dataloader) instead"
+                "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_nbeta(dataloader) instead"
 
             )
         defaults = dict(

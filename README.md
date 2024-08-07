@@ -22,10 +22,10 @@ DevInterp is a python library for conducting research on developmental interpret
 
 from devinterp.slt import sample, LLCEstimator
 from devinterp.optim import SGLD
-from devinterp.utils import optimal_temperature
+from devinterp.utils import optimal_nbeta
 
 # Assuming you have a PyTorch Model assigned to model, and DataLoader assigned to trainloader
-llc_estimator = LLCEstimator(..., temperature=optimal_temperature(trainloader))
+llc_estimator = LLCEstimator(..., temperature=optimal_nbeta(trainloader))
 sample(model, trainloader, ..., callbacks = [llc_estimator])
 
 llc_mean = llc_estimator.sample()["llc/mean"]

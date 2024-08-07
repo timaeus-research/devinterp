@@ -9,7 +9,7 @@ from devinterp.optim.sgnht import SGNHT
 from devinterp.slt import sample
 from devinterp.backends.default.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.test_utils import *
-from devinterp.utils import evaluate_mse, optimal_temperature
+from devinterp.utils import evaluate_mse, optimal_nbeta
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def test_accuracy_normalcrossing(
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
     )
     sample(
         model,
