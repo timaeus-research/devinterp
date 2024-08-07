@@ -40,7 +40,7 @@ class LLCEstimator(SamplerCallback):
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
         )
-        self.init_loss = (init_loss or torch.zeros(1, dtype=torch.float32)).to(device)
+        self.init_loss = init_loss or torch.zeros(1, dtype=torch.float32).to(device)
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
         self.llc_per_chain = torch.zeros(num_chains, dtype=torch.float32).to(device)
         self.llc_mean = torch.tensor(0.0, dtype=torch.float32).to(device)
