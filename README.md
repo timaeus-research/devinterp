@@ -14,7 +14,7 @@ DevInterp is a python library for conducting research on developmental interpret
 
 ## Installation
 
- To install `devinterp`, simply run `pip install devinterp`.
+ To install `devinterp`, simply run `pip install devinterp`. (Note: This has PyTorch as a dependency.)
 
 ### Minimal Example
 
@@ -24,7 +24,7 @@ from devinterp.slt import sample, LLCEstimator
 from devinterp.optim import SGLD
 from devinterp.utils import optimal_temperature
 
-# Assuming you have a PyTorch Module and DataLoader
+# Assuming you have a PyTorch Model assigned to model, and DataLoader assigned to trainloader
 llc_estimator = LLCEstimator(..., temperature=optimal_temperature(trainloader))
 sample(model, trainloader, ..., callbacks = [llc_estimator])
 
@@ -47,15 +47,6 @@ For papers that either inspired or used the DevInterp package, [click here](http
 
 ## Known Issues
 
-- The current implementation does not work with transformers out-of-the-box. This can be fixed by adding a wrapper to your model, for example passing Unpack(model) to sample() where unpack is defined by:
-```python
-class Unpack(nn.Module):
- def __init__(model: nn.Module):
-      self.model = model
-
- def forward(data: Tuple[torch.Tensor, torch.Tensor]):
-      return self.model(*data)
-```
 - LLC Estimation is currently more of an art than a science. It will take some time and pain to get it work reliably.
 
 If you run into issues not mentioned here, please first check the github issues, then ask in [the DevInterp Discord](https://discord.gg/UwjWKCZZYR), and only then make a new github issue.
@@ -66,14 +57,14 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on how to contribute.
 
 ## Credits & Citations
 
-This package was created by [Timaeus](https://timaeus.co). The main contributors to this package are Jesse Hoogland, Stan van Wingerden, and George Wang. Zach Furman, Matthew Farrugia-Roberts and Edmund Lau also made valuable contributions or provided useful advice.
+This package was created by [Timaeus](https://timaeus.co). The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts, William Zhou, Rohan Hitchcock, and Edmund Lau also made valuable contributions or provided useful advice.
 
 If this package was useful in your work, please cite it as:
 
 ```BibTeX
    @misc{devinterp2024,
       title = {DevInterp},
-      author = {Jesse Hoogland, Stan van Wingerden, and George Wang},
+      author = {Stan van Wingerden, Jesse Hoogland, and George Wang},
       year = {2024},
       howpublished = {\url{https://github.com/timaeus-research/devinterp}},
    }

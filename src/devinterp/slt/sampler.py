@@ -21,11 +21,11 @@ from devinterp.utils import (
     get_init_loss_multi_batch,
     optimal_temperature,
     prepare_input,
+    split_results,
 )
 
 if USE_TPU_BACKEND:
-    # from devinterp.backends.tpu.slt.sampler import sample
-    raise NotImplementedError("TPU backend not supported for sample")
+    from devinterp.backends.tpu.slt.sampler import sample
 else:
     from devinterp.backends.default.slt.sampler import sample
 
@@ -33,20 +33,22 @@ else:
 def estimate_learning_coeff_with_summary(
     model: torch.nn.Module,
     loader: DataLoader,
+    callbacks: List[Callable] = [],
     evaluate: Optional[EvaluateFn] = None,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
-    optimizer_kwargs: Optional[Dict] = {},
+    optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
     num_draws: int = 100,
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
+    init_loss: float = None,
+    grad_accum_steps: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    device: torch.device = torch.device("cpu"),
+    device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[Callable] = [],
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
     online: bool = False,
-    init_loss: float = None,
 ) -> dict:
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
     if not init_loss:
@@ -76,12 +78,14 @@ def estimate_learning_coeff_with_summary(
         num_chains=num_chains,
         num_burnin_steps=num_burnin_steps,
         num_steps_bw_draws=num_steps_bw_draws,
+        grad_accum_steps=grad_accum_steps,
         cores=cores,
         seed=seed,
         device=device,
         verbose=verbose,
         callbacks=callbacks,
         init_loss=init_loss,
+        optimize_over_per_model_param=optimize_over_per_model_param,
     )
 
     results = {}
@@ -96,6 +100,7 @@ def estimate_learning_coeff_with_summary(
 def estimate_learning_coeff(
     model: torch.nn.Module,
     loader: DataLoader,
+    callbacks: List[Callable] = [],
     evaluate: Optional[EvaluateFn] = None,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict[str, Union[float, Literal["adaptive"]]]] = None,
@@ -103,12 +108,13 @@ def estimate_learning_coeff(
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
+    init_loss: float = None,
+    grad_accum_steps: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    device: torch.device = torch.device("cpu"),
+    device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    callbacks: List[Callable] = [],
-    init_loss: float = None,
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None
 ) -> float:
     return estimate_learning_coeff_with_summary(
         model=model,
@@ -120,6 +126,7 @@ def estimate_learning_coeff(
         num_chains=num_chains,
         num_burnin_steps=num_burnin_steps,
         num_steps_bw_draws=num_steps_bw_draws,
+        grad_accum_steps=grad_accum_steps,
         cores=cores,
         seed=seed,
         device=device,
@@ -127,4 +134,5 @@ def estimate_learning_coeff(
         callbacks=callbacks,
         online=False,
         init_loss=init_loss,
+        optimize_over_per_model_param=optimize_over_per_model_param,
     )["llc/mean"]
