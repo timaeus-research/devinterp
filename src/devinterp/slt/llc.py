@@ -36,8 +36,8 @@ class LLCEstimator(SamplerCallback):
         self,
         num_chains: int,
         num_draws: int,
+        init_loss: torch.Tensor,
         eval_field: str = "loss",
-        init_loss: torch.Tensor = None,
         device: Union[torch.device, str] = "cpu",
         nbeta: float = None,
         temperature: Optional[float] = None, # Temperature is deprecated
@@ -47,8 +47,7 @@ class LLCEstimator(SamplerCallback):
 
         self.loss = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
 
-        if init_loss is not None:
-            self.init_loss = init_loss.to(torch.float32).to(device)
+        self.init_loss = init_loss
         if nbeta is None and temperature is not None:
             nbeta = temperature
             warnings.warn("Temperature is deprecated. Please use nbeta instead.")
@@ -87,10 +86,6 @@ class LLCEstimator(SamplerCallback):
             self.loss = xm.all_reduce(xm.REDUCE_SUM, self.loss, scale=scale)
 
         avg_loss = self.loss.mean(axis=1) # [num_chains]. Average loss across draws for each chain.
-    
-        # In the default case, we take the initial loss to be the model's loss across chains and draws.
-        if self.init_loss is None:
-            self.init_loss = avg_loss.mean()
 
         self.llc_per_chain = self.nbeta * (avg_loss - self.init_loss) # [num_chains]. A single LLC value for each chain.
         self.sq_loss = torch.square(self.loss)
