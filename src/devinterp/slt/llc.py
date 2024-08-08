@@ -27,8 +27,8 @@ class LLCEstimator(SamplerCallback):
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param nbeta: Reparameterized inverse temperature, float (default: 1., set by get_results() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
-    :type nbeta: int
+    :param nbeta: Reparameterized inverse temperature
+    :type nbeta: float
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     :type device: str | torch.device, optional
     """
@@ -132,8 +132,8 @@ class OnlineLLCEstimator(SamplerCallback):
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param nbeta: Inverse reparameterized temperature, float (default: 1., set by get_results() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
-    :type nbeta: int
+    :param nbeta: Inverse reparameterized temperature
+    :type nbeta: float
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
     :type device: str | torch.device, optional
     """
