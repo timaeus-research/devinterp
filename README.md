@@ -20,7 +20,7 @@ DevInterp is a python library for conducting research on developmental interpret
 
 ```python
 
-from devinterp.slt import sample, LLCEstimator
+from devinterp.slt.sampler import  sample, LLCEstimator
 from devinterp.optim import SGLD
 from devinterp.utils import optimal_nbeta
 

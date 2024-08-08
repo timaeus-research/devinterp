@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
 from devinterp.optim.sgld import SGLD
-from devinterp.slt import sample
+from devinterp.slt.sampler import  sample
 from devinterp.slt.llc import LLCEstimator
 from devinterp.test_utils import *
 from devinterp.utils import *

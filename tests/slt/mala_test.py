@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
-from devinterp.slt import sample
+from devinterp.slt.sampler import  sample
 from devinterp.backends.default.slt.mala import MalaAcceptanceRate, mala_acceptance_probability
 from devinterp.test_utils import *
 from devinterp.utils import make_evaluate, optimal_nbeta

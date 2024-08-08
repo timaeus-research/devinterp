@@ -70,7 +70,7 @@ def _test_hf(model, dataset, device: str):
         num_draws=num_draws,
         nbeta=nbeta,
         device=device,
-        
+        init_loss=init_loss,
     )
 
     # Run the LLC estimation
@@ -117,11 +117,10 @@ def test_hf():
 
     # Set up the LLC estimator
 
-    metrics_cpu = _test_hf(model, dataset, "cpu")
-    pp(metrics_cpu)
-
     metrics_tpu = _test_hf(model, dataset, "tpu")
     pp(metrics_tpu)
+    metrics_cpu = _test_hf(model, dataset, "cpu")
+    pp(metrics_cpu)
 
     for k, v in metrics_cpu.items():
         if isinstance(v, torch.Tensor):

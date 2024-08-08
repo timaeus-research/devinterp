@@ -17,8 +17,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 
 from devinterp.backends.tpu.slt.llc import LLCEstimator, OnlineLLCEstimator
-from devinterp.backends.default.slt.mala import MalaAcceptanceRate
-from devinterp.backends.default.slt.norms import NoiseNorm
+from devinterp.backends.default.slt.mala import MalaAcceptanceRate  # TODO
+from devinterp.backends.default.slt.norms import NoiseNorm  # TODO
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.utils import (
@@ -27,8 +27,9 @@ from devinterp.utils import (
     get_init_loss_multi_batch,
     optimal_nbeta,
     prepare_input,
-    set_seed
+    set_seed,
 )
+
 
 def mark_step_if_xla():
     if USE_TPU_BACKEND:
@@ -54,13 +55,12 @@ def sample_single_chain(
     callbacks: List[Callable] = [],
     optimize_over_per_model_param: Optional[Dict[str, torch.Tensor]] = None,
     init_noise: Optional[float] = None,
-    use_alternate_batching = False, # See George's alternate SGLD sampling method
+    use_alternate_batching=False,  # See George's alternate SGLD sampling method
     **kwargs,
 ):
     """
     Base function to sample a single chain. This function is called by the `sample` function on both single and multi-core setups.
     """
-
 
     # == Model ==
     model = deepcopy(ref_model).to(device)
@@ -123,6 +123,7 @@ def sample_single_chain(
         feed = zip(range(num_steps * grad_accum_steps), cycle(feed))
     else:
         feed = zip(range(num_steps * grad_accum_steps), cycle(loader))
+    loader = cycle(loader)
 
     model.train()
     no_grad = not any(map(lambda pg: pg["nbeta"] > 0, optimizer.param_groups))
@@ -133,9 +134,9 @@ def sample_single_chain(
     # which is what happens if we have an if statement that changes control flow at each iteration.
 
     # Will: If my modifications break on TPUs, let me know.
-    with trange(0, num_steps,
-                    desc = f"[{device}] Chain {chain}", 
-                    disable = not verbose) as pbar:
+    with trange(
+        0, num_steps, desc=f"[{device}] Chain {chain}", disable=not verbose
+    ) as pbar:
         for i in pbar:
             # optimizer.zero_grad()
             loss, results = None, {}
@@ -145,7 +146,7 @@ def sample_single_chain(
             # and batch_size to 32 to sample from 1 effective batch of size 3.2k
 
             for j in range(grad_accum_steps):
-                data = next(feed)[1]
+                data = next(loader)
                 _loss, _results = evaluate(model, prepare_input(data, device))
                 _mean_loss = _loss.mean() / grad_accum_steps
 
@@ -211,7 +212,6 @@ def sample_single_chain(
 
                 mark_step_if_xla()
 
-
     # except ChainHealthError as e:
     #     warnings.warn(f"Chain failed: {e}")
 
@@ -264,8 +264,10 @@ def sample(
     batch_size: int = 32,
     init_noise: Optional[float] = None,
     shuffle: bool = True,
-    use_alternate_batching = False, # See George's alternate SGLD sampling method
-    ):
+    use_alternate_batching=False,  # See George's alternate SGLD sampling method
+    init_loss=None,
+    **kwargs,
+):
     """
     Sample model weights using a given sampling_method, supporting multiple chains/cores,
     and calculate the observables (loss, llc, etc.) for each callback passed along.
@@ -319,6 +321,15 @@ def sample(
         callbacks if isinstance(callbacks, list) else list(callbacks.values())
     )
 
+    if not init_loss:
+        init_loss = get_init_loss_multi_batch(
+            loader, num_chains, model, evaluate, device
+        )
+        # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
+        # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
+    for callback in callbacks:
+        if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
+            setattr(callback, "init_loss", init_loss)
     if cores is None:
         cores = min(4, cpu_count())
 
@@ -337,7 +348,7 @@ def sample(
 
     validate_callbacks(callbacks_list)
 
-    # shared_kwargs is passed into sample_single_chain for each chain. 
+    # shared_kwargs is passed into sample_single_chain for each chain.
     # Args differ slightly based on chain index.
     shared_kwargs = dict(
         ref_model=model,
