@@ -46,8 +46,9 @@ class LLCEstimator(SamplerCallback):
         self.num_draws = num_draws
 
         self.loss = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
-
         self.init_loss = init_loss
+
+        assert nbeta is not None or temperature is not None, "Please provide a value for nbeta."
         if nbeta is None and temperature is not None:
             nbeta = temperature
             warnings.warn("Temperature is deprecated. Please use nbeta instead.")
@@ -137,17 +138,24 @@ class OnlineLLCEstimator(SamplerCallback):
         self, 
         num_chains: int, 
         num_draws: int, 
-        nbeta: float,
         init_loss: torch.Tensor,
         device="cpu",
         eval_field="loss",
+        nbeta: float = None,
+        temperature: Optional[float] = None, # Temperature is deprecated
     ):
         self.num_draws = num_draws
         self.init_loss = init_loss
 
         self.losses = torch.zeros((num_chains, num_draws)).to(device)
         self.llcs = torch.zeros((num_chains, num_draws)).to(device)
-        self.nbeta = nbeta
+
+        assert nbeta is not None or temperature is not None, "Please provide a value for nbeta."
+        if nbeta is None and temperature is not None:
+            nbeta = temperature
+            warnings.warn("Temperature is deprecated. Please use nbeta instead.")
+        self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
+        
         self.device = device
         self.eval_field = eval_field
 
