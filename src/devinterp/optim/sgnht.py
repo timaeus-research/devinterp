@@ -37,10 +37,10 @@ class SGNHT(torch.optim.Optimizer):
     :type diffusion_factor: float, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory. Default is None
     :type bounding_box_size: float, optional
-    :param temperature: Effective Inverse Temperature, float (default: 1., set to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
-    :type temperature: int, optional
+    :param nbeta: Effective Inverse Temperature, float (default: 1., set to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :type nbeta: int, optional
     
-    :raises Warning: if :python:`temperature` is set to 1
+    :raises Warning: if :python:`nbeta` is set to 1
     :raises Warning: if :python:`NoiseNorm` callback is used
     :raises Warning: if :python:`MALA` callback is used
     """
@@ -52,7 +52,7 @@ class SGNHT(torch.optim.Optimizer):
         bounding_box_size=None,
         save_noise=False,
         save_mala_vars=False,
-        temperature=1.0,
+        nbeta=1.0,
     ):
         if save_noise:
             warnings.warn(
@@ -61,16 +61,16 @@ class SGNHT(torch.optim.Optimizer):
         if save_mala_vars:
             warnings.warn(
                 "Warning: MALA not implemented for SGNHT! If you insist on using MALA, use SGLD instead.")
-        if temperature == 1.0:
+        if nbeta == 1.0:
             warnings.warn(
-                "Warning: temperature set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_nbeta(dataloader) instead"
+                "Warning: nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_nbeta(dataloader) instead"
             )
 
         defaults = dict(
             lr=lr,
             diffusion_factor=diffusion_factor,
             bounding_box_size=bounding_box_size,
-            temperature=temperature,
+            nbeta=nbeta,
         )
         super(SGNHT, self).__init__(params, defaults)
 
@@ -99,7 +99,7 @@ class SGNHT(torch.optim.Optimizer):
                     momentum = param_state["momentum"]
 
                     # Gradient term
-                    dw = p.grad.data * group["temperature"]
+                    dw = p.grad.data * group["nbeta"]
 
                     momentum.sub_(group["lr"] * dw)
 
