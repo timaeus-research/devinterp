@@ -223,7 +223,7 @@ class SGLD(torch.optim.Optimizer):
                         group["noise_norm"] += (noise**2).sum().detach()
 
                     if group["distance"] is not False and not self.save_mala_vars:
-                        group["distance"] += (initial_param_distance**2).sum().detach()
+                        group["distance"] += ((initial_param_distance * group["localization"])**2).sum().detach()
 
                     # Rebound if exceeded bounding box size
                     if group["bounding_box_size"]:
