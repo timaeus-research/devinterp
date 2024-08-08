@@ -5,7 +5,7 @@ import torch
 
 class SamplerCallback:
     """
-    Base class for creating callbacks used in :func:`devinterp.slt.sampler.sample()`. 
+    Base class for creating callbacks used in :func:`devinterp.slt.sampler.get_results()`. 
     Each instantiated callback gets its :python:`__call__` called every sample, and :python:`finalize` called at the end of sample (if it exists).
     Each callback method can access parameters in :python:`locals()`, so there's no need to pass variables along explicitly.
 
@@ -45,7 +45,7 @@ class SamplerCallback:
         """Gets called at the end of sampling. Can access any variable in :python:`locals()` when called. Should be used for calucalting stats over chains, for example average chain loss."""
         pass
 
-    def sample(self, *args, **kwargs):
+    def get_results(self, *args, **kwargs):
         """Does not get called automatically, but functions as an interface to easily access stats calculated by the callback."""
         raise NotImplementedError
 

@@ -107,8 +107,8 @@ def test_accuracy_rrr(sampling_method, m, h, n):
         verbose=False,
         seed=42,
     )
-    llc_mean = llc_estimator.sample()["llc/mean"]
-    llc_std_dev = llc_estimator.sample()["llc/std"]
+    llc_mean = llc_estimator.get_results()["llc/mean"]
+    llc_std_dev = llc_estimator.get_results()["llc/std"]
     case_1_even = (m + h + n) % 2 == 0
     case_1_odd = (m + h + n) % 2 == 1
     case_2 = m + h < n

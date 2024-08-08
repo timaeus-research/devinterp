@@ -20,14 +20,14 @@ class LLCEstimator(SamplerCallback):
     For use with :func:`devinterp.slt.sampler.sample`.
     
     Note: 
-        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function, 
+        - `init_loss` gets set inside :func:`devinterp.slt.get_results()`. It can be passed as an argument to that function, 
         and if not passed will be the average loss of the supplied model over `num_chains` batches.
 
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param nbeta: Reparameterized inverse temperature, float (default: 1., set by sample() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param nbeta: Reparameterized inverse temperature, float (default: 1., set by get_results() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     :type device: str | torch.device, optional
@@ -127,12 +127,12 @@ class OnlineLLCEstimator(SamplerCallback):
     For use with :func:`devinterp.slt.sampler.sample`.
     
     Note: 
-        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It should be passed as an argument to that function.
+        - `init_loss` gets set inside :func:`devinterp.slt.get_results()`. It should be passed as an argument to that function.
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param nbeta: Inverse reparameterized temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param nbeta: Inverse reparameterized temperature, float (default: 1., set by get_results() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
     :type device: str | torch.device, optional
@@ -180,7 +180,7 @@ class OnlineLLCEstimator(SamplerCallback):
         self.llc_means = self.llcs.mean(dim=0)
         self.llc_stds = self.llcs.std(dim=0)
 
-    def sample(self):
+    def get_results(self):
         """    
         :returns: A dict :python:`{"llc/means": llc_means, "llc/stds": llc_stds, "llc/trace": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
         """

@@ -74,8 +74,8 @@ class MalaAcceptanceRate(SamplerCallback):
     Callback for computing MALA acceptance rate.
 
     Attributes:
-        num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
-        num_chains (int): Number of chains to run. (should be identical to param passed to sample())
+        num_draws (int): Number of samples to draw. (should be identical to param passed to get_results())
+        num_chains (int): Number of chains to run. (should be identical to param passed to get_results())
         temperature (float): Temperature used to calculate the LLC.
         learning_rate (int): Learning rate of the model.
         device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
@@ -133,7 +133,7 @@ class MalaAcceptanceRate(SamplerCallback):
             param.clone().detach() for param in model.parameters() if param.requires_grad
         ]
 
-    def sample(self):
+    def get_results(self):
         return {
             "mala_accept/trace": self.mala_acceptance_rate.cpu().numpy(),
             "mala_accept/mean": np.mean(self.mala_acceptance_rate.cpu().numpy()),

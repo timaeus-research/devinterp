@@ -74,8 +74,8 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
         verbose=False,
         seed=seed,
     )
-    llc_mean_1 = llc_estimator_1.sample()["llc/mean"]
-    llc_mean_2 = llc_estimator_2.sample()["llc/mean"]
+    llc_mean_1 = llc_estimator_1.get_results()["llc/mean"]
+    llc_mean_2 = llc_estimator_2.get_results()["llc/mean"]
     assert np.array_equal(
         llc_mean_1, llc_mean_2
     ), f"LLC mean {llc_mean_1:.8f}!={llc_mean_2:.8f} for same seed for sampler {SGLD}!"
@@ -115,8 +115,8 @@ def unused_test_batch_size_convergence(
             callbacks=[llc_estimator],
             verbose=False,
         )
-        means += [llc_estimator.sample()["llc/mean"]]
-        stds += [llc_estimator.sample()["llc/std"]]
+        means += [llc_estimator.get_results()["llc/mean"]]
+        stds += [llc_estimator.get_results()["llc/std"]]
     overall_mean = np.mean(means)
     std_dev_of_means = np.std(means)
     assert (
@@ -157,5 +157,5 @@ def test_grad_accum_convergence(
             verbose=False,
             grad_accum_steps=grad_accum,
         )
-        means += [llc_estimator.sample()["llc/mean"]]
+        means += [llc_estimator.get_results()["llc/mean"]]
     assert np.ptp(means) < 1e-6, f"LLCs for different grad accums not close: {means}"

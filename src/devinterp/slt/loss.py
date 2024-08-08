@@ -76,7 +76,7 @@ class OnlineLossStatistics(SamplerCallback):
         else:
             self.z_scores[chain, draw] = float("nan")
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict :python:`{"loss/percent_neg_steps": percent_neg_steps, "loss/percent_mean_neg_steps": percent_mean_neg_steps, "loss/percent_thresholded_neg_steps": percent_thresholded_neg_steps, "loss/z_scores": z_scores}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance, online_loss_stats_instance], ...)`)
         """

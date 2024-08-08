@@ -53,7 +53,7 @@ class OnlineWBICEstimator(SamplerCallback):
         self.wbic_means = self.wbics.mean(axis=0)
         self.wbic_stds = self.wbics.std(axis=0)
 
-    def sample(self):
+    def get_results(self):
         """    
         :returns: A dict :python:`{"wbic/means": wbic_means, "wbic/stds": wbic_stds, "wbic/trace": wbic_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [wbic_estimator_instance], ...)`).
         """

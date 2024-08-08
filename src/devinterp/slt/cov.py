@@ -82,7 +82,7 @@ class CovarianceAccumulator(SamplerCallback):
 
         return results
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict :python:`{"evals": eigenvalues_of_cov_matrix, "evecs": eigenvectors_of_cov_matrix, "matrix": cov_matrix}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [covariance_accumulator_instance], ...)`)
         """
@@ -215,7 +215,7 @@ class WithinHeadCovarianceAccumulator:
 
         return results
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict :python:`{"evals": array_of_eigenvalues_of_cov_matrix_layer_idx_head_idx, "evecs": array_of_eigenvectors_of_cov_matrix_layer_idx_head_idx, "matrix": array_of_cov_matrices_layer_idx_head_idx}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [covariance_accumulator_instance], ...)`).
         """
@@ -353,7 +353,7 @@ class BetweenLayerCovarianceAccumulator:
 
         return results
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict with named_pairs keys, with corresponding values :python:`{"evals": eigenvalues_of_cov_matrix, "evecs": eigenvectors_of_cov_matrix, "matrix": cov_matrix}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [covariance_accumulator_instance], ...)`).
         """

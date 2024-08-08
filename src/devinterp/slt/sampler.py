@@ -156,7 +156,7 @@ def sample(
     Sample model weights using a given sampling_method, supporting multiple chains/cores,
     and calculate the observables (loss, llc, etc.) for each callback passed along.
     The :python:`update`, :python:`finalize` and :python:`sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called
-    during sampling, after sampling, and at :python:`sampler_callback_object.sample()` respectively.
+    during sampling, after sampling, and at :python:`sampler_callback_object.get_results()` respectively.
 
     After calling this function, the stats of interest live in the callback object.
 
@@ -196,7 +196,7 @@ def sample(
     :raises Warning: if num_draws > len(loader)
     :raises Warning: if using seeded runs
 
-    :returns: None (access LLCs or other observables through `callback_object.sample()`)
+    :returns: None (access LLCs or other observables through `callback_object.get_results()`)
     """
     if num_burnin_steps < num_draws:
         warnings.warn(
@@ -336,7 +336,7 @@ def estimate_learning_coeff_with_summary(
 
     for callback in callbacks:
         if hasattr(callback, "sample"):
-            results.update(callback.sample())
+            results.update(callback.get_results())
 
     return results
 

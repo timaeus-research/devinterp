@@ -134,7 +134,7 @@ def test_mala_callback_closeness(
             verbose=False,
             seed=seed,
         )
-        mala_acceptance_rate_mean = mala_estimator.sample()["mala_accept/mean"]
+        mala_acceptance_rate_mean = mala_estimator.get_results()["mala_accept/mean"]
         if not np.isnan(mala_acceptance_rate_mean):
             break
     assert np.isclose(

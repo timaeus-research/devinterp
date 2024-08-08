@@ -50,7 +50,7 @@ class SGLD(torch.optim.Optimizer):
     :type weight_decay: float, optional
     :param localization: Strength of the force $\gamma$ pulling weights back to their initial values. Default is 0
     :type localization: float, optional
-    :param temperature: Inverse reparameterized temperature (otherwise known as n*beta or ~beta), float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param temperature: Inverse reparameterized temperature (otherwise known as n*beta or ~beta), float (default: 1., set by get_results() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type temperature: int, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory in parameter space. Default is None, in which case no bounding box is used.
     :type bounding_box_size: float, optional
