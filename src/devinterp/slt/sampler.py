@@ -293,11 +293,11 @@ def estimate_learning_coeff_with_summary(
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
     if online:
         llc_estimator = OnlineLLCEstimator(
-            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
+            num_chains, num_draws, optimizer_kwargs["temperature"], device=device, init_loss=init_loss
         )
     else:
         llc_estimator = LLCEstimator(
-            num_chains, num_draws, optimizer_kwargs["temperature"], device=device
+            num_chains, num_draws, optimizer_kwargs["temperature"], device=device, init_loss=init_loss
         )
 
     callbacks = [llc_estimator, *callbacks]
