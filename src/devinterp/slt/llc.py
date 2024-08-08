@@ -111,7 +111,7 @@ class LLCEstimator(SamplerCallback):
                 for i in range(self.num_chains)
             },
             "loss/trace": self.loss.cpu().numpy(),
-            "loss/init_loss": self.init_loss.cpu().item(),
+            "loss/init_loss": self.init_loss,
             "loss/sq_loss": self.sq_loss.cpu().numpy(),
         }
 
