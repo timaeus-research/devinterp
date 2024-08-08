@@ -27,22 +27,25 @@ from devinterp.utils import (
 
 def sample_single_chain(
     ref_model: nn.Module,
-    loader: DataLoader,
     evaluate: EvaluateFn,
+    loader: Optional[DataLoader] = None,
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
     grad_accum_steps=1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
     optimizer_kwargs: Optional[Dict] = None,
+    scheduler_cls: Optional[Type[torch.optim.lr_scheduler._LRScheduler]] = None,
+    scheduler_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
     verbose: bool = True,
     device: torch.device = torch.device("cpu"),
     optimize_over_per_model_param: Optional[dict] = None,
     callbacks: List[SamplerCallback] = [],
-    init_loss: float = None,
-    
+    init_noise: float = None,
+    use_alternate_batching = False, # See George's alternate SGLD sampling method,
+    **kwargs,
 ):
     if grad_accum_steps > 1:
         assert type(grad_accum_steps) == int, "grad_accum_steps must be an integer."
@@ -61,27 +64,60 @@ def sample_single_chain(
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
         optimizer_kwargs.setdefault("save_noise", True)
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
-    if optimize_over_per_model_param:
-        param_groups = []
-        for name, parameter in model.named_parameters():
-            param_groups.append(
-                {
-                    "params": parameter,
-                    "optimize_over": optimize_over_per_model_param[name].to(device),
-                }
-            )
-        optimizer = sampling_method(
-            param_groups,
-            **optimizer_kwargs,
-        )
-    else:
-        optimizer = sampling_method(model.parameters(), **optimizer_kwargs)
 
+    param_groups = []
+    for name, parameter in model.named_parameters():
+        if optimize_over_per_model_param:
+            if name in optimize_over_per_model_param:
+                param_groups.append(
+                    {
+                        "params": parameter,
+                        "optimize_over": optimize_over_per_model_param[name].to(device),
+                    }
+                )
+        else:
+            param_groups.append(parameter)
 
+    optimizer = sampling_method(
+        param_groups,
+        **optimizer_kwargs,
+    )
+
+    # == (Optional) Init Noise ==
+    if init_noise:
+        for pg in optimizer.param_groups:
+            params = pg["params"]
+            for parameter in params:
+                optimize_over = pg.get("optimize_over", 1.0) or 1.0
+                noise_term = (
+                    torch.randn_like(parameter.data) *
+                    init_noise * optimize_over
+                )
+                parameter.data.add_(noise_term)
+
+    # == (Optional) Scheduler ==
+    scheduler = None
+
+    if scheduler_cls is not None:
+        scheduler_kwargs = scheduler_kwargs or {}
+        scheduler = scheduler_cls(optimizer, **scheduler_kwargs)
+        
     if seed is not None:
         torch.manual_seed(seed)
 
+    # == Sampling ==
     num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
+
+    if use_alternate_batching:
+        # We take one very large batch and sample SGLD on the fixed batch.
+        cycler = cycle(loader)
+        feed = []
+        for step in range(grad_accum_steps):
+            data = next(cycler)
+            feed.append(data)
+        feed = zip(range(num_steps * grad_accum_steps), cycle(feed))
+    else:
+        feed = zip(range(num_steps * grad_accum_steps), cycle(loader))
 
     cumulative_loss = 0
     with tqdm(desc=f"Chain {chain}",
@@ -241,7 +277,6 @@ def sample(
             num_draws=num_draws,
             num_burnin_steps=num_burnin_steps,
             num_steps_bw_draws=num_steps_bw_draws,
-            init_loss=init_loss,
             grad_accum_steps=grad_accum_steps,
             sampling_method=sampling_method,
             optimizer_kwargs=optimizer_kwargs,
