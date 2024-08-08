@@ -143,7 +143,7 @@ def test_grad_accum_convergence(
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
-            temperature=optimal_nbeta(train_dataloader),
+            nbeta=optimal_nbeta(train_dataloader),
         )
         sample(
             model,

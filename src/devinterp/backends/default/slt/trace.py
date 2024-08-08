@@ -59,7 +59,7 @@ class OnlineTraceStatistics(SamplerCallback):
         if not hasattr(self.base_callback, "num_draws"):
             raise ValueError("Base callback must have attribute num_draws")
 
-    def sample(self):
+    def get_results(self):
         """    
         :returns: A dict :python:`"{self.attribute}/chain/mean": mean_attribute_by_chain, "{self.attribute}/chain/std": std_attribute_by_chain, "{self.attribute}/draw/mean": mean_attribute_by_draw, "{self.attribute}/draw/std": std_attribute_by_draw}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [some_thing_to_calc_stats_of, ..., trace_stats_instance], ...)`).
         """        

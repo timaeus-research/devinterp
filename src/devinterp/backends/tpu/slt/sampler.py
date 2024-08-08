@@ -24,7 +24,6 @@ from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.utils import (
     USE_TPU_BACKEND,
     EvaluateFn,
-    call_with,
     get_init_loss_multi_batch,
     optimal_nbeta,
     prepare_input,
@@ -53,10 +52,8 @@ def sample_single_chain(
     verbose=True,
     device: Union[str, torch.device] = torch.device("xla"),
     callbacks: List[Callable] = [],
-    batch_size: int = 32,
     optimize_over_per_model_param: Optional[Dict[str, torch.Tensor]] = None,
     init_noise: Optional[float] = None,
-    shuffle=True,
     use_alternate_batching = False, # See George's alternate SGLD sampling method
     **kwargs,
 ):
@@ -128,7 +125,7 @@ def sample_single_chain(
         feed = zip(range(num_steps * grad_accum_steps), cycle(loader))
 
     model.train()
-    no_grad = not any(map(lambda pg: pg["temperature"] > 0, optimizer.param_groups))
+    no_grad = not any(map(lambda pg: pg["nbeta"] > 0, optimizer.param_groups))
 
     mark_step_if_xla()
 
@@ -247,7 +244,7 @@ def _sample_single_chain_xla(kwargs):
 
 def sample(
     model: torch.nn.Module,
-    loader: torch.utils.data.Dataset,
+    loader: DataLoader,
     callbacks: Union[List[SamplerCallback], Dict[str, SamplerCallback]],
     evaluate: Callable = lambda model, data: model(data),
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
@@ -273,7 +270,7 @@ def sample(
     Sample model weights using a given sampling_method, supporting multiple chains/cores,
     and calculate the observables (loss, llc, etc.) for each callback passed along.
     The :python:`update`, :python:`finalize` and :python:`sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called
-    during sampling, after sampling, and at :python:`sampler_callback_object.sample()` respectively.
+    during sampling, after sampling, and at :python:`sampler_callback_object.get_results()` respectively.
 
     After calling this function, the stats of interest live in the callback object.
 
@@ -311,7 +308,7 @@ def sample(
     :raises Warning: if num_draws > len(loader)
     :raises Warning: if using seeded runs
 
-    :returns: None (access LLCs or other observables through `callback_object.sample()`)
+    :returns: None (access LLCs or other observables through `callback_object.get_results()`)
     """
     if num_burnin_steps < num_draws:
         warnings.warn(

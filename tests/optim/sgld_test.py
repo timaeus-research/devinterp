@@ -21,7 +21,7 @@ def test_SGLD_vs_SGD(lr):
         lr=2 * lr,
         noise_level=0.0,
         localization=0.0,
-        temperature=1.0,
+        nbeta=1.0,
     )
 
     criterion = nn.MSELoss()

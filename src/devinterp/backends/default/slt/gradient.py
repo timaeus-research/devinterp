@@ -142,7 +142,7 @@ class GradientDistribution(SamplerCallback):
             self.num_bins = new_bin_count
             self.bin_size *= 2
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict :python:`{"gradient/distributions": grad_dists}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [gradient_dist_instance], ...)`)
         """

@@ -47,7 +47,7 @@ class WeightNorm(SamplerCallback):
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
         self.weight_norms[chain, draw] = total_norm
 
-    def sample(self):
+    def get_results(self):
         """:returns: A dict :python:`{"weight_norm/trace": weight_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [weight_norm_instance], ...)`)
         """
         return {
@@ -96,7 +96,7 @@ class GradientNorm(SamplerCallback):
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
         self.gradient_norms[chain, draw] = total_norm
 
-    def sample(self):
+    def get_results(self):
         """:returns: A dict :python:`{"gradient_norm/trace": gradient_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [grad_norm_instance], ...)`)
         """
         return {
@@ -145,7 +145,7 @@ class NoiseNorm(SamplerCallback):
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
         self.noise_norms[chain, draw] = total_norm
 
-    def sample(self):
+    def get_results(self):
         """:returns: A dict :python:`{"noise_norm/trace": noise_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [noise_norm_instance], ...)`)
         """
         return {

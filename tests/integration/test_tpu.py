@@ -70,12 +70,13 @@ def _test_hf(model, dataset, device: str):
         num_draws=num_draws,
         nbeta=nbeta,
         device=device,
+        
     )
 
     # Run the LLC estimation
     metrics = sample(
         model,
-        dataset,
+        loader,
         callbacks=[llc_estimator],
         evaluate=evaluate,
         sampling_method=SGLD,
@@ -84,7 +85,7 @@ def _test_hf(model, dataset, device: str):
             noise_level=10.0,
             weight_decay=0.0,
             localization=0.0,
-            temperature=nbeta,
+            nbeta=nbeta,
             save_noise=False,
             save_mala_vars=False,
         ),

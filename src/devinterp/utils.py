@@ -12,10 +12,8 @@ from torch.utils.data import DataLoader
 try:
     import torch_xla.core.xla_model as xm
 
-    PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "TPU")
-    USE_TPU_BACKEND = (
-        os.environ.get("USE_TPU_BACKEND", "1" if (PJRT_DEVICE == "TPU") else "0") == "1"
-    )
+    PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "None")
+    USE_TPU_BACKEND = os.environ.get("USE_TPU_BACKEND", "1" if (PJRT_DEVICE == "TPU") else "0")
 except ImportError:
     USE_TPU_BACKEND = False
 
@@ -89,7 +87,7 @@ def optimal_nbeta(dataloader: Union[DataLoader, int]):
         return dataloader / np.log(dataloader)
     else:
         raise NotImplementedError(
-            f"Temperature for data type {type(dataloader)} not implemented, use DataLoader or int instead."
+            f"N*beta for data type {type(dataloader)} not implemented, use DataLoader or int instead."
         )
 
 
@@ -209,17 +207,6 @@ def make_evaluate(
 
 evaluate_mse = make_evaluate(F.mse_loss)
 evaluate_ce = make_evaluate(F.cross_entropy)
-
-
-def call_with(func: Callable, **kwargs):
-    # Check the func annotation and call with only the necessary kwargs.
-    sig = inspect.signature(func)
-
-    # Filter out the kwargs that are not in the function's signature
-    filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
-
-    # Call the function with the filtered kwargs
-    return func(**filtered_kwargs)
 
 
 def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):

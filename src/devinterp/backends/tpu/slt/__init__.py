@@ -1,2 +1,2 @@
-from devinterp.backends.default.slt.llc import *
-from devinterp.backends.default.slt.sampler import *
+from devinterp.backends.tpu.slt.llc import *
+from devinterp.backends.tpu.slt.sampler import *

@@ -44,7 +44,7 @@ def estimate_learning_coeff_with_summary(
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
     online: bool = False,
 ) -> dict:
-    optimizer_kwargs.setdefault("temperature", optimal_nbeta(loader))
+    optimizer_kwargs.setdefault("nbeta", optimal_nbeta(loader))
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
             loader, num_chains, model, evaluate, device
@@ -53,11 +53,11 @@ def estimate_learning_coeff_with_summary(
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
     if online:
         llc_estimator = OnlineLLCEstimator(
-            num_chains, num_draws, nbeta=optimizer_kwargs["temperature"], device=device, init_loss=init_loss
+            num_chains, num_draws, nbeta=optimizer_kwargs["nbeta"], device=device, init_loss=init_loss
         )
     else:
         llc_estimator = LLCEstimator(
-            num_chains, num_draws, nbeta=optimizer_kwargs["temperature"], device=device, init_loss=init_loss
+            num_chains, num_draws, nbeta=optimizer_kwargs["nbeta"], device=device, init_loss=init_loss
         )
 
     callbacks = [llc_estimator, *callbacks]

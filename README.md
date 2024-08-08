@@ -25,7 +25,7 @@ from devinterp.optim import SGLD
 from devinterp.utils import optimal_nbeta
 
 # Assuming you have a PyTorch Model assigned to model, and DataLoader assigned to trainloader
-llc_estimator = LLCEstimator(..., temperature=optimal_nbeta(trainloader))
+llc_estimator = LLCEstimator(..., nbeta=optimal_nbeta(trainloader))
 sample(model, trainloader, ..., callbacks = [llc_estimator])
 
 llc_mean = llc_estimator.get_results()["llc/mean"]

@@ -24,16 +24,6 @@ from devinterp.utils import (
 )
 
 
-def call_with(func: Callable, **kwargs):
-    # Check the func annotation and call with only the necessary kwargs.
-    sig = inspect.signature(func)
-
-    # Filter out the kwargs that are not in the function's signature
-    filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
-
-    # Call the function with the filtered kwargs
-    return func(**filtered_kwargs)
-
 
 def sample_single_chain(
     ref_model: nn.Module,
@@ -51,8 +41,7 @@ def sample_single_chain(
     device: torch.device = torch.device("cpu"),
     optimize_over_per_model_param: Optional[dict] = None,
     callbacks: List[SamplerCallback] = [],
-    init_loss: float = None,
-    
+    **kwargs
 ):
     if grad_accum_steps > 1:
         assert type(grad_accum_steps) == int, "grad_accum_steps must be an integer."
@@ -70,7 +59,7 @@ def sample_single_chain(
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
         optimizer_kwargs.setdefault("save_noise", True)
-    optimizer_kwargs.setdefault("temperature", optimal_nbeta(loader))
+    optimizer_kwargs.setdefault("nbeta", optimal_nbeta(loader))
     if optimize_over_per_model_param:
         param_groups = []
         for name, parameter in model.named_parameters():
@@ -126,7 +115,7 @@ def sample_single_chain(
 
                 with torch.no_grad():
                     for callback in callbacks:
-                        call_with(callback, **locals())  # Cursed. This is the way.
+                        callback(**locals())  # Cursed. This is the way.
 
 
 def _sample_single_chain(kwargs):
@@ -151,12 +140,14 @@ def sample(
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
+    batch_size: bool = 1,
+    **kwargs
 ):
     """
     Sample model weights using a given sampling_method, supporting multiple chains/cores,
     and calculate the observables (loss, llc, etc.) for each callback passed along.
     The :python:`update`, :python:`finalize` and :python:`sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called
-    during sampling, after sampling, and at :python:`sampler_callback_object.sample()` respectively.
+    during sampling, after sampling, and at :python:`sampler_callback_object.get_results()` respectively.
 
     After calling this function, the stats of interest live in the callback object.
 
@@ -196,7 +187,7 @@ def sample(
     :raises Warning: if num_draws > len(loader)
     :raises Warning: if using seeded runs
 
-    :returns: None (access LLCs or other observables through `callback_object.sample()`)
+    :returns: None (access LLCs or other observables through `callback_object.get_results()`)
     """
     if num_burnin_steps < num_draws:
         warnings.warn(

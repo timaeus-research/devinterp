@@ -115,7 +115,7 @@ def test_mala_callback_closeness(
         mala_estimator = MalaAcceptanceRate(
             num_chains=num_chains,
             num_draws=num_draws,
-            temperature=optimal_nbeta(train_dataloader),
+            nbeta=optimal_nbeta(train_dataloader),
             learning_rate=lr,
         )
         sample(
@@ -125,7 +125,7 @@ def test_mala_callback_closeness(
             optimizer_kwargs=dict(
                 lr=lr,
                 localization=localization,
-                temperature=optimal_nbeta(train_dataloader),
+                nbeta=optimal_nbeta(train_dataloader),
             ),
             sampling_method=SGLD,
             num_chains=num_chains,

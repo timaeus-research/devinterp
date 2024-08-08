@@ -76,7 +76,7 @@ class MalaAcceptanceRate(SamplerCallback):
     Attributes:
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
-        temperature (float): Temperature used to calculate the LLC.
+        nbeta (float): Effective Inverse Temperature used to calculate the LLC.
         learning_rate (int): Learning rate of the model.
         device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
@@ -85,14 +85,14 @@ class MalaAcceptanceRate(SamplerCallback):
         self,
         num_chains: int,
         num_draws: int,
-        temperature: float,
+        nbeta: float,
         learning_rate: float,
         device: Union[torch.device, str] = "cpu",
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
         self.learning_rate = learning_rate
-        self.temperature = temperature
+        self.nbeta = nbeta
         self.mala_acceptance_rate = torch.zeros(
             (num_chains, num_draws - 1), dtype=torch.float32
         ).to(device)
@@ -111,7 +111,7 @@ class MalaAcceptanceRate(SamplerCallback):
         # (so we update those only after the calculation)
         self.current_grads = optimizer.dws
         # mala acceptance loss is different from pytorch supplied loss
-        mala_loss = (loss * self.temperature).item() + optimizer.localization_loss
+        mala_loss = (loss * self.nbeta).item() + optimizer.localization_loss
         if draw > 1:
             self.mala_acceptance_rate[chain, draw - 1] = (
                 mala_acceptance_probability(
@@ -133,7 +133,7 @@ class MalaAcceptanceRate(SamplerCallback):
             param.clone().detach() for param in model.parameters() if param.requires_grad
         ]
 
-    def sample(self):
+    def get_results(self):
         return {
             "mala_accept/trace": self.mala_acceptance_rate.cpu().numpy(),
             "mala_accept/mean": np.mean(self.mala_acceptance_rate.cpu().numpy()),
