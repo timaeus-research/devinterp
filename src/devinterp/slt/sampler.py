@@ -24,16 +24,6 @@ from devinterp.utils import (
 )
 
 
-def call_with(func: Callable, **kwargs):
-    # Check the func annotation and call with only the necessary kwargs.
-    sig = inspect.signature(func)
-
-    # Filter out the kwargs that are not in the function's signature
-    filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
-
-    # Call the function with the filtered kwargs
-    return func(**filtered_kwargs)
-
 
 def sample_single_chain(
     ref_model: nn.Module,
@@ -126,7 +116,7 @@ def sample_single_chain(
 
                 with torch.no_grad():
                     for callback in callbacks:
-                        call_with(callback, **locals())  # Cursed. This is the way.
+                        callback(**locals())  # Cursed. This is the way.
 
 
 def _sample_single_chain(kwargs):

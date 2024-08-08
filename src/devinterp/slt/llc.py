@@ -150,7 +150,7 @@ class OnlineLLCEstimator(SamplerCallback):
         self.num_draws = num_draws
         self.init_loss = init_loss
 
-        self.losses = [[] for _ in range(num_chains)]
+        self.losses = torch.zeros((num_chains, num_draws)).to(device)
         self.llcs = torch.zeros((num_chains, num_draws)).to(device)
         self.nbeta = nbeta
         self.device = device
@@ -164,16 +164,16 @@ class OnlineLLCEstimator(SamplerCallback):
         
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss
-        self.llcs[chain, draw] = self.temperature * (loss - self.init_loss)
+        self.llcs[chain, draw] = self.nbeta * (loss - self.init_loss)
         if draw == 0:
-            self.moving_avg_llcs[chain, draw] = self.temperature * (
+            self.moving_avg_llcs[chain, draw] = self.nbeta * (
                 loss - self.init_loss
             )
         else:
             t = draw + 1
             prev_moving_avg = self.moving_avg_llcs[chain, draw - 1]
             self.moving_avg_llcs[chain, draw] = (1 / t) * (
-                (t - 1) * prev_moving_avg + self.temperature * (loss - self.init_loss)
+                (t - 1) * prev_moving_avg + self.nbeta * (loss - self.init_loss)
             )
 
     def finalize(self):
