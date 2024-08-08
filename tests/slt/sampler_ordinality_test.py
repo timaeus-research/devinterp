@@ -74,7 +74,7 @@ def test_linedot_normal_crossing(
             callbacks=[llc_estimator],
             verbose=False,
         )
-        llcs += [llc_estimator.sample()["llc/mean"]]
+        llcs += [llc_estimator.get_results()["llc/mean"]]
     assert (
         np.diff(llcs) >= 0
     ).all(), f"Ordinality not preserved for sampler {sampling_method} on {dim}-d {model}: llcs {llcs} are not in ascending order."

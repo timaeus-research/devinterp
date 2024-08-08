@@ -28,7 +28,7 @@ from devinterp.utils import optimal_nbeta
 llc_estimator = LLCEstimator(..., temperature=optimal_nbeta(trainloader))
 sample(model, trainloader, ..., callbacks = [llc_estimator])
 
-llc_mean = llc_estimator.sample()["llc/mean"]
+llc_mean = llc_estimator.get_results()["llc/mean"]
 
 ```
 

@@ -187,7 +187,7 @@ class EpsilonBetaAnalyzer:
                 "log_z": True
                 }
     
-        assert self.sweep_df is not None, "No data to plot. Please call sample() first."
+        assert self.sweep_df is not None, "No data to plot. Please call get_results() first."
 
         sweep_df = self.sweep_df.copy()
         # Calculate additional statistics

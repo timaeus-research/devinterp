@@ -66,8 +66,8 @@ def test_accuracy_normalcrossing(
         verbose=False,
         seed=seed,
     )
-    llc_mean = llc_estimator.sample()["llc/mean"]
-    llc_std_dev = llc_estimator.sample()["llc/std"]
+    llc_mean = llc_estimator.get_results()["llc/mean"]
+    llc_std_dev = llc_estimator.get_results()["llc/std"]
     assert (
         llc_mean - 2 * llc_std_dev < true_lc < llc_mean + 2 * llc_std_dev
     ), f"LLC mean {llc_mean:.3f} +- {2*llc_std_dev:.3f} does not contain true value {true_lc:.3f} for powers {powers} using {sampling_method}"
