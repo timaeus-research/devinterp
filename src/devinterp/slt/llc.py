@@ -1,8 +1,7 @@
-from typing import Union
-
+from typing import Union, Optional
 import torch
-
 from devinterp.slt.callback import SamplerCallback
+import warnings
 
 # TPU support
 try:
@@ -37,10 +36,11 @@ class LLCEstimator(SamplerCallback):
         self,
         num_chains: int,
         num_draws: int,
-        nbeta: float,
-        eval_field: str,
+        eval_field: str = "loss",
         init_loss: torch.Tensor = None,
         device: Union[torch.device, str] = "cpu",
+        nbeta: float = None,
+        temperature: Optional[float] = None, # Temperature is deprecated
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
@@ -49,7 +49,9 @@ class LLCEstimator(SamplerCallback):
 
         if init_loss is not None:
             self.init_loss = init_loss.to(torch.float32).to(device)
-
+        if nbeta is None and temperature is not None:
+            nbeta = temperature
+            warnings.warn("Temperature is deprecated. Please use nbeta instead.")
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
         self.eval_field = eval_field
         self.device = device
@@ -114,7 +116,7 @@ class LLCEstimator(SamplerCallback):
         }
 
     def __call__(self, chain: int, draw: int, **kwargs):
-        """Calls self.update."""            
+        """Calls self.update."""
         self.update(chain, draw, kwargs[self.eval_field])
 
 
@@ -125,14 +127,13 @@ class OnlineLLCEstimator(SamplerCallback):
     For use with :func:`devinterp.slt.sampler.sample`.
     
     Note: 
-        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It can be passed as an argument to that function, 
-        and if not passed will be the average loss of the supplied model over `num_chains` batches.
+        - `init_loss` gets set inside :func:`devinterp.slt.sample()`. It should be passed as an argument to that function.
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param temperature: Temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
-    :type temperature: int
+    :param nbeta: Inverse reparameterized temperature, float (default: 1., set by sample() to utils.optimal_temperature(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :type nbeta: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
     :type device: str | torch.device, optional
     """
