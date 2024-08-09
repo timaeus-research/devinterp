@@ -19,8 +19,6 @@ if USE_TPU_BACKEND:
 else:
     from devinterp.backends.default.slt.sampler import sample
 
-
-
 def estimate_learning_coeff_with_summary(
     model: torch.nn.Module,
     loader: DataLoader,

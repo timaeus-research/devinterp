@@ -54,7 +54,7 @@ class GradientDistribution(SamplerCallback):
     def max_grad(self):
         return self.min_grad + self.bin_size * self.num_bins
 
-    def __call__(self, chain: int, draw: int, model: nn.Module):
+    def __call__(self, chain: int, draw: int, model: nn.Module, **kwargs):
         self.update(chain, draw, model)
 
     # Updates the gradient histograms for each parameter.
