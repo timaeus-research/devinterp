@@ -28,7 +28,7 @@ def _test_hf(model, dataset, device: str):
         device = xm.xla_device()
 
     else:
-        from devinterp.backends.default.slt.llc import LLCEstimator
+        from devinterp.slt.llc import LLCEstimator
         from devinterp.backends.default.slt.sampler import sample
 
     print(f"Testing on {device}")
