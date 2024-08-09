@@ -142,7 +142,7 @@ def test_grad_accum_convergence(
 ):
     GRAD_ACCUMS = [1, 4, 16, 64]
     model = model(model_dims)
-    lr = 0.0002
+    lr = 0.00001
     num_chains = 1
     means = []
     _, train_data, _, _ = generated_normalcrossing_dataset

@@ -224,7 +224,7 @@ def test_rllc_full_normalcrossing_between_dims(
 ):
     torch.manual_seed(42)
     seed = 42
-    lr = 0.001
+    lr = 0.01
     num_chains = 1
     num_draws = 500
     model1 = Polynomial(relevant_powers)
@@ -298,7 +298,7 @@ def test_rllc_different_from_full_llc_between_dims(
     seed = 42
 
     model = Polynomial(relevant_powers)
-    model.weights = torch.nn.Parameter(torch.tensor([0.0, 1.0]))
+    model.weights = torch.nn.Parameter(torch.tensor([0.3, 1.5]))
 
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
     lr = 0.001

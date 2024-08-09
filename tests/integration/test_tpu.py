@@ -1,34 +1,28 @@
 from pprint import pp
-from typing import Dict
-import torch
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-from transformers import AutoTokenizer
-from datasets import load_dataset
-from transformer_lens import HookedTransformerConfig
-from transformer_lens.utils import tokenize_and_concatenate, lm_cross_entropy_loss
 
 import torch
 import torch_xla.core.xla_model as xm
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from transformers.modeling_outputs import CausalLMOutputWithPast
 from datasets import load_dataset
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from transformer_lens.utils import (lm_cross_entropy_loss,
+                                    tokenize_and_concatenate)
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from devinterp.utils import optimal_nbeta, set_seed, prepare_input
 from devinterp.optim.sgld import SGLD
+from devinterp.slt.llc import LLCEstimator
+from devinterp.utils import prepare_input, set_seed
 
 
 def _test_hf(model, dataset, device: str):
     set_seed(1)
 
     if device == "tpu":
-        from devinterp.backends.tpu.slt.llc import LLCEstimator
         from devinterp.backends.tpu.slt.sampler import sample
 
         device = xm.xla_device()
 
     else:
-        from devinterp.slt.llc import LLCEstimator
         from devinterp.backends.default.slt.sampler import sample
 
     print(f"Testing on {device}")
