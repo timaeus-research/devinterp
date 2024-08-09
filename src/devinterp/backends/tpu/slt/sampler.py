@@ -1,31 +1,24 @@
-import contextlib
 import warnings
 from copy import deepcopy
-from dataclasses import dataclass, field
 from itertools import cycle
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 
-import numpy as np
 import torch
 import torch_xla.core.xla_model as xm
 
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
-from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from tqdm import tqdm, trange
+from tqdm import trange
 
-from devinterp.backends.tpu.slt.llc import LLCEstimator, OnlineLLCEstimator
-from devinterp.backends.default.slt.mala import MalaAcceptanceRate  # TODO
-from devinterp.backends.default.slt.norms import NoiseNorm  # TODO
+from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
+from devinterp.slt.mala import MalaAcceptanceRate
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.utils import (
     USE_TPU_BACKEND,
-    EvaluateFn,
     get_init_loss_multi_batch,
-    optimal_nbeta,
     prepare_input,
     set_seed,
 )

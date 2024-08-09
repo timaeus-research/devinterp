@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 
 
 from devinterp.optim.sgld import SGLD
+from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.utils import (
     USE_TPU_BACKEND,
     EvaluateFn,
@@ -14,13 +15,9 @@ from devinterp.utils import (
 )
 
 if USE_TPU_BACKEND:
-    print('USING TPU BACKEND')
     from devinterp.backends.tpu.slt.sampler import sample
-    from devinterp.backends.tpu.slt.llc import LLCEstimator, OnlineLLCEstimator
-
 else:
     from devinterp.backends.default.slt.sampler import sample
-    from devinterp.backends.default.slt.llc import LLCEstimator, OnlineLLCEstimator
 
 
 

@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
-from devinterp.backends.default.slt.llc import LLCEstimator, OnlineLLCEstimator
+from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.backends.default.slt.mala import MalaAcceptanceRate
 from devinterp.backends.default.slt.norms import NoiseNorm
 from devinterp.utils import (
