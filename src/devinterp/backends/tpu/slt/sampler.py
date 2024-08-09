@@ -173,7 +173,6 @@ def sample_single_chain(
             #     )
 
             optimizer.step()
-            optimizer.zero_grad()
 
             if scheduler is not None:
                 scheduler.step()
@@ -206,6 +205,8 @@ def sample_single_chain(
                         )
 
                 mark_step_if_xla(device)
+            optimizer.zero_grad()
+
 
     # except ChainHealthError as e:
     #     warnings.warn(f"Chain failed: {e}")

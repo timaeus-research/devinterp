@@ -102,8 +102,6 @@ def sample_single_chain(
             # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
             if (i+1) % grad_accum_steps == 0:
                 optimizer.step()
-                optimizer.zero_grad()
-                pbar.update(1)
 
             if i >= num_burnin_steps and (i + 1 - num_burnin_steps) % num_steps_bw_draws == 0:
                 draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
@@ -115,7 +113,13 @@ def sample_single_chain(
 
                 with torch.no_grad():
                     for callback in callbacks:
-                        callback(**locals())  # Cursed. This is the way.
+                        callback(**locals())  # Cursed. This is the way
+                        
+            if (i+1) % grad_accum_steps == 0:
+                optimizer.zero_grad()
+                pbar.update(1)
+
+
 
 
 def _sample_single_chain(kwargs):
