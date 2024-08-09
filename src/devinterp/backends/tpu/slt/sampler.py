@@ -207,6 +207,7 @@ def sample_single_chain(
                             draw=draw,
                             chain=chain,
                             model=model,
+                            optimizer=optimizer,
                             **results,
                         )
 

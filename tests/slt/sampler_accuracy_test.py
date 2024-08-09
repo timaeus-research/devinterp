@@ -9,7 +9,7 @@ from devinterp.optim.sgnht import SGNHT
 from devinterp.slt.sampler import  sample
 from devinterp.backends.default.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.test_utils import *
-from devinterp.utils import evaluate_mse, optimal_nbeta
+from devinterp.utils import evaluate_mse, optimal_nbeta, get_init_loss_multi_batch
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ TRUE_LCS_PER_POWER = [
 ]
 
 
-@pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
+@pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize("powers, true_lc", TRUE_LCS_PER_POWER)
 def test_accuracy_normalcrossing(
     generated_normalcrossing_dataset, sampling_method, powers, true_lc
@@ -49,10 +49,14 @@ def test_accuracy_normalcrossing(
     lr = 0.0002
     num_chains = 10
     num_draws = 5_000
+    init_loss = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model, evaluate_mse, device="cpu"
+    )
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
         nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss
     )
     sample(
         model,

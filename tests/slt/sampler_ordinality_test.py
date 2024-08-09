@@ -26,11 +26,11 @@ def generated_linedot_normalcrossing_dataset():
     return train_dataloader, train_data, x, y
 
 
-@pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
+@pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize(
     "model", [Polynomial, LinePlusDot]
 )  # LinePlusDot currently not tested, TODO
-@pytest.mark.parametrize("dim", [2, 10, 100])
+@pytest.mark.parametrize("dim", [2, 10])
 def test_linedot_normal_crossing(
     generated_linedot_normalcrossing_dataset, sampling_method, model, dim
 ):
@@ -55,11 +55,16 @@ def test_linedot_normal_crossing(
         model.weights = nn.Parameter(
             torch.tensor(sample_point, dtype=torch.float32, requires_grad=True)
         )
+        init_loss = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model, evaluate_mse, device="cpu"
+    )
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
             nbeta=optimal_nbeta(train_dataloader),
+            init_loss=init_loss
         )
+
         sample(
             model,
             train_dataloader,

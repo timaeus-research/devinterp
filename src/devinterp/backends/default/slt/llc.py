@@ -30,7 +30,7 @@ class LLCEstimator(SamplerCallback):
         num_chains: int,
         num_draws: int,
         nbeta: float,
-        init_loss: torch.Tensor = None,
+        init_loss: torch.Tensor,
         device: Union[torch.device, str] = "cpu",
         eval_field: str = "loss",
     ):
@@ -39,8 +39,7 @@ class LLCEstimator(SamplerCallback):
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
         )
-        self.init_loss = init_loss or torch.zeros(1, dtype=torch.float32).to(device)
-
+        self.init_loss = init_loss 
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
 
         self.device = device

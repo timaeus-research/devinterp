@@ -103,7 +103,7 @@ class MalaAcceptanceRate(SamplerCallback):
         self.prev_grads = []
         self.prev_mala_loss = 0.0
 
-    def __call__(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
+    def __call__(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer, **kwargs):
         self.update(chain, draw, model, loss, optimizer)
 
     def update(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
