@@ -1,12 +1,21 @@
+import inspect
+import os
 from itertools import islice
-from typing import Any, Callable, Dict, Mapping, NamedTuple, Tuple, Union
+from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Tuple, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+
+try:
+    import torch_xla.core.xla_model as xm
+
+    PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "None")
+    USE_TPU_BACKEND = os.environ.get("USE_TPU_BACKEND", "1" if (PJRT_DEVICE == "TPU") else "0")
+except ImportError:
+    USE_TPU_BACKEND = False
 
 
 class Outputs(NamedTuple):
@@ -31,6 +40,8 @@ def plot_trace(
     fig_size=(12, 9),
     true_lc=None,
 ):
+    import matplotlib.pyplot as plt
+
     num_chains, num_draws = trace.shape
     sgld_step = list(range(num_draws))
     if true_lc:
@@ -69,14 +80,14 @@ def plot_trace(
     plt.show()
 
 
-def optimal_temperature(dataloader: Union[DataLoader, int]):
+def optimal_nbeta(dataloader: Union[DataLoader, int]):
     if isinstance(dataloader, DataLoader):
         return dataloader.batch_size / np.log(dataloader.batch_size)
     elif isinstance(dataloader, int):
         return dataloader / np.log(dataloader)
     else:
         raise NotImplementedError(
-            f"Temperature for data type {type(dataloader)} not implemented, use DataLoader or int instead."
+            f"N*beta for data type {type(dataloader)} not implemented, use DataLoader or int instead."
         )
 
 
@@ -131,7 +142,7 @@ def split_results(results: EvalResults) -> Tuple[torch.Tensor, Any]:
     elif isinstance(results, tuple):
         loss = results[0]
         if len(results) > 1:
-            results = loss[1:]
+            results = results[1:]
     elif isinstance(results, torch.Tensor):
         loss = results
         results = None
@@ -189,10 +200,43 @@ def make_evaluate(
     def evaluate(model, data):
         x, y = data
         y_pred = model(x)
-        return criterion(y_pred, y)
+        return criterion(y_pred, y), {'output': y_pred}
 
     return evaluate
 
 
 evaluate_mse = make_evaluate(F.mse_loss)
 evaluate_ce = make_evaluate(F.cross_entropy)
+
+
+def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):
+    """
+    Sets the seed for the Learner.
+
+    Args:
+        seed (int): Seed to set.
+    """
+    import random
+
+    torch.manual_seed(seed)
+    random.seed(seed)
+
+    try:
+        import numpy as np
+        np.random.seed(seed)
+    except ImportError:
+        pass
+
+    try:
+        import torch_xla.core.xla_model as xm
+
+        if device is None:
+            xm.set_rng_state(seed)
+        elif "xla" in str(device):
+            xm.set_rng_state(seed, device=device)
+
+    except (ImportError, RuntimeError):
+        pass
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)

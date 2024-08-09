@@ -83,7 +83,7 @@ class OnlineTraceStatistics(SamplerCallback):
             f"{self.attribute}/draw/std": self.std_by_draw[draw].cpu().numpy(),
         }
 
-    def __call__(self, draw: int):
+    def __call__(self, draw: int, **kwargs):
         attribute = getattr(self.base_callback, self.attribute)
         self.mean_by_chain[:, draw] = attribute[:, : draw + 1].mean(axis=1)
         self.std_by_chain[:, draw] = attribute[:, : draw + 1].std(axis=1)

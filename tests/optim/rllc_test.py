@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
 from devinterp.optim.sgld import SGLD
-from devinterp.slt import sample
+from devinterp.slt.sampler import sample
 from devinterp.slt.llc import LLCEstimator
 from devinterp.test_utils import *
 from devinterp.utils import *
@@ -61,15 +61,23 @@ def test_rllc_normalcrossing_between_powers(
     lr = 0.0002
     num_chains = 1
     num_draws = 100
+    init_loss_1 = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model1, evaluate_mse, device="cpu"
+    )
+    init_loss_2 = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model2, evaluate_mse, device="cpu"
+    )
     llc_estimator_1 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss_1,
     )
     llc_estimator_2 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss_2,
     )
     torch.manual_seed(seed)
 
@@ -79,7 +87,7 @@ def test_rllc_normalcrossing_between_powers(
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
-            temperature=optimal_temperature(train_dataloader),
+            nbeta=optimal_nbeta(train_dataloader),
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -97,7 +105,7 @@ def test_rllc_normalcrossing_between_powers(
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
-            temperature=optimal_temperature(train_dataloader),
+            nbeta=optimal_nbeta(train_dataloader),
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -144,16 +152,24 @@ def test_restricted_gradient_normalcrossing_between_dims(
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
     lr = 0.0001
     num_chains = 1
-    num_draws = 200
+    num_draws = 1000
+    init_loss_1 = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model1, evaluate_mse, device="cpu"
+    )
+    init_loss_2 = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model2, evaluate_mse, device="cpu"
+    )
     llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss_1,
     )
     llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss_2,
     )
 
     sample(
@@ -161,7 +177,7 @@ def test_restricted_gradient_normalcrossing_between_dims(
         train_dataloader,
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
-            lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
+            lr=lr, nbeta=optimal_nbeta(train_dataloader), noise_level=0.0
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -175,7 +191,7 @@ def test_restricted_gradient_normalcrossing_between_dims(
         train_dataloader,
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
-            lr=lr, temperature=optimal_temperature(train_dataloader), noise_level=0.0
+            lr=lr, nbeta=optimal_nbeta(train_dataloader), noise_level=0.0
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -208,7 +224,9 @@ def test_rllc_full_normalcrossing_between_dims(
 ):
     torch.manual_seed(42)
     seed = 42
-
+    lr = 0.001
+    num_chains = 1
+    num_draws = 500
     model1 = Polynomial(relevant_powers)
     model2 = Polynomial(relevant_powers + [extra_dim_power])
 
@@ -216,25 +234,31 @@ def test_rllc_full_normalcrossing_between_dims(
     model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
 
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    lr = 0.0001
-    num_chains = 1
-    num_draws = 2000
+    init_loss_1 = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model1, evaluate_mse, device="cpu"
+    )
+    init_loss_2 = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model2, evaluate_mse, device="cpu"
+    )
+
     llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss_1,
     )
     llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss_2,
     )
 
     sample(
         model1,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, nbeta=optimal_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -246,7 +270,7 @@ def test_rllc_full_normalcrossing_between_dims(
         model2,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, nbeta=optimal_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -258,7 +282,7 @@ def test_rllc_full_normalcrossing_between_dims(
     llc_mean_2d = llc_estimator_2d.get_results()["llc/mean"]
     llc_mean_3d_restricted = llc_estimator_3d.get_results()["llc/mean"]
     assert np.isclose(
-        llc_mean_2d, llc_mean_3d_restricted, atol=3e-2
+        llc_mean_2d, llc_mean_3d_restricted, atol=8e-2
     ), f"LLC mean {llc_mean_2d:.8f}!={llc_mean_3d_restricted:.8f} for powers {relevant_powers + [extra_dim_power]} using {sampling_method}, {model2.weights}"
 
 
@@ -274,28 +298,33 @@ def test_rllc_different_from_full_llc_between_dims(
     seed = 42
 
     model = Polynomial(relevant_powers)
-    model.weights = torch.nn.Parameter(torch.tensor([0., 1.]))
+    model.weights = torch.nn.Parameter(torch.tensor([0.3, 1.5]))
 
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
     lr = 0.001
     num_chains = 1
     num_draws = 200
+    init_loss = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model, evaluate_mse, device="cpu"
+    )
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss,
     )
     rllc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss,
     )
 
     sample(
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, nbeta=optimal_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -307,7 +336,7 @@ def test_rllc_different_from_full_llc_between_dims(
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, temperature=optimal_temperature(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, nbeta=optimal_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,

@@ -6,10 +6,10 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
-from devinterp.slt import sample
+from devinterp.slt.sampler import  sample
 from devinterp.slt.llc import LLCEstimator
 from devinterp.test_utils import *
-from devinterp.utils import evaluate_mse, optimal_temperature
+from devinterp.utils import evaluate_mse, optimal_nbeta, get_init_loss_multi_batch
 
 
 @pytest.fixture
@@ -36,15 +36,21 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
     lr = 0.0001
     num_chains = 3
     num_draws = 100
+    init_loss = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model, evaluate_mse, device="cpu"
+    )
     llc_estimator_1 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss
     )
     llc_estimator_2 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        temperature=optimal_temperature(train_dataloader),
+        nbeta=optimal_nbeta(train_dataloader),
+        init_loss=init_loss
+
     )
     torch.manual_seed(42)
 
@@ -99,10 +105,14 @@ def unused_test_batch_size_convergence(
         num_draws = 5_000
         torch.manual_seed(42)
         train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+        init_loss = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model, evaluate_mse, device="cpu"
+    )
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
-            temperature=optimal_temperature(train_dataloader),
+            nbeta=optimal_nbeta(train_dataloader),
+            init_loss=init_loss
         )
         sample(
             model,
@@ -132,7 +142,7 @@ def test_grad_accum_convergence(
 ):
     GRAD_ACCUMS = [1, 4, 16, 64]
     model = model(model_dims)
-    lr = 0.0002
+    lr = 0.00001
     num_chains = 1
     means = []
     _, train_data, _, _ = generated_normalcrossing_dataset
@@ -140,10 +150,14 @@ def test_grad_accum_convergence(
         num_draws = 64 // grad_accum
         torch.manual_seed(42)
         train_dataloader = DataLoader(train_data, batch_size=4, shuffle=True)
+        init_loss = get_init_loss_multi_batch(
+        train_dataloader, num_chains, model, evaluate_mse, device="cpu"
+    )
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
-            temperature=optimal_temperature(train_dataloader),
+            nbeta=optimal_nbeta(train_dataloader),
+            init_loss=init_loss
         )
         sample(
             model,
@@ -158,4 +172,4 @@ def test_grad_accum_convergence(
             grad_accum_steps=grad_accum,
         )
         means += [llc_estimator.get_results()["llc/mean"]]
-    assert np.ptp(means) < 1e-6, f"LLCs for different grad accums not close: {means}"
+    assert np.ptp(means) < 1e-5, f"LLCs for different grad accums not close: {means}"

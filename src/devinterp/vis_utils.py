@@ -8,7 +8,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from collections.abc import Sequence
-from devinterp.utils import optimal_temperature
+from devinterp.utils import optimal_nbeta
 import warnings
 import torch
 
@@ -44,7 +44,7 @@ class SweepConfig(BaseModel):
         else:
             if dataloader is not None:
                 # Calculate default beta (inverse temperature) range.
-                optimal_beta = optimal_temperature(dataloader)
+                optimal_beta = optimal_nbeta(dataloader)
                 if min_beta is None:
                     min_beta = 1e-2 * optimal_beta
                 if max_beta is None:

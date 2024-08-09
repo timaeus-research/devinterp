@@ -88,7 +88,7 @@ class CovarianceAccumulator(SamplerCallback):
         """
         return self.to_eigen(include_matrix=True)
 
-    def __call__(self, model):
+    def __call__(self, model, **kwargs):
         self.accumulate(model)
 
 

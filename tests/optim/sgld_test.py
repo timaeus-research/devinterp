@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from devinterp.optim.sgld import SGLD
-from devinterp.utils import optimal_temperature
+from devinterp.utils import optimal_nbeta
 
 
 @pytest.mark.parametrize("lr", [1e-1, 1e-2, 1e-3, 1e-4])
@@ -21,7 +21,7 @@ def test_SGLD_vs_SGD(lr):
         lr=2 * lr,
         noise_level=0.0,
         localization=0.0,
-        temperature=1.0,
+        nbeta=1.0,
     )
 
     criterion = nn.MSELoss()
