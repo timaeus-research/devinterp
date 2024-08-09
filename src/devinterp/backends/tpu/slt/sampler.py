@@ -25,7 +25,7 @@ from devinterp.utils import (
 
 
 def mark_step_if_xla(device):
-    if USE_TPU_BACKEND and device.startswith('xla:'): # not ideal, but allows CPU process while TPU is running
+    if USE_TPU_BACKEND and str(device).startswith('xla:'): # not ideal, but allows CPU process while TPU is running
         xm.mark_step()
 
 
