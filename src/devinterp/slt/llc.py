@@ -55,17 +55,13 @@ class LLCEstimator(SamplerCallback):
         self.device = device
         self.eval_field = eval_field
 
-        self.count = 0.0
-
     def update(self, chain: int, draw: int, loss: float):
         self.losses[chain, draw] = loss
-        self.count += 1.0
 
     def finalize(self):
         if USE_TPU_BACKEND:
             import torch_xla.core.xla_model as xm
-
-            scale = 1.0 / (self.count * xm.xrt_world_size())
+            scale = 1.0 / (xm.xrt_world_size())
             self.losses *= scale
             self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
         avg_losses = self.losses.mean(axis=1)
