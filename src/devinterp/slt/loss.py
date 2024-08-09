@@ -49,7 +49,7 @@ class OnlineLossStatistics(SamplerCallback):
             (self.num_chains, self.num_draws), dtype=torch.float32
         )
 
-    def __call__(self, chain: int, draw: int, loss: float):
+    def __call__(self, chain: int, draw: int, loss: float, **kwargs):
         self.update(chain, draw, loss)
 
     def update(self, chain: int, draw: int, loss: float):
