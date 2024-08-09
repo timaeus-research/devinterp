@@ -24,8 +24,8 @@ from devinterp.utils import (
 )
 
 
-def mark_step_if_xla():
-    if USE_TPU_BACKEND:
+def mark_step_if_xla(device):
+    if USE_TPU_BACKEND and device.startswith('xla:'): # not ideal, but allows CPU process while TPU is running
         xm.mark_step()
 
 
@@ -121,7 +121,7 @@ def sample_single_chain(
     model.train()
     no_grad = not any(map(lambda pg: pg["nbeta"] > 0, optimizer.param_groups))
 
-    mark_step_if_xla()
+    mark_step_if_xla(device)
 
     # The nested loop structure is present to prevent XLA from recompiling the computation graph at each iteration,
     # which is what happens if we have an if statement that changes control flow at each iteration.
@@ -163,7 +163,8 @@ def sample_single_chain(
 
                 pbar.set_postfix({"grad_accum_steps": j})
 
-                mark_step_if_xla()
+                mark_step_if_xla(device)
+
 
             # Check loss is not nan or inf
             # if torch.isnan(loss).any() or torch.isinf(loss).any():
@@ -177,7 +178,7 @@ def sample_single_chain(
             if scheduler is not None:
                 scheduler.step()
 
-            mark_step_if_xla()
+            mark_step_if_xla(device)
 
             if (
                 i >= num_burnin_steps
@@ -204,7 +205,7 @@ def sample_single_chain(
                             **results,
                         )
 
-                mark_step_if_xla()
+                mark_step_if_xla(device)
 
     # except ChainHealthError as e:
     #     warnings.warn(f"Chain failed: {e}")

@@ -263,3 +263,18 @@ def sample(
     for callback in callbacks:
         if hasattr(callback, "finalize"):
             callback.finalize()
+    
+        results = {}
+
+    if isinstance(callbacks, dict):
+        for name, callback in callbacks.items():
+            if name == "":
+                results.update(callback.get_results())
+            else:
+                results[name] = callback.get_results()
+    else:
+        for callback in callbacks:
+            if hasattr(callback, "get_results"):
+                results.update(callback.get_results())
+
+    return results
