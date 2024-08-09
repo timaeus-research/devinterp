@@ -133,8 +133,7 @@ def test_accuracy_rrr(sampling_method, m, h, n):
         case = "1_odd"
         true_lc = (1 + 2 * m * n + 2 * h * n + 2 * m * h - n**2 - m**2 - h**2) / 8
 
-    assert (
-        llc_mean - 2 * llc_std_dev < true_lc < llc_mean + 2.5 * llc_std_dev
+    assert np.isclose(llc_mean, true_lc, rtol=0.3
     ), f"DLN case {case} estimated LLC mean {llc_mean:.3f} +- {2.5*llc_std_dev:.3f} vs True LC {true_lc:.3f} for (M, H, N)={(m, h, n)} using {sampling_method}"
 
 

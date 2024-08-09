@@ -224,7 +224,7 @@ def test_rllc_full_normalcrossing_between_dims(
 ):
     torch.manual_seed(42)
     seed = 42
-    lr = 0.01
+    lr = 0.001
     num_chains = 1
     num_draws = 500
     model1 = Polynomial(relevant_powers)
