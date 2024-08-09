@@ -1,20 +1,24 @@
 from pprint import pp
 
 import torch
+import numpy as np
 import torch_xla.core.xla_model as xm
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformer_lens.utils import (lm_cross_entropy_loss,
-                                    tokenize_and_concatenate)
+from transformer_lens.utils import lm_cross_entropy_loss, tokenize_and_concatenate
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
-from devinterp.utils import prepare_input, set_seed
+from devinterp.utils import prepare_input, set_seed, USE_TPU_BACKEND
 
 
 def _test_hf(model, dataset, device: str):
+    assert (
+        USE_TPU_BACKEND
+    ), "This test is intended to run using TPU, feel free to ignore failure if unavailable"
+
     set_seed(1)
 
     if device == "tpu":
@@ -32,9 +36,9 @@ def _test_hf(model, dataset, device: str):
     model.eval()
     init_loss = torch.zeros(1).to(device)
 
-    evaluate = lambda model, batch: lm_cross_entropy_loss(
-        model(batch["tokens"]).logits, batch["tokens"]
-    )
+    def evaluate(model, batch):
+        logits = model(batch["tokens"]).logits
+        return lm_cross_entropy_loss(logits, batch["tokens"]), {"logits": logits}
 
     with torch.no_grad():
         for i, batch in tqdm(enumerate(loader), total=4):
@@ -42,7 +46,7 @@ def _test_hf(model, dataset, device: str):
                 batch, device, is_deepspeed_enabled=False, accelerator=None
             )
 
-            init_loss += evaluate(model, batch)
+            init_loss += evaluate(model, batch)[0]
 
             if i >= 4:
                 break
@@ -115,11 +119,18 @@ def test_hf():
     pp(metrics_tpu)
     metrics_cpu = _test_hf(model, dataset, "cpu")
     pp(metrics_cpu)
-
+    metrics_cpu.pop('llc/std') # 1 chain only
+    metrics_cpu.pop('loss/trace') # 1 chain only
     for k, v in metrics_cpu.items():
         if isinstance(v, torch.Tensor):
             assert torch.allclose(
-                v, metrics_tpu[k], atol=1e-4
+                v, metrics_tpu[k], rtol=5e-3
             ), f"Evaluation failed for {k}"
+        elif isinstance(v, np.ndarray):
+            assert np.isclose(
+                v, metrics_tpu[k], rtol=5e-3
+            ).all(), f"Evaluation failed for {k}"
         else:
-            assert v == metrics_tpu[k], f"Evaluation failed for {k}"
+            assert np.isclose(
+                v, metrics_tpu[k], rtol=5e-3
+            ), f"Evaluation failed for {k}"

@@ -59,7 +59,7 @@ class LLCEstimator(SamplerCallback):
         self.losses[chain, draw] = loss
 
     def finalize(self):
-        if USE_TPU_BACKEND:
+        if USE_TPU_BACKEND and str(self.device).startswith('xla:'):
             import torch_xla.core.xla_model as xm
             scale = 1.0 / (xm.xrt_world_size())
             self.losses *= scale
