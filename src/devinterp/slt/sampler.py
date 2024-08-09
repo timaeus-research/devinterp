@@ -56,10 +56,13 @@ def sample_single_chain(
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
     optimizer_kwargs = optimizer_kwargs or {}
+    
+    # Flags for saving variables in the optimizer for metric callbacks:
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
         optimizer_kwargs.setdefault("save_noise", True)
+
     optimizer_kwargs.setdefault("temperature", optimal_temperature(loader))
     if optimize_over_per_model_param:
         param_groups = []
@@ -99,12 +102,9 @@ def sample_single_chain(
                 cumulative_loss += loss.item()
             loss.backward()
 
-            # i+1 instead of i so that the gradient accumulates to an entire batch first
-            # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
             if (i+1) % grad_accum_steps == 0:
+                # Sandwich: Top half.
                 optimizer.step()
-                optimizer.zero_grad()
-                pbar.update(1)
 
             if i >= num_burnin_steps and (i + 1 - num_burnin_steps) % num_steps_bw_draws == 0:
                 draw = (i - num_burnin_steps) // num_steps_bw_draws  # required for locals()
@@ -118,6 +118,13 @@ def sample_single_chain(
                     for callback in callbacks:
                         callback(**locals())  # Cursed. This is the way.
 
+            # NOTE: Sandwich: Bottom half. Keep this around the callback call to ensure that model parameter gradients are visible to the callbacks.
+
+            # i+1 instead of i so that the gradient accumulates to an entire batch first
+            # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
+            if (i+1) % grad_accum_steps == 0:
+                optimizer.zero_grad()
+                pbar.update(1)
 
 def _sample_single_chain(kwargs):
     return sample_single_chain(**kwargs)

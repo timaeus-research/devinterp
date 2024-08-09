@@ -64,5 +64,6 @@ class OnlineWBICEstimator(SamplerCallback):
             "loss/trace": self.losses.cpu().numpy(),
         }
 
-    def __call__(self, chain: int, draw: int, loss: float):
+    def __call__(self, chain: int, draw: int, loss: float, **kwargs):
+        # The **kwargs is to ignore any additional arguments passed to the callback via **locals() from SGLD.
         self.update(chain, draw, loss)

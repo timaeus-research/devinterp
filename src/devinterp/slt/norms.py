@@ -35,7 +35,7 @@ class WeightNorm(SamplerCallback):
         self.p_norm = p_norm
         self.device = device
 
-    def __call__(self, chain: int, draw: int, model: nn.Module):
+    def __call__(self, chain: int, draw: int, model: nn.Module, **kwargs):
         self.update(chain, draw, model)
 
     def update(self, chain: int, draw: int, model: nn.Module):
@@ -84,7 +84,7 @@ class GradientNorm(SamplerCallback):
         self.p_norm = p_norm
         self.device = device
 
-    def __call__(self, chain: int, draw: int, model: nn.Module):
+    def __call__(self, chain: int, draw: int, model: nn.Module, **kwargs):
         self.update(chain, draw, model)
 
     def update(self, chain: int, draw: int, model: nn.Module):
@@ -133,7 +133,7 @@ class NoiseNorm(SamplerCallback):
         self.p_norm = p_norm
         self.device = device
 
-    def __call__(self, chain: int, draw: int, optimizer: SGLD):
+    def __call__(self, chain: int, draw: int, optimizer: SGLD, **kwargs):
         self.update(chain, draw, optimizer)
 
     def update(self, chain: int, draw: int, optimizer: SGLD):

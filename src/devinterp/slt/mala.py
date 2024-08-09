@@ -15,7 +15,7 @@ def mala_acceptance_probability(
     current_grads: Union[Tensor, List[Tensor]],
     current_loss: Tensor,
     learning_rate: float,
-):
+) -> float:
     """
     Calculate the acceptance probability for a MALA transition. Parameters and 
     gradients can either all be given as a tensor (all of the same shape) or 
@@ -33,9 +33,12 @@ def mala_acceptance_probability(
     Returns:
     float: Acceptance probability for the proposed transition.
     """
-    if np.isnan(current_loss):
-        return np.nan
+    if current_loss is np.array:
+        current_loss = torch.tensor(current_loss)
     
+    if torch.isnan(current_loss):
+        return np.nan
+
     # convert tensors to lists with one element
     if not isinstance(prev_params, list): 
         prev_params = [prev_params]
