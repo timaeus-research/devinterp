@@ -1,4 +1,3 @@
-import inspect
 import os
 from itertools import islice
 from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Tuple, Union
@@ -13,7 +12,9 @@ try:
     import torch_xla.core.xla_model as xm
 
     PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "None")
-    USE_TPU_BACKEND = os.environ.get("USE_TPU_BACKEND", "1" if (PJRT_DEVICE == "TPU") else "0")
+    USE_TPU_BACKEND = os.environ.get(
+        "USE_TPU_BACKEND", "1" if (PJRT_DEVICE == "TPU") else "0"
+    )
 except ImportError:
     USE_TPU_BACKEND = False
 
@@ -200,7 +201,7 @@ def make_evaluate(
     def evaluate(model, data):
         x, y = data
         y_pred = model(x)
-        return criterion(y_pred, y), {'output': y_pred}
+        return criterion(y_pred, y), {"output": y_pred}
 
     return evaluate
 
@@ -223,6 +224,7 @@ def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):
 
     try:
         import numpy as np
+
         np.random.seed(seed)
     except ImportError:
         pass

@@ -1,9 +1,7 @@
-
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
 import torch
 from torch.utils.data import DataLoader
-
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -11,13 +9,14 @@ from devinterp.utils import (
     USE_TPU_BACKEND,
     EvaluateFn,
     get_init_loss_multi_batch,
-    optimal_nbeta
+    optimal_nbeta,
 )
 
 if USE_TPU_BACKEND:
     from devinterp.backends.tpu.slt.sampler import sample
 else:
     from devinterp.backends.default.slt.sampler import sample
+
 
 def estimate_learning_coeff_with_summary(
     model: torch.nn.Module,
@@ -48,11 +47,19 @@ def estimate_learning_coeff_with_summary(
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
     if online:
         llc_estimator = OnlineLLCEstimator(
-            num_chains, num_draws, nbeta=optimizer_kwargs["nbeta"], device=device, init_loss=init_loss
+            num_chains,
+            num_draws,
+            nbeta=optimizer_kwargs["nbeta"],
+            device=device,
+            init_loss=init_loss,
         )
     else:
         llc_estimator = LLCEstimator(
-            num_chains, num_draws, nbeta=optimizer_kwargs["nbeta"], device=device, init_loss=init_loss
+            num_chains,
+            num_draws,
+            nbeta=optimizer_kwargs["nbeta"],
+            device=device,
+            init_loss=init_loss,
         )
 
     callbacks = [llc_estimator, *callbacks]
@@ -102,7 +109,7 @@ def estimate_learning_coeff(
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None
+    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
 ) -> float:
     return estimate_learning_coeff_with_summary(
         model=model,

@@ -6,10 +6,10 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
-from devinterp.slt.sampler import  sample
 from devinterp.slt.llc import LLCEstimator
+from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
-from devinterp.utils import evaluate_mse, optimal_nbeta, get_init_loss_multi_batch
+from devinterp.utils import evaluate_mse, get_init_loss_multi_batch, optimal_nbeta
 
 
 @pytest.fixture
@@ -43,14 +43,13 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
         num_chains=num_chains,
         num_draws=num_draws,
         nbeta=optimal_nbeta(train_dataloader),
-        init_loss=init_loss
+        init_loss=init_loss,
     )
     llc_estimator_2 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
         nbeta=optimal_nbeta(train_dataloader),
-        init_loss=init_loss
-
+        init_loss=init_loss,
     )
     torch.manual_seed(42)
 
@@ -106,13 +105,13 @@ def unused_test_batch_size_convergence(
         torch.manual_seed(42)
         train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
         init_loss = get_init_loss_multi_batch(
-        train_dataloader, num_chains, model, evaluate_mse, device="cpu"
-    )
+            train_dataloader, num_chains, model, evaluate_mse, device="cpu"
+        )
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
             nbeta=optimal_nbeta(train_dataloader),
-            init_loss=init_loss
+            init_loss=init_loss,
         )
         sample(
             model,
@@ -151,13 +150,13 @@ def test_grad_accum_convergence(
         torch.manual_seed(42)
         train_dataloader = DataLoader(train_data, batch_size=4, shuffle=True)
         init_loss = get_init_loss_multi_batch(
-        train_dataloader, num_chains, model, evaluate_mse, device="cpu"
-    )
+            train_dataloader, num_chains, model, evaluate_mse, device="cpu"
+        )
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
             nbeta=optimal_nbeta(train_dataloader),
-            init_loss=init_loss
+            init_loss=init_loss,
         )
         sample(
             model,

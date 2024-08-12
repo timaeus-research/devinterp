@@ -1,4 +1,5 @@
-from typing import Union, List
+from typing import List, Union
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -17,8 +18,8 @@ def mala_acceptance_probability(
     learning_rate: float,
 ) -> float:
     """
-    Calculate the acceptance probability for a MALA transition. Parameters and 
-    gradients can either all be given as a tensor (all of the same shape) or 
+    Calculate the acceptance probability for a MALA transition. Parameters and
+    gradients can either all be given as a tensor (all of the same shape) or
     all as lists of tensors (eg the parameters of a Module).
 
     Args:
@@ -35,18 +36,18 @@ def mala_acceptance_probability(
     """
     if current_loss is np.array:
         current_loss = torch.tensor(current_loss)
-    
+
     if torch.isnan(current_loss):
         return np.nan
 
     # convert tensors to lists with one element
-    if not isinstance(prev_params, list): 
+    if not isinstance(prev_params, list):
         prev_params = [prev_params]
-    if not isinstance(prev_grads, list): 
+    if not isinstance(prev_grads, list):
         prev_grads = [prev_grads]
-    if not isinstance(current_params, list): 
+    if not isinstance(current_params, list):
         current_params = [current_params]
-    if not isinstance(current_grads, list): 
+    if not isinstance(current_grads, list):
         current_grads = [current_grads]
 
     log_q_current_to_prev = 0
@@ -106,7 +107,9 @@ class MalaAcceptanceRate(SamplerCallback):
         self.prev_grads = []
         self.prev_mala_loss = 0.0
 
-    def __call__(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer, **kwargs):
+    def __call__(
+        self, chain: int, draw: int, model: nn.Module, loss: float, optimizer, **kwargs
+    ):
         self.update(chain, draw, model, loss, optimizer)
 
     def update(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
@@ -116,16 +119,14 @@ class MalaAcceptanceRate(SamplerCallback):
         # mala acceptance loss is different from pytorch supplied loss
         mala_loss = (loss * self.nbeta).item() + optimizer.localization_loss
         if draw > 1:
-            self.mala_acceptance_rate[chain, draw - 1] = (
-                mala_acceptance_probability(
-                    self.prev_params,
-                    self.prev_grads,
-                    self.prev_mala_loss,
-                    self.current_params,
-                    self.current_grads,
-                    mala_loss,
-                    self.learning_rate,
-                )
+            self.mala_acceptance_rate[chain, draw - 1] = mala_acceptance_probability(
+                self.prev_params,
+                self.prev_grads,
+                self.prev_mala_loss,
+                self.current_params,
+                self.current_grads,
+                mala_loss,
+                self.learning_rate,
             )
         # move new -> old, then update new after
         self.prev_params = self.current_params
@@ -133,7 +134,9 @@ class MalaAcceptanceRate(SamplerCallback):
         self.prev_mala_loss = mala_loss
         # params update only at the end, as decribed
         self.current_params = [
-            param.clone().detach() for param in model.parameters() if param.requires_grad
+            param.clone().detach()
+            for param in model.parameters()
+            if param.requires_grad
         ]
 
     def get_results(self):

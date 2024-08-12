@@ -1,5 +1,5 @@
-from typing import Union, Callable
 import warnings
+from typing import Callable, Union
 
 import torch
 
@@ -31,14 +31,14 @@ class SGLD(torch.optim.Optimizer):
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
         >>> optimizer.step()
-        
-    .. |colab6| image:: https://colab.research.google.com/assets/colab-badge.svg 
+
+    .. |colab6| image:: https://colab.research.google.com/assets/colab-badge.svg
         :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb
-        
+
     Note:
         - :python:`localization` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
         - :python:`noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.
-        - Although this class is a subclass of :python:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point. 
+        - Although this class is a subclass of :python:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.
         - Hyperparameter optimization is more of an art than a science. Check out `the calibration notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab6| for how to go about it in a simple case.
     :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :python:`model.parameters()` or something more fancy, just like other :python:`torch.optim.Optimizer` classes.
     :type params: Iterable
@@ -70,7 +70,7 @@ class SGLD(torch.optim.Optimizer):
     :param distance: Boolean flag to track the distance between the current weights and the initial weights. Default is False
     :type distance: bool, optional
 
-    
+
     :raises Warning: if :python:`noise_level` is set to anything other than 1
     :raises Warning: if :python:`nbeta` is set to 1
     """
@@ -99,7 +99,6 @@ class SGLD(torch.optim.Optimizer):
         if nbeta == 1.0:
             warnings.warn(
                 "Warning: nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_nbeta(dataloader) instead"
-
             )
         defaults = dict(
             lr=lr,
@@ -167,21 +166,27 @@ class SGLD(torch.optim.Optimizer):
 
                     # Weight decay
                     if group["weight_decay"] != 0:
-                        dw.add_(p.data, alpha=group["weight_decay"]) # inplace addition. Effectively, dw = dw + p.data * group["weight_decay"]
-                    
+                        dw.add_(
+                            p.data, alpha=group["weight_decay"]
+                        )  # inplace addition. Effectively, dw = dw + p.data * group["weight_decay"]
+
                     # Here, group["localization"] is the localization strength $\gamma$ (a single float). If it's 0, we don't do anything.
                     initial_param = self.state[p]["initial_param"]
-                    initial_param_distance = (p.data - initial_param)
+                    initial_param_distance = p.data - initial_param
                     if group["localization"] != 0:
-                        dw.add_(initial_param_distance, alpha = group["localization"])
+                        dw.add_(initial_param_distance, alpha=group["localization"])
 
                     if self.save_mala_vars:
                         # TODO: Initial param distance is used as a m
                         if group["optimize_over"] is not None:
-                            initial_param_distance = initial_param_distance * group["optimize_over"]
+                            initial_param_distance = (
+                                initial_param_distance * group["optimize_over"]
+                            )
                         # localization_loss = (p.data - initial_param)^2 * group["optimize_over"]^2 * group["localization"] / 2
                         #                                                           ^ boolean
-                        distance = (initial_param_distance.detach() ** 2).sum() * group["localization"]
+                        distance = (initial_param_distance.detach() ** 2).sum() * group[
+                            "localization"
+                        ]
                         self.localization_loss += distance / 2
                         self.dws.append(dw.clone())
 
@@ -190,7 +195,10 @@ class SGLD(torch.optim.Optimizer):
 
                     # Add Gaussian noise
                     noise = torch.normal(
-                        mean=0.0, std=group["noise_level"], size=dw.size(), device=dw.device
+                        mean=0.0,
+                        std=group["noise_level"],
+                        size=dw.size(),
+                        device=dw.device,
                     )
                     if self.save_noise:
                         # Noise saved here is the unscaled noise.
@@ -203,15 +211,14 @@ class SGLD(torch.optim.Optimizer):
 
                     # Update parameters
                     p.data.add_(dw, alpha=-0.5 * group["lr"])
-                    p.data.add_(noise, alpha=group["lr"] ** 0.5) # Scale noise by sqrt(lr)
+                    p.data.add_(
+                        noise, alpha=group["lr"] ** 0.5
+                    )  # Scale noise by sqrt(lr)
 
                     # Track the size of the changes & relative contributions
                     if group["grad_norm"] is not False and p.grad is not None:
                         group["grad_norm"] += (
-                            (
-                                (p.grad.data * group["nbeta"] * 0.5 * group["lr"])
-                                ** 2
-                            )
+                            ((p.grad.data * group["nbeta"] * 0.5 * group["lr"]) ** 2)
                             .sum()
                             .detach()
                         )
@@ -223,14 +230,20 @@ class SGLD(torch.optim.Optimizer):
                         group["noise_norm"] += (noise**2).sum().detach()
 
                     if group["distance"] is not False and not self.save_mala_vars:
-                        group["distance"] += ((initial_param_distance * group["localization"])**2).sum().detach()
+                        group["distance"] += (
+                            ((initial_param_distance * group["localization"]) ** 2)
+                            .sum()
+                            .detach()
+                        )
 
                     # Rebound if exceeded bounding box size
                     if group["bounding_box_size"]:
                         torch.clamp_(
                             p.data,
-                            min=param_state["initial_param"] - group["bounding_box_size"],
-                            max=param_state["initial_param"] + group["bounding_box_size"],
+                            min=param_state["initial_param"]
+                            - group["bounding_box_size"],
+                            max=param_state["initial_param"]
+                            + group["bounding_box_size"],
                         )
 
                 for hp in ["noise_norm", "grad_norm", "distance", "weight_norm"]:

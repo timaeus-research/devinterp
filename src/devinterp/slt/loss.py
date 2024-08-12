@@ -9,12 +9,12 @@ class OnlineLossStatistics(SamplerCallback):
     """
     Derivative callback that computes various loss statistics for :func:`~devinterp.slt.llc.OnlineLLCEstimator`. Must
     be called after the base :func:`~devinterp.slt.llc.OnlineLLCEstimator` has been called at each draw.
-    
-    .. |colab5| image:: https://colab.research.google.com/assets/colab-badge.svg 
+
+    .. |colab5| image:: https://colab.research.google.com/assets/colab-badge.svg
         :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb
-        
+
     See `the diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| for examples on how to use this to diagnose your sample health.
-        
+
     :param base_callback: Base callback that computes original loss metric.
     :type base_callback: :func:`~devinterp.slt.llc.OnlineLLCEstimator`
 
@@ -94,9 +94,9 @@ class OnlineLossStatistics(SamplerCallback):
 
     def loss_hist_by_draw(self, draw: int = 0, bins: int = 10):
         """Plots a histogram of chain losses for a given draw index.
-        
+
         :param draw: Draw index to plot histogram for. Default is 0
-        :type draw: int, optional   
+        :type draw: int, optional
         :param bins: number of histogram bins. Default is 10
         :type bins: int, optional
         """

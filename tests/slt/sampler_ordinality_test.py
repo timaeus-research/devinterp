@@ -6,8 +6,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
-from devinterp.slt.sampler import  sample
 from devinterp.slt.llc import LLCEstimator
+from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
 from devinterp.utils import *
 
@@ -55,13 +55,13 @@ def test_linedot_normal_crossing(
             torch.tensor(sample_point, dtype=torch.float32, requires_grad=True)
         )
         init_loss = get_init_loss_multi_batch(
-        train_dataloader, num_chains, model, evaluate_mse, device="cpu"
-    )
+            train_dataloader, num_chains, model, evaluate_mse, device="cpu"
+        )
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
             nbeta=optimal_nbeta(train_dataloader),
-            init_loss=init_loss
+            init_loss=init_loss,
         )
 
         sample(

@@ -1,5 +1,5 @@
-from typing import Union
 import warnings
+from typing import Union
 
 import torch
 
@@ -59,8 +59,9 @@ class LLCEstimator(SamplerCallback):
         self.losses[chain, draw] = loss
 
     def finalize(self):
-        if USE_TPU_BACKEND and str(self.device).startswith('xla:'):
+        if USE_TPU_BACKEND and str(self.device).startswith("xla:"):
             import torch_xla.core.xla_model as xm
+
             scale = 1.0 / (xm.xrt_world_size())
             self.losses *= scale
             self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)

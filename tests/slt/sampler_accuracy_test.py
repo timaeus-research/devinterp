@@ -6,10 +6,10 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
-from devinterp.slt.sampler import  sample
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
+from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
-from devinterp.utils import evaluate_mse, optimal_nbeta, get_init_loss_multi_batch
+from devinterp.utils import evaluate_mse, get_init_loss_multi_batch, optimal_nbeta
 
 
 @pytest.fixture

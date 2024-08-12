@@ -3,11 +3,11 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from devinterp.optim.sgld import SGLD
-from devinterp.slt.sampler import sample
 from devinterp.slt.llc import LLCEstimator
+from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
 from devinterp.utils import *
 

@@ -5,17 +5,15 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Un
 
 import torch
 import torch_xla.core.xla_model as xm
-
-from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
 from torch.utils.data import DataLoader
 from tqdm import trange
 
-from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
-from devinterp.slt.mala import MalaAcceptanceRate
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
+from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
+from devinterp.slt.mala import MalaAcceptanceRate
 from devinterp.utils import (
     USE_TPU_BACKEND,
     get_init_loss_multi_batch,
@@ -25,7 +23,9 @@ from devinterp.utils import (
 
 
 def mark_step_if_xla(device):
-    if USE_TPU_BACKEND and str(device).startswith('xla:'): # not ideal, but allows CPU process while TPU is running
+    if USE_TPU_BACKEND and str(device).startswith(
+        "xla:"
+    ):  # not ideal, but allows CPU process while TPU is running
         xm.mark_step()
 
 
@@ -165,7 +165,6 @@ def sample_single_chain(
 
                 mark_step_if_xla(device)
 
-
             # Check loss is not nan or inf
             # if torch.isnan(loss).any() or torch.isinf(loss).any():
             #     raise ChainHealthError(
@@ -206,7 +205,6 @@ def sample_single_chain(
 
                 mark_step_if_xla(device)
             optimizer.zero_grad()
-
 
     # except ChainHealthError as e:
     #     warnings.warn(f"Chain failed: {e}")

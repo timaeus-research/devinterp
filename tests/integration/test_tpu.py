@@ -1,7 +1,7 @@
 from pprint import pp
 
-import torch
 import numpy as np
+import torch
 import torch_xla.core.xla_model as xm
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -11,7 +11,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
-from devinterp.utils import prepare_input, set_seed, USE_TPU_BACKEND
+from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
 
 
 def _test_hf(model, dataset, device: str):
@@ -119,8 +119,8 @@ def test_hf():
     pp(metrics_tpu)
     metrics_cpu = _test_hf(model, dataset, "cpu")
     pp(metrics_cpu)
-    metrics_cpu.pop('llc/std') # 1 chain only
-    metrics_cpu.pop('loss/trace') # 1 chain only
+    metrics_cpu.pop("llc/std")  # 1 chain only
+    metrics_cpu.pop("loss/trace")  # 1 chain only
     for k, v in metrics_cpu.items():
         if isinstance(v, torch.Tensor):
             assert torch.allclose(
