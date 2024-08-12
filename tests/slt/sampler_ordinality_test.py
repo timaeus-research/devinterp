@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
 from devinterp.slt.sampler import sample
-from devinterp.test_utils import *
+from devinterp._test_utils import *
 from devinterp.utils import *
 
 

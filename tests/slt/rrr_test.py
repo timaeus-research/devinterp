@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from devinterp.backends.default.slt.sampler import sample
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
-from devinterp.test_utils import *
+from devinterp._test_utils import *
 from devinterp.utils import evaluate_mse, get_init_loss_multi_batch, optimal_nbeta
 
 
@@ -102,7 +102,9 @@ def test_accuracy_rrr(sampling_method, m, h, n):
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=0.00006, localization=1.0, nbeta=optimal_nbeta(train_dataloader)),
+        optimizer_kwargs=dict(
+            lr=0.00006, localization=1.0, nbeta=optimal_nbeta(train_dataloader)
+        ),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -133,7 +135,8 @@ def test_accuracy_rrr(sampling_method, m, h, n):
         case = "1_odd"
         true_lc = (1 + 2 * m * n + 2 * h * n + 2 * m * h - n**2 - m**2 - h**2) / 8
 
-    assert np.isclose(llc_mean, true_lc, rtol=0.3
+    assert np.isclose(
+        llc_mean, true_lc, rtol=0.3
     ), f"DLN case {case} estimated LLC mean {llc_mean:.3f} +- {2.5*llc_std_dev:.3f} vs True LC {true_lc:.3f} for (M, H, N)={(m, h, n)} using {sampling_method}"
 
 
