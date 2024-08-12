@@ -1,5 +1,5 @@
 import warnings
-from typing import Callable, Union
+from typing import Callable, Union, Optional
 
 import torch
 
@@ -91,7 +91,12 @@ class SGLD(torch.optim.Optimizer):
         grad_norm=False,
         weight_norm=False,
         distance=False,
+        temperature: Optional[float] = None,
     ):
+        if temperature is not None:
+            nbeta = temperature
+            warnings.warn("Temperature is deprecated. Please pass in nbeta as an argument instead.")
+
         if noise_level != 1.0:
             warnings.warn(
                 "Warning: noise_level in SGLD is unequal to one, this removes SGLD posterior sampling guarantees."
