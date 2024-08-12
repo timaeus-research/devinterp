@@ -1,10 +1,11 @@
-from typing import List, Union
 import math
-from matplotlib.collections import PatchCollection
+from typing import List, Union
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import torch
 import torch.nn as nn
+from matplotlib.collections import PatchCollection
 
 from devinterp.slt.callback import SamplerCallback
 
@@ -54,7 +55,7 @@ class GradientDistribution(SamplerCallback):
     def max_grad(self):
         return self.min_grad + self.bin_size * self.num_bins
 
-    def __call__(self, chain: int, draw: int, model: nn.Module):
+    def __call__(self, chain: int, draw: int, model: nn.Module, **kwargs):
         self.update(chain, draw, model)
 
     # Updates the gradient histograms for each parameter.
@@ -142,7 +143,7 @@ class GradientDistribution(SamplerCallback):
             self.num_bins = new_bin_count
             self.bin_size *= 2
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict :python:`{"gradient/distributions": grad_dists}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [gradient_dist_instance], ...)`)
         """
@@ -152,7 +153,7 @@ class GradientDistribution(SamplerCallback):
 
     def plot(self, param_name: str, color="blue", plot_zero=True, chain: int = None):
         """Plots the gradient distribution for a specific parameter.
-        
+
         :param param_name: the name of the parameter plot gradients for.
         :type param_name: str
         :param color: The color to plot gradient bins in. Default is blue
@@ -161,7 +162,7 @@ class GradientDistribution(SamplerCallback):
         :type plot_zero: bool, optional
         :param chain: The model to compute covariances on.
         :type chain: int, optional
-        
+
         :returns: None, but shows the denisty gradient bins over sampling steps.
         """
         grad_dist = self.grad_dists[param_name]

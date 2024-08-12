@@ -2,8 +2,8 @@ from typing import Callable, Dict, List, Tuple, Union
 
 import numpy as np
 import torch
-from torch.linalg import eigh
 from torch import nn
+from torch.linalg import eigh
 
 from devinterp.slt.callback import SamplerCallback
 
@@ -23,7 +23,7 @@ class CovarianceAccumulator(SamplerCallback):
     :type device: str | torch.device, optional
     :param num_evals: Number of eigenvalues to compute. Default is 3
     :type num_evals: int, optional
-    
+
     """
 
     def __init__(
@@ -71,9 +71,8 @@ class CovarianceAccumulator(SamplerCallback):
         # Convert the covariance matrix to pairs of eigenvalues and vectors.
         cov = self.to_matrix().detach().cpu()
         all_evals, all_evecs = eigh(cov)
-        evals = all_evals[-self.num_evals:].numpy()
-        evecs = all_evecs[-self.num_evals:].numpy()
-
+        evals = all_evals[-self.num_evals :].numpy()
+        evecs = all_evecs[-self.num_evals :].numpy()
 
         results = {"evals": evals, "evecs": evecs}
 
@@ -82,13 +81,13 @@ class CovarianceAccumulator(SamplerCallback):
 
         return results
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict :python:`{"evals": eigenvalues_of_cov_matrix, "evecs": eigenvectors_of_cov_matrix, "matrix": cov_matrix}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [covariance_accumulator_instance], ...)`)
         """
         return self.to_eigen(include_matrix=True)
 
-    def __call__(self, model):
+    def __call__(self, model, **kwargs):
         self.accumulate(model)
 
 
@@ -110,7 +109,7 @@ class WithinHeadCovarianceAccumulator:
     :type device: str | torch.device, optional
     :param num_evals: number of eigenvectors / eigenvalues to compute. Default is 3
     :type num_evals: int, optional
-    
+
     """
 
     def __init__(
@@ -198,9 +197,8 @@ class WithinHeadCovarianceAccumulator:
             for h in range(self.num_heads):
                 head_cov = cov[l, h]
                 all_head_evals, all_head_evecs = eigh(head_cov)
-                head_evals = all_head_evals[-self.num_evals:].numpy()
-                head_evecs = all_head_evecs[-self.num_evals:].numpy()            
-
+                head_evals = all_head_evals[-self.num_evals :].numpy()
+                head_evecs = all_head_evecs[-self.num_evals :].numpy()
 
                 for i in range(self.num_evals):
                     evecs[i, l, h, :] = head_evecs[:, i].reshape(
@@ -215,7 +213,7 @@ class WithinHeadCovarianceAccumulator:
 
         return results
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict :python:`{"evals": array_of_eigenvalues_of_cov_matrix_layer_idx_head_idx, "evecs": array_of_eigenvectors_of_cov_matrix_layer_idx_head_idx, "matrix": array_of_cov_matrices_layer_idx_head_idx}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [covariance_accumulator_instance], ...)`).
         """
@@ -242,7 +240,7 @@ class BetweenLayerCovarianceAccumulator:
     :type num_evals: int
     :param accessors: Functions to access attention head weights.
     :type accessors: Callable[[nn.Module], torch.Tensor]
-    
+
     """
 
     def __init__(
@@ -338,9 +336,8 @@ class BetweenLayerCovarianceAccumulator:
         for name, cov in covariances.items():
             # TODO: U, s, Vt = svds(cov, k=self.num_evals, which='LM')
             all_evals, all_evecs = eigh(cov)
-            evals = all_evals[-self.num_evals:].numpy()
-            evecs = all_evecs[-self.num_evals:].numpy()
-
+            evals = all_evals[-self.num_evals :].numpy()
+            evecs = all_evecs[-self.num_evals :].numpy()
 
             # Reverse the order of the eigenvalues and vectors
             evals = evals[::-1]
@@ -353,7 +350,7 @@ class BetweenLayerCovarianceAccumulator:
 
         return results
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict with named_pairs keys, with corresponding values :python:`{"evals": eigenvalues_of_cov_matrix, "evecs": eigenvectors_of_cov_matrix, "matrix": cov_matrix}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [covariance_accumulator_instance], ...)`).
         """

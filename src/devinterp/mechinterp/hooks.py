@@ -1,7 +1,6 @@
 import textwrap
-from typing import Iterator, List, Tuple, Union
+from typing import Iterator, List, Tuple
 
-import torch
 from torch import nn
 from torch.nn.modules.module import Module
 

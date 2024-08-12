@@ -9,12 +9,12 @@ class OnlineLossStatistics(SamplerCallback):
     """
     Derivative callback that computes various loss statistics for :func:`~devinterp.slt.llc.OnlineLLCEstimator`. Must
     be called after the base :func:`~devinterp.slt.llc.OnlineLLCEstimator` has been called at each draw.
-    
-    .. |colab5| image:: https://colab.research.google.com/assets/colab-badge.svg 
+
+    .. |colab5| image:: https://colab.research.google.com/assets/colab-badge.svg
         :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb
-        
+
     See `the diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| for examples on how to use this to diagnose your sample health.
-        
+
     :param base_callback: Base callback that computes original loss metric.
     :type base_callback: :func:`~devinterp.slt.llc.OnlineLLCEstimator`
 
@@ -49,7 +49,7 @@ class OnlineLossStatistics(SamplerCallback):
             (self.num_chains, self.num_draws), dtype=torch.float32
         )
 
-    def __call__(self, chain: int, draw: int, loss: float):
+    def __call__(self, chain: int, draw: int, loss: float, **kwargs):
         self.update(chain, draw, loss)
 
     def update(self, chain: int, draw: int, loss: float):
@@ -76,7 +76,7 @@ class OnlineLossStatistics(SamplerCallback):
         else:
             self.z_scores[chain, draw] = float("nan")
 
-    def sample(self):
+    def get_results(self):
         """
         :returns: A dict :python:`{"loss/percent_neg_steps": percent_neg_steps, "loss/percent_mean_neg_steps": percent_mean_neg_steps, "loss/percent_thresholded_neg_steps": percent_thresholded_neg_steps, "loss/z_scores": z_scores}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance, online_loss_stats_instance], ...)`)
         """
@@ -94,9 +94,9 @@ class OnlineLossStatistics(SamplerCallback):
 
     def loss_hist_by_draw(self, draw: int = 0, bins: int = 10):
         """Plots a histogram of chain losses for a given draw index.
-        
+
         :param draw: Draw index to plot histogram for. Default is 0
-        :type draw: int, optional   
+        :type draw: int, optional
         :param bins: number of histogram bins. Default is 10
         :type bins: int, optional
         """

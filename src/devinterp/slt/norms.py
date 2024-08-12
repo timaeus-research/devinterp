@@ -1,4 +1,5 @@
 from typing import Union
+
 import torch
 import torch.nn as nn
 
@@ -35,21 +36,20 @@ class WeightNorm(SamplerCallback):
         self.p_norm = p_norm
         self.device = device
 
-    def __call__(self, chain: int, draw: int, model: nn.Module):
+    def __call__(self, chain: int, draw: int, model: nn.Module, **kwargs):
         self.update(chain, draw, model)
 
     def update(self, chain: int, draw: int, model: nn.Module):
         total_norm = torch.tensor(0.0).to(self.device)
         for param in model.parameters():
-            total_norm += torch.square(torch.linalg.vector_norm(param, ord=self.p_norm)).to(
-                self.device
-            )
+            total_norm += torch.square(
+                torch.linalg.vector_norm(param, ord=self.p_norm)
+            ).to(self.device)
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
         self.weight_norms[chain, draw] = total_norm
 
-    def sample(self):
-        """:returns: A dict :python:`{"weight_norm/trace": weight_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [weight_norm_instance], ...)`)
-        """
+    def get_results(self):
+        """:returns: A dict :python:`{"weight_norm/trace": weight_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [weight_norm_instance], ...)`)"""
         return {
             "weight_norm/trace": self.weight_norms.cpu().numpy(),
         }
@@ -84,21 +84,20 @@ class GradientNorm(SamplerCallback):
         self.p_norm = p_norm
         self.device = device
 
-    def __call__(self, chain: int, draw: int, model: nn.Module):
+    def __call__(self, chain: int, draw: int, model: nn.Module, **kwargs):
         self.update(chain, draw, model)
 
     def update(self, chain: int, draw: int, model: nn.Module):
         total_norm = torch.tensor(0.0).to(self.device)
         for param in model.parameters():
-            total_norm += torch.square(torch.linalg.vector_norm(param.grad, ord=self.p_norm)).to(
-                self.device
-            )
+            total_norm += torch.square(
+                torch.linalg.vector_norm(param.grad, ord=self.p_norm)
+            ).to(self.device)
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
         self.gradient_norms[chain, draw] = total_norm
 
-    def sample(self):
-        """:returns: A dict :python:`{"gradient_norm/trace": gradient_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [grad_norm_instance], ...)`)
-        """
+    def get_results(self):
+        """:returns: A dict :python:`{"gradient_norm/trace": gradient_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [grad_norm_instance], ...)`)"""
         return {
             "gradient_norm/trace": self.gradient_norms.cpu().numpy(),
         }
@@ -133,21 +132,20 @@ class NoiseNorm(SamplerCallback):
         self.p_norm = p_norm
         self.device = device
 
-    def __call__(self, chain: int, draw: int, optimizer: SGLD):
+    def __call__(self, chain: int, draw: int, optimizer: SGLD, **kwargs):
         self.update(chain, draw, optimizer)
 
     def update(self, chain: int, draw: int, optimizer: SGLD):
         total_norm = torch.tensor(0.0).to(self.device)
         for noise in optimizer.noise:
-            total_norm += torch.square(torch.linalg.vector_norm(noise, ord=self.p_norm)).to(
-                self.device
-            )
+            total_norm += torch.square(
+                torch.linalg.vector_norm(noise, ord=self.p_norm)
+            ).to(self.device)
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
         self.noise_norms[chain, draw] = total_norm
 
-    def sample(self):
-        """:returns: A dict :python:`{"noise_norm/trace": noise_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [noise_norm_instance], ...)`)
-        """
+    def get_results(self):
+        """:returns: A dict :python:`{"noise_norm/trace": noise_norms}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [noise_norm_instance], ...)`)"""
         return {
             "noise_norm/trace": self.noise_norms.cpu().numpy(),
         }

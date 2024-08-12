@@ -1,4 +1,5 @@
-from typing import Union, List
+from typing import List, Union
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,10 +16,10 @@ def mala_acceptance_probability(
     current_grads: Union[Tensor, List[Tensor]],
     current_loss: Tensor,
     learning_rate: float,
-):
+) -> float:
     """
-    Calculate the acceptance probability for a MALA transition. Parameters and 
-    gradients can either all be given as a tensor (all of the same shape) or 
+    Calculate the acceptance probability for a MALA transition. Parameters and
+    gradients can either all be given as a tensor (all of the same shape) or
     all as lists of tensors (eg the parameters of a Module).
 
     Args:
@@ -33,17 +34,20 @@ def mala_acceptance_probability(
     Returns:
     float: Acceptance probability for the proposed transition.
     """
-    if np.isnan(current_loss):
+    if current_loss is np.array:
+        current_loss = torch.tensor(current_loss)
+
+    if torch.isnan(current_loss):
         return np.nan
-    
+
     # convert tensors to lists with one element
-    if not isinstance(prev_params, list): 
+    if not isinstance(prev_params, list):
         prev_params = [prev_params]
-    if not isinstance(prev_grads, list): 
+    if not isinstance(prev_grads, list):
         prev_grads = [prev_grads]
-    if not isinstance(current_params, list): 
+    if not isinstance(current_params, list):
         current_params = [current_params]
-    if not isinstance(current_grads, list): 
+    if not isinstance(current_grads, list):
         current_grads = [current_grads]
 
     log_q_current_to_prev = 0
@@ -76,7 +80,7 @@ class MalaAcceptanceRate(SamplerCallback):
     Attributes:
         num_draws (int): Number of samples to draw. (should be identical to param passed to sample())
         num_chains (int): Number of chains to run. (should be identical to param passed to sample())
-        temperature (float): Temperature used to calculate the LLC.
+        nbeta (float): Effective Inverse Temperature used to calculate the LLC.
         learning_rate (int): Learning rate of the model.
         device (Union[torch.device, str]): Device to perform computations on, e.g., 'cpu' or 'cuda'.
     """
@@ -85,14 +89,14 @@ class MalaAcceptanceRate(SamplerCallback):
         self,
         num_chains: int,
         num_draws: int,
-        temperature: float,
+        nbeta: float,
         learning_rate: float,
         device: Union[torch.device, str] = "cpu",
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
         self.learning_rate = learning_rate
-        self.temperature = temperature
+        self.nbeta = nbeta
         self.mala_acceptance_rate = torch.zeros(
             (num_chains, num_draws - 1), dtype=torch.float32
         ).to(device)
@@ -103,7 +107,9 @@ class MalaAcceptanceRate(SamplerCallback):
         self.prev_grads = []
         self.prev_mala_loss = 0.0
 
-    def __call__(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
+    def __call__(
+        self, chain: int, draw: int, model: nn.Module, loss: float, optimizer, **kwargs
+    ):
         self.update(chain, draw, model, loss, optimizer)
 
     def update(self, chain: int, draw: int, model: nn.Module, loss: float, optimizer):
@@ -111,18 +117,16 @@ class MalaAcceptanceRate(SamplerCallback):
         # (so we update those only after the calculation)
         self.current_grads = optimizer.dws
         # mala acceptance loss is different from pytorch supplied loss
-        mala_loss = (loss * self.temperature).item() + optimizer.localization_loss
+        mala_loss = (loss * self.nbeta).item() + optimizer.localization_loss
         if draw > 1:
-            self.mala_acceptance_rate[chain, draw - 1] = (
-                mala_acceptance_probability(
-                    self.prev_params,
-                    self.prev_grads,
-                    self.prev_mala_loss,
-                    self.current_params,
-                    self.current_grads,
-                    mala_loss,
-                    self.learning_rate,
-                )
+            self.mala_acceptance_rate[chain, draw - 1] = mala_acceptance_probability(
+                self.prev_params,
+                self.prev_grads,
+                self.prev_mala_loss,
+                self.current_params,
+                self.current_grads,
+                mala_loss,
+                self.learning_rate,
             )
         # move new -> old, then update new after
         self.prev_params = self.current_params
@@ -130,10 +134,12 @@ class MalaAcceptanceRate(SamplerCallback):
         self.prev_mala_loss = mala_loss
         # params update only at the end, as decribed
         self.current_params = [
-            param.clone().detach() for param in model.parameters() if param.requires_grad
+            param.clone().detach()
+            for param in model.parameters()
+            if param.requires_grad
         ]
 
-    def sample(self):
+    def get_results(self):
         return {
             "mala_accept/trace": self.mala_acceptance_rate.cpu().numpy(),
             "mala_accept/mean": np.mean(self.mala_acceptance_rate.cpu().numpy()),

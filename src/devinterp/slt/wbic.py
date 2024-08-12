@@ -7,7 +7,7 @@ from devinterp.slt.callback import SamplerCallback
 
 class OnlineWBICEstimator(SamplerCallback):
     """
-    Callback for estimating the Widely Applicable Bayesian Information Criterion (WBIC) in an online fashion. 
+    Callback for estimating the Widely Applicable Bayesian Information Criterion (WBIC) in an online fashion.
     The WBIC used here is just $n * (\textrm{average sampled loss})$. (Watanabe, 2013)
 
     :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
@@ -53,8 +53,8 @@ class OnlineWBICEstimator(SamplerCallback):
         self.wbic_means = self.wbics.mean(axis=0)
         self.wbic_stds = self.wbics.std(axis=0)
 
-    def sample(self):
-        """    
+    def get_results(self):
+        """
         :returns: A dict :python:`{"wbic/means": wbic_means, "wbic/stds": wbic_stds, "wbic/trace": wbic_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [wbic_estimator_instance], ...)`).
         """
         return {
@@ -64,5 +64,6 @@ class OnlineWBICEstimator(SamplerCallback):
             "loss/trace": self.losses.cpu().numpy(),
         }
 
-    def __call__(self, chain: int, draw: int, loss: float):
+    def __call__(self, chain: int, draw: int, loss: float, **kwargs):
+        # The **kwargs is to ignore any additional arguments passed to the callback via **locals() from SGLD.
         self.update(chain, draw, loss)
