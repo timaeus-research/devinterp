@@ -3,7 +3,6 @@ from pprint import pp
 import numpy as np
 import pytest
 import torch
-from datasets import load_dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformer_lens.utils import lm_cross_entropy_loss, tokenize_and_concatenate
@@ -15,9 +14,12 @@ from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
 
 
 def _test_hf(model, dataset, device: str):
+
     assert (
         USE_TPU_BACKEND
     ), "This test is intended to run using TPU, feel free to ignore failure if unavailable"
+    import torch_xla.core.xla_model as xm
+    from datasets import load_dataset
 
     set_seed(1)
 
@@ -104,7 +106,6 @@ def _test_hf(model, dataset, device: str):
 @pytest.mark.tpu
 @pytest.mark.slow
 def test_hf():
-    import torch_xla.core.xla_model as xm
 
     # Load the model and tokenizer
     model = AutoModelForCausalLM.from_pretrained("roneneldan/TinyStories-1M")
