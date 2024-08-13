@@ -32,8 +32,8 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_math_dollar",
     "sphinx.ext.autosectionlabel",
-    'sphinx.ext.githubpages',
-    ]
+    "sphinx.ext.githubpages",
+]
 autosectionlabel_prefix_document = True
 mathjax_config = {
     "tex2jax": {
@@ -93,7 +93,7 @@ def setup(app):
     app.connect("builder-inited", run_apidoc)
 
     app.add_js_file("custom.js")
-    
+
 
 extensions = [
     "myst_parser",

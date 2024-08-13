@@ -7,7 +7,16 @@ def generate_docs(source_dir, output_dir):
         os.makedirs(output_dir)
 
     # Generate the autosummary files
-    subprocess.run(["sphinx-apidoc", "-o", output_dir, source_dir, "./src/devinterp/mechinterp", "--force"])
+    subprocess.run(
+        [
+            "sphinx-apidoc",
+            "-o",
+            output_dir,
+            source_dir,
+            "./src/devinterp/mechinterp",
+            "--force",
+        ]
+    )
 
     # Modify the generated files to include automodule directives
     for root, _, files in os.walk(output_dir):
