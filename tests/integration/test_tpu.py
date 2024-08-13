@@ -3,7 +3,6 @@ from pprint import pp
 import numpy as np
 import pytest
 import torch
-import torch_xla.core.xla_model as xm
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -105,6 +104,8 @@ def _test_hf(model, dataset, device: str):
 @pytest.mark.tpu
 @pytest.mark.slow
 def test_hf():
+    import torch_xla.core.xla_model as xm
+
     # Load the model and tokenizer
     model = AutoModelForCausalLM.from_pretrained("roneneldan/TinyStories-1M")
     tokenizer = AutoTokenizer.from_pretrained("roneneldan/TinyStories-1M")
