@@ -57,6 +57,7 @@ def generated_rrr_dataset(m, n):
     return train_dataloader, train_data, x, y
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize(
     "m,h,n",

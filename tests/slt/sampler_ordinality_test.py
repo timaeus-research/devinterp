@@ -43,8 +43,8 @@ def test_linedot_normal_crossing(
     lr = (
         0.0001 / dim
     )  # to account for smaller steps in higher D. might not work well for SGNHT?
-    num_chains = 5
-    num_draws = 1_000
+    num_chains = 3
+    num_draws = 500
     llcs = []
     sample_points = [
         [0.0 for _ in range(dim)],

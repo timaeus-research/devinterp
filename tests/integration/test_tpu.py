@@ -1,6 +1,7 @@
 from pprint import pp
 
 import numpy as np
+import pytest
 import torch
 import torch_xla.core.xla_model as xm
 from datasets import load_dataset
@@ -101,6 +102,8 @@ def _test_hf(model, dataset, device: str):
     return metrics
 
 
+@pytest.mark.tpu
+@pytest.mark.slow
 def test_hf():
     # Load the model and tokenizer
     model = AutoModelForCausalLM.from_pretrained("roneneldan/TinyStories-1M")

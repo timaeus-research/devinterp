@@ -96,6 +96,7 @@ SETS_TO_TEST = [
 ]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("powers,lr,localization,accept_prob", SETS_TO_TEST)
 def test_mala_callback_closeness(
     generated_normalcrossing_dataset,
