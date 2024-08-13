@@ -95,7 +95,7 @@ class SGLD(torch.optim.Optimizer):
     ):
         if temperature is not None:
             nbeta = temperature
-            warnings.warn("Temperature is deprecated. Please pass in nbeta as an argument instead.")
+            warnings.warn("Temperature is deprecated. Please use nbeta in your yaml file instead.")
 
         if noise_level != 1.0:
             warnings.warn(
@@ -141,7 +141,7 @@ class SGLD(torch.optim.Optimizer):
                 if group[hp] is not False:
                     group[hp] = torch.tensor(0.0).to(p.device)
 
-    def step(self, closure=None):
+    def step(self, noise_generator: Optional[torch.Generator] = None):
         """
         Perform a single SGLD optimization step.
         """
@@ -204,6 +204,7 @@ class SGLD(torch.optim.Optimizer):
                         std=group["noise_level"],
                         size=dw.size(),
                         device=dw.device,
+                        generator=noise_generator,
                     )
                     if self.save_noise:
                         # Noise saved here is the unscaled noise.
