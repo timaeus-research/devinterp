@@ -24,6 +24,7 @@ from devinterp.utils import (
     prepare_input,
     split_results,
 )
+import cloudpickle
 
 def sample_single_chain(
     ref_model: nn.Module,
@@ -125,7 +126,9 @@ def sample_single_chain(
 
 
 def _sample_single_chain(kwargs):
-    return sample_single_chain(**kwargs)
+    evaluate = cloudpickle.loads(kwargs["evaluate"])
+    kwargs = {k: v for k, v in kwargs.items() if k != "evaluate"}
+    return sample_single_chain(**kwargs, evaluate=evaluate)
 
 def get_args(chain_idx, seeds, shared_kwargs):
     return dict(
@@ -234,7 +237,7 @@ def sample(
             setattr(callback, "init_loss", init_loss)
 
     if cores is None:
-        cores = 1
+        cores = min(cpu_count(), 4)
 
     if seed is not None:
         warnings.warn(
@@ -250,7 +253,7 @@ def sample(
         seeds = [None] * num_chains
 
     if evaluate is None:
-
+        # NOTE: If you'd like to update evaluate, please update _sample_single_chain as well.
         def evaluate(model, data):
             return model(data)
 
@@ -259,7 +262,7 @@ def sample(
     shared_kwargs = dict(
         ref_model=model,
         loader=loader,
-        evaluate=evaluate,
+        evaluate=cloudpickle.dumps(evaluate),
         num_draws=num_draws,
         num_burnin_steps=num_burnin_steps,
         num_steps_bw_draws=num_steps_bw_draws,
@@ -274,13 +277,16 @@ def sample(
     )
 
     if cores > 1:
-        mp.spawn(
-            _sample_single_chain_mp,
-            args=(seeds, shared_kwargs),
-            nprocs=cores,
-            join=True,
-            start_method="spawn",
-        )
+        # mp.spawn(
+        #     _sample_single_chain_mp,
+        #     args=(seeds, shared_kwargs),
+        #     nprocs=cores,
+        #     join=True,
+        #     start_method="spawn",
+        # )
+        ctx = get_context("spawn")
+        with ctx.Pool(cores) as pool:
+            pool.map(_sample_single_chain, [get_args(i, seeds, shared_kwargs) for i in range(num_chains)])
     else:
         for i in range(num_chains):
             _sample_single_chain(get_args(i, seeds, shared_kwargs))
