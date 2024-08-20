@@ -1,6 +1,6 @@
 import warnings
 from typing import Callable, Union, Optional
-
+from collections import defaultdict
 import torch
 
 
@@ -146,14 +146,14 @@ class SGLD(torch.optim.Optimizer):
         Perform a single SGLD optimization step.
         """
         if self.save_noise:
-            self.noise = []
+            self.noise = defaultdict(list)
 
         if self.save_mala_vars:
             self.dws = []
             self.localization_loss = 0.0
 
         with torch.no_grad():
-            for group in self.param_groups:
+            for group_idx, group in enumerate(self.param_groups):
                 for hp in ["noise_norm", "grad_norm", "distance", "weight_norm"]:
                     # Zero iteration-level metrics that haven't been disabled.
                     if group[hp] is not False:
@@ -208,7 +208,7 @@ class SGLD(torch.optim.Optimizer):
                     )
                     if self.save_noise:
                         # Noise saved here is the unscaled noise.
-                        self.noise.append(noise)
+                        self.noise[group_idx].append(noise)
 
                     if group["optimize_over"] is not None:
                         # Restrict the noise and gradient to the subset of parameters we're optimizing over.

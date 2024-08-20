@@ -2,6 +2,7 @@ from typing import Union
 
 import torch
 import torch.nn as nn
+from torch.optim.optimizer import Optimizer
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback
@@ -84,15 +85,16 @@ class GradientNorm(SamplerCallback):
         self.p_norm = p_norm
         self.device = device
 
-    def __call__(self, chain: int, draw: int, model: nn.Module, **kwargs):
-        self.update(chain, draw, model)
+    def __call__(self, chain: int, draw: int, optimizer: Optimizer, **kwargs):
+        self.update(chain, draw, optimizer.param_groups)
 
-    def update(self, chain: int, draw: int, model: nn.Module):
+    def update(self, chain: int, draw: int, param_groups: dict):
         total_norm = torch.tensor(0.0).to(self.device)
-        for param in model.parameters():
-            total_norm += torch.square(
-                torch.linalg.vector_norm(param.grad, ord=self.p_norm)
-            ).to(self.device)
+        for group in param_groups:
+            for param in group["params"]:
+                total_norm += torch.square(
+                    torch.linalg.vector_norm(param.grad * 0.5 * group["lr"], ord=self.p_norm)
+                ).to(self.device)
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
         self.gradient_norms[chain, draw] = total_norm
 
@@ -137,10 +139,12 @@ class NoiseNorm(SamplerCallback):
 
     def update(self, chain: int, draw: int, optimizer: SGLD):
         total_norm = torch.tensor(0.0).to(self.device)
-        for noise in optimizer.noise:
-            total_norm += torch.square(
-                torch.linalg.vector_norm(noise, ord=self.p_norm)
-            ).to(self.device)
+
+        for group_idx, group_noises in optimizer.noise.items():
+            for noise in group_noises:
+                total_norm += torch.square(
+                    torch.linalg.vector_norm(noise * optimizer.param_groups[group_idx]["lr"]**0.5, ord=self.p_norm)
+                ).to(self.device)
         total_norm = torch.pow(total_norm, 1 / self.p_norm)
         self.noise_norms[chain, draw] = total_norm
 
