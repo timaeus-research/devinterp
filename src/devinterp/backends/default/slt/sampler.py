@@ -137,18 +137,6 @@ def get_args(chain_idx, seeds, shared_kwargs):
         **shared_kwargs,
     )
 
-def _sample_single_chain_mp(rank: int, seeds, shared_kwargs: dict):
-    """
-    Samples a single chain with the given rank and keyword arguments.
-    :param rank: The rank of the chain.
-    :type rank: int
-    :param shared_kwargs: Fixed keyword arguments for the chain. These don't differ based on rank.
-    :type shared_kwargs: dict
-    """
-    print(f"Starting chain {rank}.")
-    all_kwargs = get_args(rank, seeds, shared_kwargs)
-    return sample_single_chain(**all_kwargs)
-
 def sample(
     model: torch.nn.Module,
     loader: DataLoader,
