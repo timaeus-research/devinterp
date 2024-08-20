@@ -7,6 +7,8 @@ import torch
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
 import torch.multiprocessing as mp
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -157,7 +159,7 @@ def sample(
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
     grad_accum_steps: int = 1,
-    devices: Union[int, List[Union[str, torch.device]]] = 1,
+    cores: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
@@ -166,7 +168,7 @@ def sample(
     **kwargs,
 ):
     """
-    Sample model weights using a given sampling_method, supporting multiple chains/devices,
+    Sample model weights using a given sampling_method, supporting multiple chains/cores,
     and calculate the observables (loss, llc, etc.) for each callback passed along.
     The :python:`update`, :python:`finalize` and :python:`sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called
     during sampling, after sampling, and at :python:`sampler_callback_object.get_results()` respectively.
@@ -195,8 +197,8 @@ def sample(
     :type num_steps_bw_draws: int, optional
     :param init_loss: Initial loss for use in `LLCEstimator` and `OnlineLLCEstimator`
     :type init_loss: float, optional
-    :param devices: Number or list of devices for parallel execution. Default is 1
-    :type devices: int, optional
+    :param cores: Number or list of cores for parallel execution. Default is 1
+    :type cores: int, optional
     :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed. Default is None
     :type seed: int, optional
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
@@ -231,8 +233,8 @@ def sample(
         if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
             setattr(callback, "init_loss", init_loss)
 
-    if devices is None:
-        devices = min(4, cpu_count())
+    if cores is None:
+        cores = 1
 
     if seed is not None:
         warnings.warn(
@@ -271,11 +273,11 @@ def sample(
         optimize_over_per_model_param=optimize_over_per_model_param,
     )
 
-    if devices > 1:
+    if cores > 1:
         mp.spawn(
             _sample_single_chain_mp,
             args=(seeds, shared_kwargs),
-            nprocs=devices,
+            nprocs=cores,
             join=True,
             start_method="spawn",
         )
