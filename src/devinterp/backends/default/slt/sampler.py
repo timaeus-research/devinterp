@@ -228,8 +228,10 @@ def sample(
     if optimizer_kwargs is not None and ("nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs):
         print("If you're setting a nbeta in optimizer_kwargs, please also make sure to set it in the callbacks.")
 
+    device = torch.device(device)
     if cores is None:
         cores = min(cpu_count(), 4)
+
 
     if seed is not None:
         warnings.warn(
@@ -276,6 +278,9 @@ def sample(
         #     join=True,
         #     start_method="spawn",
         # )
+        if device.type == "gpu":
+            print("Using multiprocessing with a single GPU. Multi-GPU support is not yet available.")
+
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
             pool.map(_sample_single_chain, [get_args(i, seeds, shared_kwargs) for i in range(num_chains)])
