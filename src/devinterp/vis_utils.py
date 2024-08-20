@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm, trange
 
 from devinterp.slt.mala import MalaAcceptanceRate
-from devinterp.utils import optimal_nbeta
+from devinterp.utils import default_nbeta
 
 
 # Sampling config validates input parameters while allowing us to use **kwargs later on
@@ -69,7 +69,7 @@ class SweepConfig(BaseModel):
         else:
             if dataloader is not None:
                 # Calculate default beta (inverse temperature) range.
-                optimal_beta = optimal_nbeta(dataloader)
+                optimal_beta = default_nbeta(dataloader)
                 if min_beta is None:
                     min_beta = 1e-2 * optimal_beta
                 if max_beta is None:

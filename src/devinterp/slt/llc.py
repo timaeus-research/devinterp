@@ -21,7 +21,7 @@ class LLCEstimator(SamplerCallback):
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
     :type device: str | torch.device, optional
@@ -98,7 +98,7 @@ class OnlineLLCEstimator(SamplerCallback):
     :type num_draws: int
     :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
     :type num_chains: int
-    :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
     :type device: str | torch.device, optional

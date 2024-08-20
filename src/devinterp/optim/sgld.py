@@ -26,7 +26,7 @@ class SGLD(torch.optim.Optimizer):
     and $\sigma$ is the noise term.
 
     Example:
-        >>> optimizer = SGLD(model.parameters(), lr=0.1, nbeta=utils.optimal_nbeta(dataloader))
+        >>> optimizer = SGLD(model.parameters(), lr=0.1, nbeta=utils.default_nbeta(dataloader))
 
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
@@ -50,7 +50,7 @@ class SGLD(torch.optim.Optimizer):
     :type weight_decay: float, optional
     :param localization: Strength of the force $\gamma$ pulling weights back to their initial values. Default is 0
     :type localization: float, optional
-    :param nbeta: Inverse reparameterized temperature (otherwise known as n*beta or ~beta), float (default: 1., set to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param nbeta: Inverse reparameterized temperature (otherwise known as n*beta or ~beta), float (default: 1., set to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory in parameter space. Default is None, in which case no bounding box is used.
     :type bounding_box_size: float, optional
@@ -103,7 +103,7 @@ class SGLD(torch.optim.Optimizer):
             )
         if nbeta == 1.0:
             warnings.warn(
-                "Warning: nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_nbeta(dataloader) instead"
+                "Warning: nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.default_nbeta(dataloader) instead"
             )
         defaults = dict(
             lr=lr,

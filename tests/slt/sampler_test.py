@@ -9,7 +9,7 @@ from devinterp.optim.sgnht import SGNHT
 from devinterp.slt.llc import LLCEstimator
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
-from devinterp.utils import evaluate_mse, get_init_loss_multi_batch, optimal_nbeta
+from devinterp.utils import evaluate_mse, get_init_loss_multi_batch, default_nbeta
 
 
 @pytest.fixture
@@ -42,13 +42,13 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
     llc_estimator_1 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss,
     )
     llc_estimator_2 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss,
     )
     torch.manual_seed(42)
@@ -110,7 +110,7 @@ def unused_test_batch_size_convergence(
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
-            nbeta=optimal_nbeta(train_dataloader),
+            nbeta=default_nbeta(train_dataloader),
             init_loss=init_loss,
         )
         sample(
@@ -155,7 +155,7 @@ def test_grad_accum_convergence(
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
-            nbeta=optimal_nbeta(train_dataloader),
+            nbeta=default_nbeta(train_dataloader),
             init_loss=init_loss,
         )
         sample(

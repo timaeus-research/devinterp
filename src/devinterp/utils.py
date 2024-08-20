@@ -81,7 +81,7 @@ def plot_trace(
     plt.show()
 
 
-def optimal_nbeta(dataloader: Union[DataLoader, int]):
+def default_nbeta(dataloader: Union[DataLoader, int]):
     if isinstance(dataloader, DataLoader):
         return dataloader.batch_size / np.log(dataloader.batch_size)
     elif isinstance(dataloader, int):

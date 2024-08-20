@@ -9,7 +9,7 @@ from devinterp.utils import (
     USE_TPU_BACKEND,
     EvaluateFn,
     get_init_loss_multi_batch,
-    optimal_nbeta,
+    default_nbeta,
 )
 
 if USE_TPU_BACKEND:
@@ -43,7 +43,7 @@ def estimate_learning_coeff_with_summary(
     :param cores: Number of cores to use for parallel sampling. Can be either an integer (will use cores starting from device 0) or a list of cores.
     :type cores: int or list of torch.device or str
     """
-    optimizer_kwargs.setdefault("nbeta", optimal_nbeta(loader))
+    optimizer_kwargs.setdefault("nbeta", default_nbeta(loader))
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
             loader, num_chains, model, evaluate, device

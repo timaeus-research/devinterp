@@ -20,7 +20,7 @@ from devinterp.slt.norms import NoiseNorm
 from devinterp.utils import (
     EvaluateFn,
     get_init_loss_multi_batch,
-    optimal_nbeta,
+    default_nbeta,
     prepare_input,
     split_results,
 )
@@ -60,7 +60,7 @@ def sample_single_chain(
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
         optimizer_kwargs.setdefault("save_noise", True)
-    optimizer_kwargs.setdefault("nbeta", optimal_nbeta(loader))
+    optimizer_kwargs.setdefault("nbeta", default_nbeta(loader))
     if optimize_over_per_model_param:
         param_groups = []
         for name, parameter in model.named_parameters():
