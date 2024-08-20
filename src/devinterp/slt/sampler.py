@@ -44,7 +44,10 @@ def estimate_learning_coeff_with_summary(
     :type cores: int or list of torch.device or str
     """
 
-    if not("nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs):
+    # Temperature consistency warning
+    if "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs:
+        print("Using passed in nbeta. Make sure callbacks are also initialized with the same nbeta.")
+    else:
         print("nbeta not set - using default nbeta.")
 
     optimizer_kwargs.setdefault("nbeta", default_nbeta(loader))

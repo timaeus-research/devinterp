@@ -225,7 +225,7 @@ def sample(
             setattr(callback, "init_loss", init_loss)
     
     # Temperature consistency warning
-    if "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs:
+    if optimizer_kwargs is not None and ("nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs):
         print("If you're setting a nbeta in optimizer_kwargs, please also make sure to set it in the callbacks.")
 
     if cores is None:
