@@ -223,6 +223,10 @@ def sample(
     for callback in callbacks:
         if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
             setattr(callback, "init_loss", init_loss)
+    
+    # Temperature consistency warning
+    if "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs:
+        print("If you're setting a nbeta in optimizer_kwargs, please also make sure to set it in the callbacks.")
 
     if cores is None:
         cores = min(cpu_count(), 4)
