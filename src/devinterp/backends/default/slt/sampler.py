@@ -1,11 +1,12 @@
 import itertools
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Literal, Optional, Type, Union
+from typing import Dict, List, Literal, Optional, Type, Union, Callable
 
 import torch
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
+import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -21,7 +22,6 @@ from devinterp.utils import (
     prepare_input,
     split_results,
 )
-
 
 def sample_single_chain(
     ref_model: nn.Module,
@@ -42,7 +42,7 @@ def sample_single_chain(
     **kwargs,
 ):
     if grad_accum_steps > 1:
-        assert type(grad_accum_steps) == int, "grad_accum_steps must be an integer."
+        assert type(grad_accum_steps) is int, "grad_accum_steps must be an integer."
         num_steps_bw_draws *= grad_accum_steps
         num_burnin_steps *= grad_accum_steps
     if num_draws > len(loader):
@@ -125,6 +125,24 @@ def sample_single_chain(
 def _sample_single_chain(kwargs):
     return sample_single_chain(**kwargs)
 
+def get_args(chain_idx, seeds, shared_kwargs):
+    return dict(
+        chain=chain_idx,
+        seed=seeds[chain_idx],
+        **shared_kwargs,
+    )
+
+def _sample_single_chain_mp(rank: int, seeds, shared_kwargs: dict):
+    """
+    Samples a single chain with the given rank and keyword arguments.
+    :param rank: The rank of the chain.
+    :type rank: int
+    :param shared_kwargs: Fixed keyword arguments for the chain. These don't differ based on rank.
+    :type shared_kwargs: dict
+    """
+    print(f"Starting chain {rank}.")
+    all_kwargs = get_args(rank, seeds, shared_kwargs)
+    return sample_single_chain(**all_kwargs)
 
 def sample(
     model: torch.nn.Module,
@@ -139,7 +157,7 @@ def sample(
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
     grad_accum_steps: int = 1,
-    cores: int = 1,
+    devices: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
@@ -148,7 +166,7 @@ def sample(
     **kwargs,
 ):
     """
-    Sample model weights using a given sampling_method, supporting multiple chains/cores,
+    Sample model weights using a given sampling_method, supporting multiple chains/devices,
     and calculate the observables (loss, llc, etc.) for each callback passed along.
     The :python:`update`, :python:`finalize` and :python:`sample` methods of each :func:`~devinterp.slt.callback.SamplerCallback` are called
     during sampling, after sampling, and at :python:`sampler_callback_object.get_results()` respectively.
@@ -177,8 +195,8 @@ def sample(
     :type num_steps_bw_draws: int, optional
     :param init_loss: Initial loss for use in `LLCEstimator` and `OnlineLLCEstimator`
     :type init_loss: float, optional
-    :param cores: Number of cores for parallel execution. Default is 1
-    :type cores: int, optional
+    :param devices: Number or list of devices for parallel execution. Default is 1
+    :type devices: int, optional
     :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed. Default is None
     :type seed: int, optional
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
@@ -213,8 +231,8 @@ def sample(
         if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
             setattr(callback, "init_loss", init_loss)
 
-    if cores is None:
-        cores = min(4, cpu_count())
+    if devices is None:
+        devices = min(4, cpu_count())
 
     if seed is not None:
         warnings.warn(
@@ -236,33 +254,34 @@ def sample(
 
     validate_callbacks(callbacks)
 
-    def get_args(i):
-        return dict(
-            chain=i,
-            seed=seeds[i],
-            ref_model=model,
-            loader=loader,
-            evaluate=evaluate,
-            num_draws=num_draws,
-            num_burnin_steps=num_burnin_steps,
-            num_steps_bw_draws=num_steps_bw_draws,
-            init_loss=init_loss,
-            grad_accum_steps=grad_accum_steps,
-            sampling_method=sampling_method,
-            optimizer_kwargs=optimizer_kwargs,
-            device=device,
-            verbose=verbose,
-            callbacks=callbacks,
-            optimize_over_per_model_param=optimize_over_per_model_param,
-        )
+    shared_kwargs = dict(
+        ref_model=model,
+        loader=loader,
+        evaluate=evaluate,
+        num_draws=num_draws,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_bw_draws=num_steps_bw_draws,
+        init_loss=init_loss,
+        grad_accum_steps=grad_accum_steps,
+        sampling_method=sampling_method,
+        optimizer_kwargs=optimizer_kwargs,
+        device=device,
+        verbose=verbose,
+        callbacks=callbacks,
+        optimize_over_per_model_param=optimize_over_per_model_param,
+    )
 
-    if cores > 1:
-        ctx = get_context("spawn")
-        with ctx.Pool(cores) as pool:
-            pool.map(_sample_single_chain, [get_args(i) for i in range(num_chains)])
+    if devices > 1:
+        mp.spawn(
+            _sample_single_chain_mp,
+            args=(seeds, shared_kwargs),
+            nprocs=devices,
+            join=True,
+            start_method="spawn",
+        )
     else:
         for i in range(num_chains):
-            _sample_single_chain(get_args(i))
+            _sample_single_chain(get_args(i, seeds, shared_kwargs))
 
     for callback in callbacks:
         if hasattr(callback, "finalize"):

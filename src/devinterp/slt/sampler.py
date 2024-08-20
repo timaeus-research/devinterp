@@ -31,13 +31,18 @@ def estimate_learning_coeff_with_summary(
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
     grad_accum_steps: int = 1,
-    cores: int = 1,
+    devices: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
     online: bool = False,
 ) -> dict:
+    """
+    Estimates the local learning coefficient and returns a dictionary of results.
+    :param devices: Number of devices to use for parallel sampling. Can be either an integer (will use devices starting from device 0) or a list of devices. Note that this only works for GPU devices - CPU multiprocessing is not currently supported.
+    :type devices: int or list of torch.device or str
+    """
     optimizer_kwargs.setdefault("nbeta", optimal_nbeta(loader))
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
@@ -75,7 +80,7 @@ def estimate_learning_coeff_with_summary(
         num_burnin_steps=num_burnin_steps,
         num_steps_bw_draws=num_steps_bw_draws,
         grad_accum_steps=grad_accum_steps,
-        cores=cores,
+        devices=devices,
         seed=seed,
         device=device,
         verbose=verbose,
@@ -105,7 +110,7 @@ def estimate_learning_coeff(
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
     grad_accum_steps: int = 1,
-    cores: int = 1,
+    devices: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
@@ -122,7 +127,7 @@ def estimate_learning_coeff(
         num_burnin_steps=num_burnin_steps,
         num_steps_bw_draws=num_steps_bw_draws,
         grad_accum_steps=grad_accum_steps,
-        cores=cores,
+        devices = 1,
         seed=seed,
         device=device,
         verbose=verbose,
