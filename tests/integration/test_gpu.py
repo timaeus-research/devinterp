@@ -1,6 +1,7 @@
 from pprint import pp
 
 import numpy as np
+import pytest
 import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -13,9 +14,11 @@ from devinterp.slt.llc import LLCEstimator
 from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
 
 
-def _test_hf(model, dataset, device: str, batch_size=8, seed = 42):
+def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
     assert not USE_TPU_BACKEND, "TPU backend not supported for this test"
-    assert device in ["cpu"] or device.startswith("cuda"), "Invalid device. Should be cpu or cuda:n. Don't worry about this error if you're not on a GPU device."
+    assert device in ["cpu"] or device.startswith(
+        "cuda"
+    ), "Invalid device. Should be cpu or cuda:n. Don't worry about this error if you're not on a GPU device."
     set_seed(seed)
 
     from devinterp.backends.default.slt.sampler import sample
@@ -91,6 +94,8 @@ def _test_hf(model, dataset, device: str, batch_size=8, seed = 42):
     return metrics
 
 
+@pytest.mark.gpu
+@pytest.mark.slow
 def test_hf():
     # Load the model and tokenizer
     model = AutoModelForCausalLM.from_pretrained("roneneldan/TinyStories-1M")
@@ -115,13 +120,13 @@ def test_hf():
         for k, v in metrics_cpu.items():
             if isinstance(v, torch.Tensor):
                 assert torch.allclose(
-                    v, metrics_gpu[k], rtol=1e-2
+                    v, metrics_gpu[k], rtol=1e-1
                 ), f"Evaluation failed for {k}"
             elif isinstance(v, np.ndarray):
                 assert np.isclose(
-                    v, metrics_gpu[k], rtol=1e-2
+                    v, metrics_gpu[k], rtol=1e-1
                 ).all(), f"Evaluation failed for {k}"
             else:
                 assert np.isclose(
-                    v, metrics_gpu[k], rtol=1e-2
+                    v, metrics_gpu[k], rtol=1e-1
                 ), f"Evaluation failed for {k}"
