@@ -26,6 +26,7 @@ from devinterp.utils import (
 )
 import cloudpickle
 
+
 def sample_single_chain(
     ref_model: nn.Module,
     loader: DataLoader,
@@ -130,12 +131,14 @@ def _sample_single_chain(kwargs):
     kwargs = {k: v for k, v in kwargs.items() if k != "evaluate"}
     return sample_single_chain(**kwargs, evaluate=evaluate)
 
+
 def get_args(chain_idx, seeds, shared_kwargs):
     return dict(
         chain=chain_idx,
         seed=seeds[chain_idx],
         **shared_kwargs,
     )
+
 
 def sample(
     model: torch.nn.Module,
@@ -223,15 +226,18 @@ def sample(
     for callback in callbacks:
         if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
             setattr(callback, "init_loss", init_loss)
-    
+
     # Temperature consistency warning
-    if optimizer_kwargs is not None and ("nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs):
-        print("If you're setting a nbeta in optimizer_kwargs, please also make sure to set it in the callbacks.")
+    if optimizer_kwargs is not None and (
+        "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs
+    ):
+        warnings.warn(
+            "If you're setting a nbeta in optimizer_kwargs, please also make sure to set it in the callbacks."
+        )
 
     device = torch.device(device)
     if cores is None:
         cores = min(cpu_count(), 4)
-
 
     if seed is not None:
         warnings.warn(
@@ -279,11 +285,16 @@ def sample(
         #     start_method="spawn",
         # )
         if device.type == "gpu":
-            print("Using multiprocessing with a single GPU. Multi-GPU support is not yet available.")
+            print(
+                "Using multiprocessing with a single GPU. Multi-GPU support is not yet available."
+            )
 
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
-            pool.map(_sample_single_chain, [get_args(i, seeds, shared_kwargs) for i in range(num_chains)])
+            pool.map(
+                _sample_single_chain,
+                [get_args(i, seeds, shared_kwargs) for i in range(num_chains)],
+            )
     else:
         for i in range(num_chains):
             _sample_single_chain(get_args(i, seeds, shared_kwargs))
