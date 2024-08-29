@@ -1,3 +1,4 @@
+import os
 from pprint import pp
 
 import numpy as np
@@ -11,7 +12,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
 from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
-import os
 
 
 def _test_hf(model, dataset, device: str, batch_size=8, seed = 42, cores = 1):

@@ -1,13 +1,14 @@
 import itertools
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Literal, Optional, Type, Union, Callable
+from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
+import cloudpickle
 import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
-import torch.multiprocessing as mp
-import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -19,12 +20,11 @@ from devinterp.slt.mala import MalaAcceptanceRate
 from devinterp.slt.norms import NoiseNorm
 from devinterp.utils import (
     EvaluateFn,
-    get_init_loss_multi_batch,
     default_nbeta,
+    get_init_loss_multi_batch,
     prepare_input,
     split_results,
 )
-import cloudpickle
 
 
 def sample_single_chain(

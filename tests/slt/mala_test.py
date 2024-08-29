@@ -8,7 +8,7 @@ from devinterp.optim.sgld import SGLD
 from devinterp.slt.mala import MalaAcceptanceRate, mala_acceptance_probability
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
-from devinterp.utils import make_evaluate, default_nbeta
+from devinterp.utils import default_nbeta, make_evaluate
 
 
 class Polynomial(nn.Module):

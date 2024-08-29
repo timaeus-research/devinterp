@@ -1,12 +1,13 @@
-from typing import List, Union, Optional
+import warnings
+from typing import List, Optional, Union
 
 import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
 
-import warnings
 from devinterp.slt.callback import SamplerCallback
+
 
 def mala_acceptance_probability(
     prev_params: Union[Tensor, List[Tensor]],
@@ -103,7 +104,7 @@ class MalaAcceptanceRate(SamplerCallback):
             warnings.warn("Temperature is deprecated. Please use nbeta instead.")
         else:
             self.nbeta = nbeta
-            
+
         self.mala_acceptance_rate = torch.zeros(
             (num_chains, num_draws - 1), dtype=torch.float32
         ).to(device)

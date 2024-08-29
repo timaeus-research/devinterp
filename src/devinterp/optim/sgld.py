@@ -1,6 +1,7 @@
 import warnings
-from typing import Callable, Union, Optional
 from collections import defaultdict
+from typing import Callable, Optional, Union
+
 import torch
 
 
@@ -95,7 +96,9 @@ class SGLD(torch.optim.Optimizer):
     ):
         if temperature is not None:
             nbeta = temperature
-            warnings.warn("Temperature is deprecated. Please use nbeta in your yaml file instead.")
+            warnings.warn(
+                "Temperature is deprecated. Please use nbeta in your yaml file instead."
+            )
 
         if noise_level != 1.0:
             warnings.warn(

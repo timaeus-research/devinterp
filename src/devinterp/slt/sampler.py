@@ -1,3 +1,4 @@
+import warnings
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
 import torch
@@ -8,8 +9,8 @@ from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.utils import (
     USE_TPU_BACKEND,
     EvaluateFn,
-    get_init_loss_multi_batch,
     default_nbeta,
+    get_init_loss_multi_batch,
 )
 
 if USE_TPU_BACKEND:
@@ -46,9 +47,11 @@ def estimate_learning_coeff_with_summary(
 
     # Temperature consistency warning
     if "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs:
-        print("Using passed in nbeta. Make sure callbacks are also initialized with the same nbeta.")
+        warnings.warn(
+            "Using passed in nbeta. Make sure callbacks are also initialized with the same nbeta."
+        )
     else:
-        print("nbeta not set - using default nbeta.")
+        warnings.warn("nbeta not set - using default nbeta.")
 
     optimizer_kwargs.setdefault("nbeta", default_nbeta(loader))
     if not init_loss:
@@ -134,7 +137,7 @@ def estimate_learning_coeff(
         num_burnin_steps=num_burnin_steps,
         num_steps_bw_draws=num_steps_bw_draws,
         grad_accum_steps=grad_accum_steps,
-        cores = 1,
+        cores=1,
         seed=seed,
         device=device,
         verbose=verbose,

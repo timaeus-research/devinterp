@@ -8,7 +8,7 @@ from devinterp.backends.default.slt.sampler import sample
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
 from devinterp.test_utils import *
-from devinterp.utils import evaluate_mse, get_init_loss_multi_batch, default_nbeta
+from devinterp.utils import default_nbeta, evaluate_mse, get_init_loss_multi_batch
 
 
 def make_pop_loss_fn(true_model):

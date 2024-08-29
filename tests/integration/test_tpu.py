@@ -21,8 +21,9 @@ def _test_hf(model, dataset, device: str):
     set_seed(1)
 
     if device == "tpu":
-        from devinterp.backends.tpu.slt.sampler import sample
         import torch_xla.core.xla_model as xm
+
+        from devinterp.backends.tpu.slt.sampler import sample
 
         device = xm.xla_device()
 
