@@ -69,11 +69,11 @@ class SweepConfig(BaseModel):
         else:
             if dataloader is not None:
                 # Calculate default beta (inverse temperature) range.
-                optimal_beta = default_nbeta(dataloader)
+                default_beta = default_nbeta(dataloader)
                 if min_beta is None:
-                    min_beta = 1e-2 * optimal_beta
+                    min_beta = 1e-2 * default_beta
                 if max_beta is None:
-                    max_beta = 1e3 * optimal_beta
+                    max_beta = 1e3 * default_beta
             else:
                 if min_beta is None or max_beta is None:
                     raise ValueError(
