@@ -46,7 +46,7 @@ def sample_single_chain(
     **kwargs,
 ):
     if grad_accum_steps > 1:
-        assert type(grad_accum_steps) is int, "grad_accum_steps must be an integer."
+        assert isinstance(grad_accum_steps, int), "grad_accum_steps must be an integer."
         num_steps_bw_draws *= grad_accum_steps
         num_burnin_steps *= grad_accum_steps
     if num_draws > len(loader):
@@ -285,7 +285,7 @@ def sample(
         #     start_method="spawn",
         # )
         if device.type == "gpu":
-            print(
+            warnings.warn(
                 "Using multiprocessing with a single GPU. Multi-GPU support is not yet available."
             )
 
