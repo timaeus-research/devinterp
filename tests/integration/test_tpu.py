@@ -2,7 +2,6 @@ from pprint import pp
 
 import numpy as np
 import torch
-import torch_xla.core.xla_model as xm
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -22,6 +21,8 @@ def _test_hf(model, dataset, device: str):
     set_seed(1)
 
     if device == "tpu":
+        import torch_xla.core.xla_model as xm
+
         from devinterp.backends.tpu.slt.sampler import sample
 
         device = xm.xla_device()
