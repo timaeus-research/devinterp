@@ -7,6 +7,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+from torch import Generator
 
 try:
     import torch_xla.core.xla_model as xm
@@ -154,8 +155,16 @@ def split_results(results: EvalResults) -> Tuple[torch.Tensor, Any]:
 
     return loss, results
 
+def get_seeded_dataloader(dataloader, seed):
+    gen = torch.Generator()
+    gen.manual_seed(seed)
+    return torch.utils.data.DataLoader(dataloader.dataset, 
+                                       batch_size=dataloader.batch_size, 
+                                       generator=gen)
 
-def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device):
+def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device, seed = None):
+    if seed is not None:
+        dataloader = get_seeded_dataloader(dataloader, seed)
     model = model.to(device)
     model.train()  # to make sure we're using train loss, comparable to train loss of sampler()
 
@@ -167,7 +176,10 @@ def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device):
     return loss
 
 
-def get_init_loss_multi_batch(dataloader, n_batches, model, evaluate, device):
+def get_init_loss_multi_batch(dataloader, n_batches, model, evaluate, device, seed = None):
+    if seed is not None:
+        dataloader = get_seeded_dataloader(dataloader, seed)
+
     model = model.to(device)
     model.train()
     loss = 0.0
@@ -181,7 +193,10 @@ def get_init_loss_multi_batch(dataloader, n_batches, model, evaluate, device):
     return loss / n_batches
 
 
-def get_init_loss_full_batch(dataloader, model, evaluate, device):
+def get_init_loss_full_batch(dataloader, model, evaluate, device, seed = None):
+    if seed is not None:
+        dataloader = get_seeded_dataloader(dataloader, seed)
+    
     model = model.to(device)
     model.train()
     loss = 0.0

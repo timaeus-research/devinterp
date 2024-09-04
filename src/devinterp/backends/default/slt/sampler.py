@@ -155,7 +155,7 @@ def sample(
     grad_accum_steps: int = 1,
     cores: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    device: Union[torch.device, str] = torch.device("cpu"),
+    device: Union[torch.device, str, List[torch.device]] = torch.device("cpu"),
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
     batch_size: bool = 1,
@@ -218,8 +218,12 @@ def sample(
             "beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
         )
     if not init_loss:
+        if seed is not None and not isinstance(seed, int):
+            init_loss_seed = seed[0]
+        else:
+            init_loss_seed = seed
         init_loss = get_init_loss_multi_batch(
-            loader, num_chains, model, evaluate, device
+            loader, num_chains, model, evaluate, device, init_loss_seed,
         )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)

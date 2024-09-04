@@ -34,9 +34,9 @@ def estimate_learning_coeff_with_summary(
     grad_accum_steps: int = 1,
     cores: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    device: Union[torch.device, str] = torch.device("cpu"),
+    device: Union[torch.device, str, List[torch.device]] = torch.device("cpu"),
     verbose: bool = True,
-    optimize_over_per_model_param: Optional[Dict[str, torch.Tensor[bool]]] = None,
+    optimize_over_per_model_param: Optional[Dict[str, torch.Tensor]] = None,
     online: bool = False,
 ) -> dict:
     """
