@@ -36,13 +36,38 @@ def estimate_learning_coeff_with_summary(
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
+    optimize_over_per_model_param: Optional[Dict[str, torch.Tensor[bool]]] = None,
     online: bool = False,
 ) -> dict:
     """
     Estimates the local learning coefficient and returns a dictionary of results.
+
     :param cores: Number of cores to use for parallel sampling. Can be either an integer (will use cores starting from device 0) or a list of cores.
     :type cores: int or list of torch.device or str
+    :param seed: Seed for reproducibility. If a list of seeds is provided, each chain will be seeded with the corresponding seed. 
+    Otherwise, this parameter will be used as an offset that will be added to the chain index to seed each chain.
+    :type seed: int or list of int
+    :param device: Device to run the sampling on. Can be a torch.device or a string (e.g. "cuda:0"). Supports GPUs and TPUs. To use TPUs:
+    .. code-block:: python
+
+        import os
+        os.environ["USE_TPU_BACKEND"] = "1"
+        import torch_xla.core.xla_model as xm
+        DEVICE = xm.xla_device()
+    \
+    Also supports multi-GPU sampling. To use multiple GPUs, pass in a list of torch.device or strings (e.g. ["cuda:0", "cuda:1"]).
+
+    :type device: torch.device or str
+    :param verbose: Whether to display progress.
+    :type verbose: bool
+    :param optimize_over_per_model_param: Dictionary of booleans indicating whether to optimize over each parameter of the model. \
+    Keys are parameter names, and values are boolean tensors that match the shape of the parameter. \
+    A value of True (or 1) indicates that this particular element of the parameter should be optimized over. \
+    None by default, which means that we optimize over all parameters.
+    :type optimize_over_per_model_param: dict of str -> torch.Tensor[bool]
+    :param online: Whether to use the online version of the LLC estimator.
+    :type online: bool
+    :returns: A dictionary containing the local learning coefficient and loss traces.
     """
 
     # Temperature consistency warning
