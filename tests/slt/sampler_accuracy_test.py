@@ -2,14 +2,13 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
+from devinterp._test_utils import *
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.slt.sampler import sample
-from devinterp._test_utils import *
-from devinterp.utils import evaluate_mse, get_init_loss_multi_batch, optimal_nbeta
+from devinterp.utils import default_nbeta, evaluate_mse, get_init_loss_multi_batch
+from torch.utils.data import DataLoader, TensorDataset
 
 
 @pytest.fixture
@@ -38,7 +37,6 @@ TRUE_LCS_PER_POWER = [
 ]
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize("powers, true_lc", TRUE_LCS_PER_POWER)
 def test_accuracy_normalcrossing(
@@ -56,7 +54,7 @@ def test_accuracy_normalcrossing(
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss,
     )
     sample(

@@ -1,16 +1,16 @@
+import warnings
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
 import torch
-from torch.utils.data import DataLoader
-
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.utils import (
     USE_TPU_BACKEND,
     EvaluateFn,
+    default_nbeta,
     get_init_loss_multi_batch,
-    optimal_nbeta,
 )
+from torch.utils.data import DataLoader
 
 if USE_TPU_BACKEND:
     from devinterp.backends.tpu.slt.sampler import sample
@@ -31,14 +31,28 @@ def estimate_learning_coeff_with_summary(
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
     grad_accum_steps: int = 1,
-    cores: int = 1,
+    cores: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
     online: bool = False,
 ) -> dict:
-    optimizer_kwargs.setdefault("nbeta", optimal_nbeta(loader))
+    """
+    Estimates the local learning coefficient and returns a dictionary of results.
+    :param cores: Number of cores to use for parallel sampling. Can be either an integer (will use cores starting from device 0) or a list of cores.
+    :type cores: int or list of torch.device or str
+    """
+
+    # Temperature consistency warning
+    if "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs:
+        warnings.warn(
+            "Using passed in nbeta. Make sure callbacks are also initialized with the same nbeta."
+        )
+    else:
+        warnings.warn("nbeta not set - using default nbeta.")
+
+    optimizer_kwargs.setdefault("nbeta", default_nbeta(loader))
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
             loader, num_chains, model, evaluate, device
@@ -105,7 +119,7 @@ def estimate_learning_coeff(
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
     grad_accum_steps: int = 1,
-    cores: int = 1,
+    cores: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
@@ -122,7 +136,7 @@ def estimate_learning_coeff(
         num_burnin_steps=num_burnin_steps,
         num_steps_bw_draws=num_steps_bw_draws,
         grad_accum_steps=grad_accum_steps,
-        cores=cores,
+        cores=1,
         seed=seed,
         device=device,
         verbose=verbose,

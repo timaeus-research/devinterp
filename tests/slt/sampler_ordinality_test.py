@@ -3,13 +3,12 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
+from devinterp._test_utils import *
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
 from devinterp.slt.sampler import sample
-from devinterp._test_utils import *
 from devinterp.utils import *
+from torch.utils.data import DataLoader, TensorDataset
 
 
 @pytest.fixture
@@ -60,7 +59,7 @@ def test_linedot_normal_crossing(
         llc_estimator = LLCEstimator(
             num_chains=num_chains,
             num_draws=num_draws,
-            nbeta=optimal_nbeta(train_dataloader),
+            nbeta=default_nbeta(train_dataloader),
             init_loss=init_loss,
         )
 

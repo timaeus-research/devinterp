@@ -1,5 +1,6 @@
 import warnings
-from typing import Callable, Union
+from collections import defaultdict
+from typing import Callable, Optional, Union
 
 import torch
 
@@ -26,7 +27,7 @@ class SGLD(torch.optim.Optimizer):
     and $\sigma$ is the noise term.
 
     Example:
-        >>> optimizer = SGLD(model.parameters(), lr=0.1, nbeta=utils.optimal_nbeta(dataloader))
+        >>> optimizer = SGLD(model.parameters(), lr=0.1, nbeta=utils.default_nbeta(dataloader))
 
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
@@ -50,7 +51,7 @@ class SGLD(torch.optim.Optimizer):
     :type weight_decay: float, optional
     :param localization: Strength of the force $\gamma$ pulling weights back to their initial values. Default is 0
     :type localization: float, optional
-    :param nbeta: Inverse reparameterized temperature (otherwise known as n*beta or ~beta), float (default: 1., set to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param nbeta: Inverse reparameterized temperature (otherwise known as n*beta or ~beta), float (default: 1., set to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory in parameter space. Default is None, in which case no bounding box is used.
     :type bounding_box_size: float, optional
@@ -91,14 +92,21 @@ class SGLD(torch.optim.Optimizer):
         grad_norm=False,
         weight_norm=False,
         distance=False,
+        temperature: Optional[float] = None,
     ):
+        if temperature is not None:
+            nbeta = temperature
+            warnings.warn(
+                "Temperature is deprecated. Please use nbeta in your yaml file instead."
+            )
+
         if noise_level != 1.0:
             warnings.warn(
                 "Warning: noise_level in SGLD is unequal to one, this removes SGLD posterior sampling guarantees."
             )
         if nbeta == 1.0:
             warnings.warn(
-                "Warning: nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_nbeta(dataloader) instead"
+                "Warning: nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.default_nbeta(dataloader) instead"
             )
         defaults = dict(
             lr=lr,
@@ -136,19 +144,19 @@ class SGLD(torch.optim.Optimizer):
                 if group[hp] is not False:
                     group[hp] = torch.tensor(0.0).to(p.device)
 
-    def step(self, closure=None):
+    def step(self, noise_generator: Optional[torch.Generator] = None):
         """
         Perform a single SGLD optimization step.
         """
         if self.save_noise:
-            self.noise = []
+            self.noise = defaultdict(list)
 
         if self.save_mala_vars:
             self.dws = []
             self.localization_loss = 0.0
 
         with torch.no_grad():
-            for group in self.param_groups:
+            for group_idx, group in enumerate(self.param_groups):
                 for hp in ["noise_norm", "grad_norm", "distance", "weight_norm"]:
                     # Zero iteration-level metrics that haven't been disabled.
                     if group[hp] is not False:
@@ -199,10 +207,11 @@ class SGLD(torch.optim.Optimizer):
                         std=group["noise_level"],
                         size=dw.size(),
                         device=dw.device,
+                        generator=noise_generator,
                     )
                     if self.save_noise:
                         # Noise saved here is the unscaled noise.
-                        self.noise.append(noise)
+                        self.noise[group_idx].append(noise)
 
                     if group["optimize_over"] is not None:
                         # Restrict the noise and gradient to the subset of parameters we're optimizing over.

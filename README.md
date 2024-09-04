@@ -22,10 +22,10 @@ DevInterp is a python library for conducting research on developmental interpret
 
 from devinterp.slt.sampler import  sample, LLCEstimator
 from devinterp.optim import SGLD
-from devinterp.utils import optimal_nbeta
+from devinterp.utils import default_nbeta
 
 # Assuming you have a PyTorch Model assigned to model, and DataLoader assigned to trainloader
-llc_estimator = LLCEstimator(..., nbeta=optimal_nbeta(trainloader))
+llc_estimator = LLCEstimator(..., nbeta=default_nbeta(trainloader))
 sample(model, trainloader, ..., callbacks = [llc_estimator])
 
 llc_mean = llc_estimator.get_results()["llc/mean"]

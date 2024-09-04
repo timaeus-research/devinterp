@@ -3,13 +3,12 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
+from devinterp._test_utils import *
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
 from devinterp.slt.sampler import sample
-from devinterp._test_utils import *
 from devinterp.utils import *
+from torch.utils.data import DataLoader, TensorDataset
 
 
 @pytest.fixture
@@ -70,13 +69,13 @@ def test_rllc_normalcrossing_between_powers(
     llc_estimator_1 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss_1,
     )
     llc_estimator_2 = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss_2,
     )
     torch.manual_seed(seed)
@@ -87,7 +86,7 @@ def test_rllc_normalcrossing_between_powers(
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
-            nbeta=optimal_nbeta(train_dataloader),
+            nbeta=default_nbeta(train_dataloader),
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -105,7 +104,7 @@ def test_rllc_normalcrossing_between_powers(
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
             lr=lr,
-            nbeta=optimal_nbeta(train_dataloader),
+            nbeta=default_nbeta(train_dataloader),
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -162,13 +161,13 @@ def test_restricted_gradient_normalcrossing_between_dims(
     llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss_1,
     )
     llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss_2,
     )
 
@@ -177,7 +176,7 @@ def test_restricted_gradient_normalcrossing_between_dims(
         train_dataloader,
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
-            lr=lr, nbeta=optimal_nbeta(train_dataloader), noise_level=0.0
+            lr=lr, nbeta=default_nbeta(train_dataloader), noise_level=0.0
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -191,7 +190,7 @@ def test_restricted_gradient_normalcrossing_between_dims(
         train_dataloader,
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
-            lr=lr, nbeta=optimal_nbeta(train_dataloader), noise_level=0.0
+            lr=lr, nbeta=default_nbeta(train_dataloader), noise_level=0.0
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,
@@ -244,13 +243,13 @@ def test_rllc_full_normalcrossing_between_dims(
     llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss_1,
     )
     llc_estimator_3d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss_2,
     )
 
@@ -258,7 +257,7 @@ def test_rllc_full_normalcrossing_between_dims(
         model1,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, nbeta=optimal_nbeta(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, nbeta=default_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -270,7 +269,7 @@ def test_rllc_full_normalcrossing_between_dims(
         model2,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, nbeta=optimal_nbeta(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, nbeta=default_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -310,13 +309,13 @@ def test_rllc_different_from_full_llc_between_dims(
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss,
     )
     rllc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss,
     )
 
@@ -324,7 +323,7 @@ def test_rllc_different_from_full_llc_between_dims(
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, nbeta=optimal_nbeta(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, nbeta=default_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -336,7 +335,7 @@ def test_rllc_different_from_full_llc_between_dims(
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, nbeta=optimal_nbeta(train_dataloader)),
+        optimizer_kwargs=dict(lr=lr, nbeta=default_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,

@@ -2,13 +2,12 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
+from devinterp._test_utils import *
 from devinterp.backends.default.slt.sampler import sample
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
-from devinterp._test_utils import *
-from devinterp.utils import evaluate_mse, get_init_loss_multi_batch, optimal_nbeta
+from devinterp.utils import default_nbeta, evaluate_mse, get_init_loss_multi_batch
+from torch.utils.data import DataLoader, TensorDataset
 
 
 def make_pop_loss_fn(true_model):
@@ -96,7 +95,7 @@ def test_accuracy_rrr(sampling_method, m, h, n):
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=optimal_nbeta(train_dataloader),
+        nbeta=default_nbeta(train_dataloader),
         init_loss=init_loss,
     )
     sample(
@@ -104,7 +103,7 @@ def test_accuracy_rrr(sampling_method, m, h, n):
         train_dataloader,
         evaluate=evaluate_mse,
         optimizer_kwargs=dict(
-            lr=0.00006, localization=1.0, nbeta=optimal_nbeta(train_dataloader)
+            lr=0.00006, localization=1.0, nbeta=default_nbeta(train_dataloader)
         ),
         sampling_method=sampling_method,
         num_chains=num_chains,

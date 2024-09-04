@@ -2,13 +2,12 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
+from devinterp._test_utils import *
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.mala import MalaAcceptanceRate, mala_acceptance_probability
 from devinterp.slt.sampler import sample
-from devinterp._test_utils import *
-from devinterp.utils import make_evaluate, optimal_nbeta
+from devinterp.utils import default_nbeta, make_evaluate
+from torch.utils.data import DataLoader, TensorDataset
 
 
 class Polynomial(nn.Module):
@@ -116,7 +115,7 @@ def test_mala_callback_closeness(
         mala_estimator = MalaAcceptanceRate(
             num_chains=num_chains,
             num_draws=num_draws,
-            nbeta=optimal_nbeta(train_dataloader),
+            nbeta=default_nbeta(train_dataloader),
             learning_rate=lr,
         )
         sample(
@@ -126,7 +125,7 @@ def test_mala_callback_closeness(
             optimizer_kwargs=dict(
                 lr=lr,
                 localization=localization,
-                nbeta=optimal_nbeta(train_dataloader),
+                nbeta=default_nbeta(train_dataloader),
             ),
             sampling_method=SGLD,
             num_chains=num_chains,

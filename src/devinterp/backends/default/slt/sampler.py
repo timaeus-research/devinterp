@@ -1,14 +1,12 @@
 import itertools
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Literal, Optional, Type, Union
+from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
+import cloudpickle
 import torch
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-
+import torch.distributed as dist
+import torch.multiprocessing as mp
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -16,11 +14,16 @@ from devinterp.slt.mala import MalaAcceptanceRate
 from devinterp.slt.norms import NoiseNorm
 from devinterp.utils import (
     EvaluateFn,
+    default_nbeta,
     get_init_loss_multi_batch,
-    optimal_nbeta,
     prepare_input,
     split_results,
 )
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 def sample_single_chain(
@@ -42,7 +45,7 @@ def sample_single_chain(
     **kwargs,
 ):
     if grad_accum_steps > 1:
-        assert type(grad_accum_steps) == int, "grad_accum_steps must be an integer."
+        assert isinstance(grad_accum_steps, int), "grad_accum_steps must be an integer."
         num_steps_bw_draws *= grad_accum_steps
         num_burnin_steps *= grad_accum_steps
     if num_draws > len(loader):
@@ -57,7 +60,7 @@ def sample_single_chain(
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
         optimizer_kwargs.setdefault("save_noise", True)
-    optimizer_kwargs.setdefault("nbeta", optimal_nbeta(loader))
+    optimizer_kwargs.setdefault("nbeta", default_nbeta(loader))
     if optimize_over_per_model_param:
         param_groups = []
         for name, parameter in model.named_parameters():
@@ -123,7 +126,17 @@ def sample_single_chain(
 
 
 def _sample_single_chain(kwargs):
-    return sample_single_chain(**kwargs)
+    evaluate = cloudpickle.loads(kwargs["evaluate"])
+    kwargs = {k: v for k, v in kwargs.items() if k != "evaluate"}
+    return sample_single_chain(**kwargs, evaluate=evaluate)
+
+
+def get_args(chain_idx, seeds, shared_kwargs):
+    return dict(
+        chain=chain_idx,
+        seed=seeds[chain_idx],
+        **shared_kwargs,
+    )
 
 
 def sample(
@@ -139,7 +152,7 @@ def sample(
     num_steps_bw_draws: int = 1,
     init_loss: float = None,
     grad_accum_steps: int = 1,
-    cores: int = 1,
+    cores: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
@@ -177,7 +190,7 @@ def sample(
     :type num_steps_bw_draws: int, optional
     :param init_loss: Initial loss for use in `LLCEstimator` and `OnlineLLCEstimator`
     :type init_loss: float, optional
-    :param cores: Number of cores for parallel execution. Default is 1
+    :param cores: Number or list of cores for parallel execution. Default is 1
     :type cores: int, optional
     :param seed: Random seed(s) for sampling. Each chain gets a different (deterministic) seed if this is passed. Default is None
     :type seed: int, optional
@@ -213,8 +226,17 @@ def sample(
         if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
             setattr(callback, "init_loss", init_loss)
 
+    # Temperature consistency warning
+    if optimizer_kwargs is not None and (
+        "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs
+    ):
+        warnings.warn(
+            "If you're setting a nbeta in optimizer_kwargs, please also make sure to set it in the callbacks."
+        )
+
+    device = torch.device(device)
     if cores is None:
-        cores = min(4, cpu_count())
+        cores = min(cpu_count(), 4)
 
     if seed is not None:
         warnings.warn(
@@ -230,39 +252,51 @@ def sample(
         seeds = [None] * num_chains
 
     if evaluate is None:
-
+        # NOTE: If you'd like to update evaluate, please update _sample_single_chain as well.
         def evaluate(model, data):
             return model(data)
 
     validate_callbacks(callbacks)
 
-    def get_args(i):
-        return dict(
-            chain=i,
-            seed=seeds[i],
-            ref_model=model,
-            loader=loader,
-            evaluate=evaluate,
-            num_draws=num_draws,
-            num_burnin_steps=num_burnin_steps,
-            num_steps_bw_draws=num_steps_bw_draws,
-            init_loss=init_loss,
-            grad_accum_steps=grad_accum_steps,
-            sampling_method=sampling_method,
-            optimizer_kwargs=optimizer_kwargs,
-            device=device,
-            verbose=verbose,
-            callbacks=callbacks,
-            optimize_over_per_model_param=optimize_over_per_model_param,
-        )
+    shared_kwargs = dict(
+        ref_model=model,
+        loader=loader,
+        evaluate=cloudpickle.dumps(evaluate),
+        num_draws=num_draws,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_bw_draws=num_steps_bw_draws,
+        init_loss=init_loss,
+        grad_accum_steps=grad_accum_steps,
+        sampling_method=sampling_method,
+        optimizer_kwargs=optimizer_kwargs,
+        device=device,
+        verbose=verbose,
+        callbacks=callbacks,
+        optimize_over_per_model_param=optimize_over_per_model_param,
+    )
 
     if cores > 1:
+        # mp.spawn(
+        #     _sample_single_chain_mp,
+        #     args=(seeds, shared_kwargs),
+        #     nprocs=cores,
+        #     join=True,
+        #     start_method="spawn",
+        # )
+        if device.type == "gpu":
+            warnings.warn(
+                "Using multiprocessing with a single GPU. Multi-GPU support is not yet available."
+            )
+
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
-            pool.map(_sample_single_chain, [get_args(i) for i in range(num_chains)])
+            pool.map(
+                _sample_single_chain,
+                [get_args(i, seeds, shared_kwargs) for i in range(num_chains)],
+            )
     else:
         for i in range(num_chains):
-            _sample_single_chain(get_args(i))
+            _sample_single_chain(get_args(i, seeds, shared_kwargs))
 
     for callback in callbacks:
         if hasattr(callback, "finalize"):

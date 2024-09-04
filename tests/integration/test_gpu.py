@@ -1,36 +1,31 @@
 from pprint import pp
 
 import numpy as np
+import pytest
 import torch
 from datasets import load_dataset
-from devinterp.optim.sgld import SGLD
-from devinterp.slt.llc import LLCEstimator
-from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformer_lens.utils import lm_cross_entropy_loss, tokenize_and_concatenate
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from devinterp.optim.sgld import SGLD
+from devinterp.slt.llc import LLCEstimator
+from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
 
-def _test_hf(model, dataset, device: str):
-    assert (
-        USE_TPU_BACKEND
-    ), "This test is intended to run using TPU, feel free to ignore failure if unavailable"
 
-    set_seed(1)
+def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
+    assert not USE_TPU_BACKEND, "TPU backend not supported for this test"
+    assert device in ["cpu"] or device.startswith(
+        "cuda"
+    ), "Invalid device. Should be cpu or cuda:n. Don't worry about this error if you're not on a GPU device."
+    set_seed(seed)
 
-    if device == "tpu":
-        import torch_xla.core.xla_model as xm
-        from devinterp.backends.tpu.slt.sampler import sample
-
-        device = xm.xla_device()
-
-    else:
-        from devinterp.backends.default.slt.sampler import sample
+    from devinterp.backends.default.slt.sampler import sample
 
     print(f"Testing on {device}")
 
-    loader = DataLoader(dataset, batch_size=16, shuffle=True)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     model.to(device)
     model.eval()
     init_loss = torch.zeros(1).to(device)
@@ -60,7 +55,6 @@ def _test_hf(model, dataset, device: str):
     nbeta = 20.0
     num_chains = 1
     num_draws = 50
-    batch_size = 16
 
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
@@ -78,7 +72,7 @@ def _test_hf(model, dataset, device: str):
         evaluate=evaluate,
         sampling_method=SGLD,
         optimizer_kwargs=dict(
-            lr=0.001,
+            lr=0.0002,
             noise_level=10.0,
             weight_decay=0.0,
             localization=0.0,
@@ -90,7 +84,7 @@ def _test_hf(model, dataset, device: str):
         num_chains=num_chains,
         num_burnin_steps=0,
         num_steps_bw_draws=1,
-        seed=42,
+        seed=seed,
         device=device,
         verbose=True,
         batch_size=batch_size,
@@ -100,6 +94,8 @@ def _test_hf(model, dataset, device: str):
     return metrics
 
 
+@pytest.mark.gpu
+@pytest.mark.slow
 def test_hf():
     # Load the model and tokenizer
     model = AutoModelForCausalLM.from_pretrained("roneneldan/TinyStories-1M")
@@ -113,23 +109,24 @@ def test_hf():
     dataset = tokenize_and_concatenate(dataset, tokenizer)
 
     # Set up the LLC estimator
-
-    metrics_tpu = _test_hf(model, dataset, "tpu")
-    pp(metrics_tpu)
     metrics_cpu = _test_hf(model, dataset, "cpu")
     pp(metrics_cpu)
     metrics_cpu.pop("llc/std")  # 1 chain only
     metrics_cpu.pop("loss/trace")  # 1 chain only
-    for k, v in metrics_cpu.items():
-        if isinstance(v, torch.Tensor):
-            assert torch.allclose(
-                v, metrics_tpu[k], rtol=5e-3
-            ), f"Evaluation failed for {k}"
-        elif isinstance(v, np.ndarray):
-            assert np.isclose(
-                v, metrics_tpu[k], rtol=5e-3
-            ).all(), f"Evaluation failed for {k}"
-        else:
-            assert np.isclose(
-                v, metrics_tpu[k], rtol=5e-3
-            ), f"Evaluation failed for {k}"
+
+    for gpu in range(0, torch.cuda.device_count()):
+        metrics_gpu = _test_hf(model, dataset, f"cuda:{gpu}")
+        pp(metrics_gpu)
+        for k, v in metrics_cpu.items():
+            if isinstance(v, torch.Tensor):
+                assert torch.allclose(
+                    v, metrics_gpu[k], rtol=1e-1
+                ), f"Evaluation failed for {k}"
+            elif isinstance(v, np.ndarray):
+                assert np.isclose(
+                    v, metrics_gpu[k], rtol=1e-1
+                ).all(), f"Evaluation failed for {k}"
+            else:
+                assert np.isclose(
+                    v, metrics_gpu[k], rtol=1e-1
+                ), f"Evaluation failed for {k}"

@@ -8,11 +8,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import torch
+from devinterp.slt.mala import MalaAcceptanceRate
+from devinterp.utils import default_nbeta
 from pydantic import BaseModel, Field
 from tqdm import tqdm, trange
-
-from devinterp.slt.mala import MalaAcceptanceRate
-from devinterp.utils import optimal_nbeta
 
 
 # Sampling config validates input parameters while allowing us to use **kwargs later on
@@ -69,11 +68,11 @@ class SweepConfig(BaseModel):
         else:
             if dataloader is not None:
                 # Calculate default beta (inverse temperature) range.
-                optimal_beta = optimal_nbeta(dataloader)
+                default_beta = default_nbeta(dataloader)
                 if min_beta is None:
-                    min_beta = 1e-2 * optimal_beta
+                    min_beta = 1e-2 * default_beta
                 if max_beta is None:
-                    max_beta = 1e3 * optimal_beta
+                    max_beta = 1e3 * default_beta
             else:
                 if min_beta is None or max_beta is None:
                     raise ValueError(

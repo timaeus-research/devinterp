@@ -37,7 +37,7 @@ class SGNHT(torch.optim.Optimizer):
     :type diffusion_factor: float, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory. Default is None
     :type bounding_box_size: float, optional
-    :param nbeta: Effective Inverse Temperature, float (default: 1., set to utils.optimal_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param nbeta: Effective Inverse Temperature, float (default: 1., set to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int, optional
 
     :raises Warning: if :python:`nbeta` is set to 1
@@ -65,7 +65,7 @@ class SGNHT(torch.optim.Optimizer):
             )
         if nbeta == 1.0:
             warnings.warn(
-                "Warning: nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.optimal_nbeta(dataloader) instead"
+                "Warning: nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.default_nbeta(dataloader) instead"
             )
 
         defaults = dict(
