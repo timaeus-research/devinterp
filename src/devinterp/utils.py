@@ -7,7 +7,6 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from torch import Generator
 
 try:
     import torch_xla.core.xla_model as xm
@@ -257,3 +256,25 @@ def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):
 
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+def cycle(iterable, limit = None):
+    """
+    Use this function to cycle through a dataloader. Unlike itertools.cycle, this function doesn't cache
+    values in memory.
+
+    Note: Be careful with cycling a shuffled interable. The shuffling will be different for each loop dependent on the seed
+    state, unlike with itertools.cycle.
+
+    :param iterable: Iterable to cycle through
+    :param limit: Number of cycles to go through. If None, cycles indefinitely.
+    """
+    index = 0
+    if limit is None:
+        limit = float('inf')
+    while True:
+        for x in iterable:
+            if index >= limit:
+                return
+            else:
+                yield x
+            index += 1

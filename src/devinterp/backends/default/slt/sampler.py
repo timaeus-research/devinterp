@@ -1,15 +1,11 @@
-import itertools
 import warnings
 from copy import deepcopy
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
 import cloudpickle
 import torch
-import torch.distributed as dist
-import torch.multiprocessing as mp
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
-from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -24,8 +20,8 @@ from devinterp.utils import (
     get_init_loss_multi_batch,
     prepare_input,
     split_results,
+    cycle
 )
-
 
 def sample_single_chain(
     ref_model: nn.Module,
@@ -87,7 +83,7 @@ def sample_single_chain(
     with tqdm(
         desc=f"Chain {chain}", total=num_steps // grad_accum_steps, disable=not verbose
     ) as pbar:
-        for i, data in zip(range(num_steps), itertools.cycle(loader)):
+        for i, data in zip(range(num_steps), cycle(loader)):
             model.train()
             data = prepare_input(data, device)
 
