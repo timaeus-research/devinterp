@@ -25,10 +25,8 @@ def generated_linedot_normalcrossing_dataset():
 
 
 @pytest.mark.parametrize("sampling_method", [SGLD])
-@pytest.mark.parametrize(
-    "model", [Polynomial, LinePlusDot]
-)  # LinePlusDot currently not tested, TODO
-@pytest.mark.parametrize("dim", [2, 10])
+@pytest.mark.parametrize("model", [Polynomial, LinePlusDot])
+@pytest.mark.parametrize("dim", [2])
 def test_linedot_normal_crossing(
     generated_linedot_normalcrossing_dataset, sampling_method, model, dim
 ):

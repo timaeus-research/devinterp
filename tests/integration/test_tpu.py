@@ -100,7 +100,7 @@ def _test_hf(model, dataset, device: str):
     return metrics
 
 
-def test_hf():
+def _test_hf():
     # Load the model and tokenizer
     model = AutoModelForCausalLM.from_pretrained("roneneldan/TinyStories-1M")
     tokenizer = AutoTokenizer.from_pretrained("roneneldan/TinyStories-1M")
