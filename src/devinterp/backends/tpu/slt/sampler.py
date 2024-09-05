@@ -249,6 +249,7 @@ def sample(
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
+    init_loss=None,
     grad_accum_steps: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
@@ -259,8 +260,7 @@ def sample(
     init_noise: Optional[float] = None,
     shuffle: bool = True,
     use_alternate_batching=False,  # See George's alternate SGLD sampling method
-    init_loss=None,
-    **kwargs,
+    **kwargs, # NOTE: This is an important catch-all for any additional arguments that may be passed to the function. Please don't remove it.
 ):
     """
     Sample model weights using a given sampling_method, supporting multiple chains/cores,

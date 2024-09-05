@@ -132,10 +132,19 @@ def _sample_single_chain(kwargs):
     return sample_single_chain(**kwargs, evaluate=evaluate)
 
 
-def get_args(chain_idx, seeds, shared_kwargs):
+def get_args(chain_idx: int, seeds: List[int], device, callbacks, shared_kwargs):
+    if isinstance(device, list):
+        instance_device = device[chain_idx % len(device)]
+        for callback in callbacks:
+            if hasattr(callback, "device"):
+                callback.device = instance_device
+    else:
+        instance_device = device
     return dict(
         chain=chain_idx,
         seed=seeds[chain_idx],
+        device=instance_device,
+        callbacks=callbacks,
         **shared_kwargs,
     )
 
@@ -155,9 +164,10 @@ def sample(
     grad_accum_steps: int = 1,
     cores: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    device: Union[torch.device, str, List[torch.device]] = torch.device("cpu"),
+    device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
+    gpu_idxs: Optional[List[int]] = None,
     batch_size: bool = 1,
     **kwargs,
 ):
@@ -239,9 +249,17 @@ def sample(
             "If you're setting a nbeta in optimizer_kwargs, please also make sure to set it in the callbacks."
         )
 
-    device = torch.device(device)
     if cores is None:
         cores = min(cpu_count(), 4)
+
+    if isinstance(device, str):
+        device = torch.device(device)
+
+    if device.type == "cuda":
+        if gpu_idxs is not None:
+            assert cores >= len(gpu_idxs), "Number of cores must be greater than number of devices."
+    else:
+        assert gpu_idxs is None, "Multi-GPU sampling is only supported for CUDA devices. Check your device parameter."
 
     if seed is not None:
         warnings.warn(
@@ -274,9 +292,7 @@ def sample(
         grad_accum_steps=grad_accum_steps,
         sampling_method=sampling_method,
         optimizer_kwargs=optimizer_kwargs,
-        device=device,
         verbose=verbose,
-        callbacks=callbacks,
         optimize_over_per_model_param=optimize_over_per_model_param,
     )
 
@@ -288,20 +304,18 @@ def sample(
         #     join=True,
         #     start_method="spawn",
         # )
-        if device.type == "gpu":
-            warnings.warn(
-                "Using multiprocessing with a single GPU. Multi-GPU support is not yet available."
-            )
 
+        if gpu_idxs is not None:
+            device = [torch.device(f"cuda:{i}") for i in gpu_idxs]
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
             pool.map(
                 _sample_single_chain,
-                [get_args(i, seeds, shared_kwargs) for i in range(num_chains)],
+                [get_args(i, seeds, device, callbacks, shared_kwargs) for i in range(num_chains)],
             )
     else:
         for i in range(num_chains):
-            _sample_single_chain(get_args(i, seeds, shared_kwargs))
+            _sample_single_chain(get_args(i, seeds, device, callbacks, shared_kwargs))
 
     for callback in callbacks:
         if hasattr(callback, "finalize"):

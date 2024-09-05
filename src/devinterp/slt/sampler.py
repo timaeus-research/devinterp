@@ -34,7 +34,8 @@ def estimate_learning_coeff_with_summary(
     grad_accum_steps: int = 1,
     cores: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
-    device: Union[torch.device, str, List[torch.device]] = torch.device("cpu"),
+    device: Union[torch.device, str] = torch.device("cpu"),
+    gpu_idxs: Optional[List[int]] = None,
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, torch.Tensor]] = None,
     online: bool = False,
@@ -55,9 +56,10 @@ def estimate_learning_coeff_with_summary(
         import torch_xla.core.xla_model as xm
         DEVICE = xm.xla_device()
     \
-    Also supports multi-GPU sampling. To use multiple GPUs, pass in a list of torch.device or strings (e.g. ["cuda:0", "cuda:1"]).
-
+    If you are using a TPU, make sure to set the environment variable `USE_TPU_BACKEND` to `1` before importing `devinterp`.
     :type device: torch.device or str
+    :param gpu_idxs: List of GPU indices to use. If None, the device will be used as is. Provide a list of indices \
+    and set cores greater than the length of the list to use multiple GPUs.
     :param verbose: Whether to display progress.
     :type verbose: bool
     :param optimize_over_per_model_param: Dictionary of booleans indicating whether to optimize over each parameter of the model. \
