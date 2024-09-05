@@ -21,7 +21,7 @@ class SGLD(torch.optim.Optimizer):
     $$\Delta w_t = \frac{\epsilon}{2}\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right)+\gamma\left(w_0-w_t\right) - \lambda w_t\right) + N(0, \epsilon\sigma^2)$$
 
     where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate,
-    $(\beta n)$ is the inverse temperature (we're in the tempered Bayes paradigm),
+    $(\beta n)$ is the inverse nbeta (we're in the tempered Bayes paradigm),
     $n$ is the number of training samples, $m$ is the batch size, $\gamma$ is
     the localization strength, $\lambda$ is the weight decay strength,
     and $\sigma$ is the noise term.
@@ -51,7 +51,7 @@ class SGLD(torch.optim.Optimizer):
     :type weight_decay: float, optional
     :param localization: Strength of the force $\gamma$ pulling weights back to their initial values. Default is 0
     :type localization: float, optional
-    :param nbeta: Inverse reparameterized temperature (otherwise known as n*beta or ~beta), float (default: 1., set to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
+    :param nbeta: Inverse reparameterized nbeta (otherwise known as n*beta or ~beta), float (default: 1., set to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory in parameter space. Default is None, in which case no bounding box is used.
     :type bounding_box_size: float, optional
@@ -97,7 +97,7 @@ class SGLD(torch.optim.Optimizer):
         if temperature is not None:
             nbeta = temperature
             warnings.warn(
-                "Temperature is deprecated. Please use nbeta in your yaml file instead."
+                "temperature is deprecated. Please use nbeta in your yaml file instead."
             )
 
         if noise_level != 1.0:
