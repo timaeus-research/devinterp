@@ -92,7 +92,7 @@ class MalaAcceptanceRate(SamplerCallback):
         learning_rate: float,
         device: Union[torch.device, str] = "cpu",
         nbeta: float = None,
-        nbeta: Optional[float] = None,
+        temperature: Optional[float] = None,
     ):
         self.num_chains = num_chains
         self.num_draws = num_draws
