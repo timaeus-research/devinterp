@@ -1,6 +1,7 @@
 from pprint import pp
 
 import numpy as np
+import pytest
 import torch
 from datasets import load_dataset
 from devinterp.optim.sgld import SGLD
@@ -100,7 +101,9 @@ def _test_hf(model, dataset, device: str):
     return metrics
 
 
-def _test_hf():
+@pytest.mark.tpu
+@pytest.mark.slow
+def test_hf():
     # Load the model and tokenizer
     model = AutoModelForCausalLM.from_pretrained("roneneldan/TinyStories-1M")
     tokenizer = AutoTokenizer.from_pretrained("roneneldan/TinyStories-1M")

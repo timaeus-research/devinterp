@@ -2,16 +2,16 @@ import os
 from pprint import pp
 
 import numpy as np
+import pytest
 import torch
 from datasets import load_dataset
+from devinterp.optim.sgld import SGLD
+from devinterp.slt.llc import LLCEstimator
+from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformer_lens.utils import lm_cross_entropy_loss, tokenize_and_concatenate
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
-from devinterp.optim.sgld import SGLD
-from devinterp.slt.llc import LLCEstimator
-from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
 
 
 def _test_hf(model, dataset, device: str, batch_size=8, seed=42, cores=1):
@@ -96,6 +96,7 @@ def _test_hf(model, dataset, device: str, batch_size=8, seed=42, cores=1):
 
 
 # although it does pass, this test currently takes >1hr to complete. Deactivating it for now
+# @pytest.mark.slow
 def inactive_test_hf():
     assert os.cpu_count() >= 2, "Multiprocessing requires at least 2 CPU cores."
 
