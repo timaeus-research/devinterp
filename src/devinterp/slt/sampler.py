@@ -123,6 +123,7 @@ def estimate_learning_coeff_with_summary(
         verbose=verbose,
         callbacks=callbacks,
         optimize_over_per_model_param=optimize_over_per_model_param,
+        gpu_idxs=gpu_idxs,
     )
 
     results = {}
