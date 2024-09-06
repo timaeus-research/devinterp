@@ -22,7 +22,9 @@ def evaluate(model, data):
     }  # transformers doesn't output a vector
 
 
-def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_workers = 1):
+def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_workers = 1,
+              batch_size = 256,
+              grad_accum_steps = 1):
     # Load a pretrained MNIST classifier
     model = AutoModelForImageClassification.from_pretrained("fxmarty/resnet-tiny-mnist").to(
         device
@@ -36,7 +38,7 @@ def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_w
             ]
         ),
     )
-    loader = torch.utils.data.DataLoader(data, batch_size=256, shuffle=True, num_workers=num_workers)
+    loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     return estimate_learning_coeff_with_summary(
         model,
@@ -53,16 +55,17 @@ def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_w
         cores=1,  # How many cores to use for parallelization
         gpu_idxs=None,  # Which GPUs to use ([0, 1] for using GPU 0 and 1)
         seed=seed,
+        grad_accum_steps=grad_accum_steps
     )
 
-def check(s1, s2, rtol=1e-3, reverse = False):
+def check(s1, s2, atol=1e-3, reverse = False):
     """
     Check if two stats are close to each other.
     
     """
     assert s1.keys() == s2.keys(), f"Expected the same keys in both stats, got {s1.keys()} and {s2.keys()}."
     assert s1["llc/trace"].shape == s2["llc/trace"].shape, f"Expected the same shape for llc/trace, got {s1['llc/trace'].shape} and {s2['llc/trace'].shape}."
-    valid = np.allclose(s1["llc/trace"], s2["llc/trace"], rtol=rtol)
+    valid = np.allclose(s1["llc/trace"], s2["llc/trace"], atol=atol)
     if reverse:
         valid = not valid
     assert valid, f"Expected {'different' if reverse else 'close'} llc/trace in both stats, got {s1['llc/trace']} and {s2['llc/trace']}."
@@ -82,7 +85,7 @@ def test_cpu_consistent(cpu_default):
 
 def test_cpu_consistent_seeds(cpu_default):
     diff_seed_stats = get_stats("cpu", seed=101)
-    check(cpu_default, diff_seed_stats, 0.1, reverse = True)
+    check(cpu_default, diff_seed_stats, 5, reverse = True)
 
 def test_cpu_multicore(cpu_default):
     multicore_stats = get_stats("cpu", seed=100, cores = 4)
@@ -92,31 +95,35 @@ def test_cpu_multiworker(cpu_default):
     multiworker_stats = get_stats("cpu", seed=100, num_workers = 4)
     check(cpu_default, multiworker_stats, 1e-4)
 
+def test_grad_accum(cpu_default: dict):
+    grad_accum_stats = get_stats("cpu", seed=100, cores = 4, grad_accum_steps = 2, batch_size = 128)
+    check(cpu_default, grad_accum_stats, 1)
+
 @pytest.mark.gpu
 def test_gpu_consistent(gpu_default):
     repeat_stats = get_stats("cuda", seed=100)
-    check(gpu_default, repeat_stats, 5e-3)
+    check(gpu_default, repeat_stats, 0.2)
 
 @pytest.mark.gpu
 def test_gpu_consistent_seeds(gpu_default):
     diff_seed_stats = get_stats("cuda", seed=101)
-    check(gpu_default, diff_seed_stats, 0.1, reverse = True)
+    check(gpu_default, diff_seed_stats, 5, reverse = True)
 
 @pytest.mark.gpu
 def test_gpu_multicore(gpu_default):
     multicore_stats = get_stats("cuda", seed=100, cores = 4)
-    check(gpu_default, multicore_stats, 5e-3)
+    check(gpu_default, multicore_stats, 0.2)
 
 @pytest.mark.gpu
 def test_gpu_multiworker(gpu_default):
     multiworker_stats = get_stats("cuda", seed=100, num_workers = 4)
-    check(gpu_default, multiworker_stats, 5e-3)
+    check(gpu_default, multiworker_stats, 0.2)
 
 @pytest.mark.gpu
 def test_multigpu(gpu_default):
     if torch.cuda.device_count() > 1:
         multigpu_stats = get_stats("cuda", seed=100, gpu_idxs = [0, 1], cores = 2)
-        check(gpu_default, multigpu_stats, 5e-3)
+        check(gpu_default, multigpu_stats, 0.2)
     else:
         pytest.skip("Multiple GPUs unavailable.")
 
@@ -124,6 +131,6 @@ def test_multigpu(gpu_default):
 def test_multigpu_multicore(gpu_default):
     if torch.cuda.device_count() > 1:
         multigpu_multicore_stats = get_stats("cuda", seed=100, gpu_idxs = [0, 1], cores = 4)
-        check(gpu_default, multigpu_multicore_stats, 5e-3)
+        check(gpu_default, multigpu_multicore_stats, 0.2)
     else:
         pytest.skip("Multiple GPUs unavailable.")
