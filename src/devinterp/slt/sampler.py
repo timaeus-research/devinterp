@@ -80,7 +80,8 @@ def estimate_learning_coeff_with_summary(
     else:
         warnings.warn("nbeta not set - using default nbeta.")
 
-    optimizer_kwargs.setdefault("nbeta", default_nbeta(loader))
+    optimizer_kwargs.setdefault("nbeta", default_nbeta(dataloader = loader, 
+                                                       grad_accum_steps = grad_accum_steps))
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
             loader, num_chains, model, evaluate, device

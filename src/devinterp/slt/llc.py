@@ -123,9 +123,6 @@ class OnlineLLCEstimator(SamplerCallback):
         )
         self.llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
 
-        self.losses = torch.zeros((num_chains, num_draws)).to(device)
-        self.llcs = torch.zeros((num_chains, num_draws)).to(device)
-
         assert (
             nbeta is not None or temperature is not None
         ), "Please provide a value for nbeta."

@@ -81,11 +81,11 @@ def plot_trace(
     plt.show()
 
 
-def default_nbeta(dataloader: Union[DataLoader, int]):
+def default_nbeta(dataloader: Union[DataLoader, int], grad_accum_steps: int = 1) -> float:
     if isinstance(dataloader, DataLoader):
-        return dataloader.batch_size / np.log(dataloader.batch_size)
+        return (dataloader.batch_size * grad_accum_steps) / np.log(dataloader.batch_size * grad_accum_steps)
     elif isinstance(dataloader, int):
-        return dataloader / np.log(dataloader)
+        return (dataloader * grad_accum_steps) / np.log(dataloader * grad_accum_steps)
     else:
         raise NotImplementedError(
             f"N*beta for data type {type(dataloader)} not implemented, use DataLoader or int instead."

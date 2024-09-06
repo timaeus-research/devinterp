@@ -90,9 +90,8 @@ def sample_single_chain(
             results = evaluate(model, data)
             loss, results = split_results(results)
 
-            if grad_accum_steps > 1:
-                loss = loss / grad_accum_steps
-                cumulative_loss += loss.item()
+            loss /= grad_accum_steps
+            cumulative_loss += loss.item()
             loss.backward()
 
             # i+1 instead of i so that the gradient accumulates to an entire batch first
@@ -107,11 +106,7 @@ def sample_single_chain(
                 draw = (
                     i - num_burnin_steps
                 ) // num_steps_bw_draws  # required for locals()
-                if grad_accum_steps > 1:
-                    loss = cumulative_loss
-                    cumulative_loss = 0
-                else:
-                    loss = loss.item()
+                loss = cumulative_loss
 
                 with torch.no_grad():
                     for callback in callbacks:
@@ -119,6 +114,7 @@ def sample_single_chain(
 
             if (i + 1) % grad_accum_steps == 0:
                 optimizer.zero_grad()
+                cumulative_loss = 0
                 pbar.update(1)
 
 
@@ -229,7 +225,7 @@ def sample(
         else:
             init_loss_seed = seed
         init_loss = get_init_loss_multi_batch(
-            loader, num_chains, model, evaluate, device, init_loss_seed,
+            loader, num_chains * grad_accum_steps, model, evaluate, device, init_loss_seed,
         )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
