@@ -39,6 +39,7 @@ def estimate_learning_coeff_with_summary(
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, torch.Tensor]] = None,
     online: bool = False,
+    use_amp: bool = False,
 ) -> dict:
     """
     Estimates the local learning coefficient and returns a dictionary of results.
@@ -69,9 +70,12 @@ def estimate_learning_coeff_with_summary(
     :type optimize_over_per_model_param: dict of str -> torch.Tensor[bool]
     :param online: Whether to use the online version of the LLC estimator.
     :type online: bool
+    :param use_amp: Whether to use automatic mixed precision. Casts to bfloat16 on GPUs.
+    :type use_amp: bool
     :returns: A dictionary containing the local learning coefficient and loss traces.
     """
 
+    model.to(device)
     # Temperature consistency warning
     if "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs:
         warnings.warn(
@@ -125,6 +129,7 @@ def estimate_learning_coeff_with_summary(
         callbacks=callbacks,
         optimize_over_per_model_param=optimize_over_per_model_param,
         gpu_idxs=gpu_idxs,
+        use_amp=use_amp,
     )
 
     results = {}

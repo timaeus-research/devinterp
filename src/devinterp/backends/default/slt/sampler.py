@@ -39,6 +39,7 @@ def sample_single_chain(
     device: torch.device = torch.device("cpu"),
     optimize_over_per_model_param: Optional[dict] = None,
     callbacks: List[SamplerCallback] = [],
+    use_amp: bool = False,
     **kwargs,
 ):
     if grad_accum_steps > 1:
@@ -83,16 +84,17 @@ def sample_single_chain(
     with tqdm(
         desc=f"Chain {chain}", total=num_steps // grad_accum_steps, disable=not verbose
     ) as pbar:
+        model.train()
         for i, data in zip(range(num_steps), cycle(loader)):
             model.train()
             data = prepare_input(data, device)
+            with torch.autocast(device_type = device.type, dtype = torch.float16, enabled = use_amp):
+                results = evaluate(model, data)
+                loss, results = split_results(results)
 
-            results = evaluate(model, data)
-            loss, results = split_results(results)
-
-            loss /= grad_accum_steps
-            cumulative_loss += loss.item()
-            loss.backward()
+                loss /= grad_accum_steps
+                cumulative_loss += loss.item()
+                loss.backward()
 
             # i+1 instead of i so that the gradient accumulates to an entire batch first
             # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
@@ -161,6 +163,7 @@ def sample(
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
     gpu_idxs: Optional[List[int]] = None,
     batch_size: bool = 1,
+    use_amp: bool = False,
     **kwargs,
 ):
     """
@@ -201,7 +204,13 @@ def sample(
     :type device: str or torch.device, optional
     :param verbose: whether to print sample chain progress. Default is True
     :type verbose: bool, optional
-
+    :param optimize_over_per_model_param: Dictionary of booleans indicating whether to optimize over each parameter of the model. \
+    Keys are parameter names, and values are boolean tensors that match the shape of the parameter. \
+    A value of True (or 1) indicates that this particular element of the parameter should be optimized over. \
+    None by default, which means that we optimize over all parameters.
+    :type optimize_over_per_model_param: dict, optional
+    :param use_amp: Whether to use automatic mixed precision. Casts to float16 on GPUs.
+    :type use_amp: bool, optional
     :raises ValueError: if derivative callbacks (f.e. :func:`~devinterp.slt.loss.OnlineLossStatistics`) are passed before base callbacks (f.e. :func:`~devinterp.slt.llc.OnlineLLCEstimator`)
     :raises Warning: if num_burnin_steps < num_draws
     :raises Warning: if num_draws > len(loader)
@@ -286,6 +295,7 @@ def sample(
         optimizer_kwargs=optimizer_kwargs,
         verbose=verbose,
         optimize_over_per_model_param=optimize_over_per_model_param,
+        use_amp=use_amp,
     )
 
     if cores > 1:
