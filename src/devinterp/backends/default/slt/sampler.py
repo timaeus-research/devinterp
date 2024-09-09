@@ -93,7 +93,7 @@ def sample_single_chain(
                 loss, results = split_results(results)
 
                 loss /= grad_accum_steps
-                cumulative_loss += loss.item()
+                cumulative_loss += loss
                 loss.backward()
 
             # i+1 instead of i so that the gradient accumulates to an entire batch first
