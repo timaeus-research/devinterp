@@ -256,6 +256,12 @@ def sample(
     if isinstance(device, str):
         device = torch.device(device)
 
+    if device.type == "cpu" and use_amp:
+        warnings.warn(
+            "Automatic Mixed Precision (AMP) is not supported on CPU devices. Disabling AMP."
+        )
+        use_amp = False
+
     if device.type == "cuda":
         if gpu_idxs is not None:
             assert cores >= len(gpu_idxs), "Number of cores must be greater than number of devices."

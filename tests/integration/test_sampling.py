@@ -11,6 +11,7 @@ from devinterp.optim import SGLD
 from devinterp.slt.sampler import estimate_learning_coeff_with_summary
 from devinterp.utils import plot_trace, USE_TPU_BACKEND
 import pytest
+import time
 
 warnings.filterwarnings("ignore")
 
@@ -24,7 +25,8 @@ def evaluate(model, data):
 
 def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_workers = 1,
               batch_size = 256,
-              grad_accum_steps = 1):
+              grad_accum_steps = 1,
+              use_amp = False):
     # Load a pretrained MNIST classifier
     model = AutoModelForImageClassification.from_pretrained("fxmarty/resnet-tiny-mnist").to(
         device
@@ -55,7 +57,8 @@ def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_w
         cores=1,  # How many cores to use for parallelization
         gpu_idxs=None,  # Which GPUs to use ([0, 1] for using GPU 0 and 1)
         seed=seed,
-        grad_accum_steps=grad_accum_steps
+        grad_accum_steps=grad_accum_steps,
+        use_amp = use_amp,
     )
 
 def check(s1, s2, atol=1e-3, reverse = False):
@@ -134,3 +137,13 @@ def test_multigpu_multicore(gpu_default):
         check(gpu_default, multigpu_multicore_stats, 0.2)
     else:
         pytest.skip("Multiple GPUs unavailable.")
+
+@pytest.mark.gpu
+def test_gpu_grad_accum(gpu_default: dict):
+    grad_accum_stats = get_stats("cuda", seed=100, cores = 4, grad_accum_steps = 2, batch_size = 128)
+    check(gpu_default, grad_accum_stats, 1)
+
+@pytest.mark.gpu
+def test_gpu_amp(gpu_default: dict):
+    amp_stats = get_stats("cuda", seed=100, cores = 4, use_amp = True)
+    check(gpu_default, amp_stats, 0.2)

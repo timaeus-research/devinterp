@@ -70,7 +70,7 @@ def estimate_learning_coeff_with_summary(
     :type optimize_over_per_model_param: dict of str -> torch.Tensor[bool]
     :param online: Whether to use the online version of the LLC estimator.
     :type online: bool
-    :param use_amp: Whether to use automatic mixed precision. Casts to bfloat16 on GPUs.
+    :param use_amp: Whether to use automatic mixed precision (casts to float16 on GPUs). Significantly speeds up sampling at the cost of a minor loss in precision (default: False).
     :type use_amp: bool
     :returns: A dictionary containing the local learning coefficient and loss traces.
     """
