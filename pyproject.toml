@@ -21,9 +21,12 @@ classifiers = [
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
+[tool.pip]
+extra-index-url = "https://storage.googleapis.com/libtpu-releases/index.html"
+
 [project.optional-dependencies]
 dev = ["pytest==7.4.3", "transformers", "datasets", "transformer_lens"]
-tpu = ["torch-xla==2.2.0", "torch==2.2.0"]
+tpu = ["torch-xla[tpu]==2.3.0", "torch==2.3.0"]
 
 [project.urls]
 "Homepage" = "https://github.com/timaeus-research/devinterp"
