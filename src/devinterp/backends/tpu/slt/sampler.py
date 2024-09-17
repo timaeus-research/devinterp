@@ -33,12 +33,12 @@ def sample_single_chain(
     ref_model: nn.Module,
     loader: torch.utils.data.DataLoader,
     evaluate: Callable[[nn.Module, torch.Tensor], Tuple[torch.Tensor, Dict[str, Any]]],
+    optimizer_kwargs: Dict,
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
     grad_accum_steps: int = 1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
-    optimizer_kwargs: Optional[Dict] = None,
     scheduler_cls: Optional[Type[torch.optim.lr_scheduler._LRScheduler]] = None,
     scheduler_kwargs: Optional[Dict] = None,
     chain: int = 0,
@@ -62,7 +62,11 @@ def sample_single_chain(
         set_seed(seed, device=device)
 
     # == Optimizer ==
-    optimizer_kwargs = optimizer_kwargs or {}
+    if "temperature" in optimizer_kwargs:
+        assert not "nbeta" in optimizer_kwargs, 'Set either nbeta or temperature in optimizer_kwargs, not both'
+        optimizer_kwargs["nbeta"] = optimizer_kwargs.pop("temperature")
+    assert "nbeta" in optimizer_kwargs, "Set nbeta in optimizer_kwargs"
+
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)
 

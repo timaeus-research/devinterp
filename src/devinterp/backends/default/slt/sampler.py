@@ -31,12 +31,12 @@ def sample_single_chain(
     ref_model: nn.Module,
     loader: DataLoader,
     evaluate: EvaluateFn,
+    optimizer_kwargs: Dict,
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
     grad_accum_steps=1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
-    optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
     verbose: bool = True,
@@ -56,7 +56,10 @@ def sample_single_chain(
 
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
-    optimizer_kwargs = optimizer_kwargs or {}
+    if "temperature" in optimizer_kwargs:
+        assert not "nbeta" in optimizer_kwargs, 'Set either nbeta or temperature in optimizer_kwargs, not both'
+        optimizer_kwargs["nbeta"] = optimizer_kwargs.pop("temperature")
+    assert "nbeta" in optimizer_kwargs, "Set nbeta in optimizer_kwargs"
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
