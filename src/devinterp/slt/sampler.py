@@ -59,8 +59,10 @@ def estimate_learning_coeff_with_summary(
         )
         optimizer_kwargs["nbeta"] = optimizer_kwargs.pop("temperature")
     elif "nbeta" in optimizer_kwargs and "temperature" in optimizer_kwargs:
-        raise ValueError, "Found nonzero temperature and nbeta. Temperature is deprecated, please switch to using nbeta only (also in callbacks)."
+        raise ValueError(
+            "Found temperature and nbeta in optimizer_kwargs. Temperature is deprecated, please switch to using nbeta only (also in callbacks)."
         )
+
     else:
         warnings.warn("nbeta not set - using default nbeta.")
 

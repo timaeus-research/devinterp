@@ -57,7 +57,9 @@ def sample_single_chain(
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
     if "temperature" in optimizer_kwargs:
-        assert not "nbeta" in optimizer_kwargs, 'Set either nbeta or temperature in optimizer_kwargs, not both'
+        assert (
+            not "nbeta" in optimizer_kwargs
+        ), "Set either nbeta or temperature in optimizer_kwargs, not both"
         optimizer_kwargs["nbeta"] = optimizer_kwargs.pop("temperature")
     assert "nbeta" in optimizer_kwargs, "Set nbeta in optimizer_kwargs"
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
@@ -235,7 +237,7 @@ def sample(
         "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs
     ):
         warnings.warn(
-            "If you're setting a nbeta in optimizer_kwargs, please also make sure to set it in the callbacks."
+            "If you're setting a nbeta or temperature in optimizer_kwargs, please also make sure to set it in the callbacks."
         )
 
     device = torch.device(device)

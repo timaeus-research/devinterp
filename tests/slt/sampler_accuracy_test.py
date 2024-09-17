@@ -56,13 +56,15 @@ def test_accuracy_normalcrossing(
         num_chains=num_chains,
         num_draws=num_draws,
         nbeta=default_nbeta(train_dataloader),
-        init_loss=init_loss
+        init_loss=init_loss,
     )
     sample(
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, bounding_box_size=1.0),
+        optimizer_kwargs=dict(
+            lr=lr, bounding_box_size=1.0, nbeta=default_nbeta(train_dataloader)
+        ),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
