@@ -44,20 +44,57 @@ def estimate_learning_coeff_with_summary(
     """
     Estimates the local learning coefficient and returns a dictionary of results.
 
+
+    :param model: PyTorch model to sample from.
+    :type model: torch.nn.Module
+    :param loader: PyTorch DataLoader to sample from.
+    :type loader: torch.utils.data.DataLoader
+    :param callbacks: Additional callbacks to use during sampling. Since this function will automatically add the LLC estimator callback, \
+    please do not include it in this list. An example of an additional callback is `devinterp.slt.mala.MalaAcceptanceRate`, which uses the Metropolis-Adjusted Langevin Algorithm's acceptance step to compute an acceptance rate.
+    :type callbacks: list of callable
+    :type evaluate: callable
+    :param evaluate: Function to evaluate the model. Should take in a model and a batch of data and return a Transformer-like dictionary of metrics. \
+    An example of an evaluate function is:
+    ```python
+    def evaluate(model, data):
+        inputs, outputs = data
+        return F.cross_entropy(model(inputs).logits, outputs), {
+            "logits": model(inputs).logits
+        } 
+    ```
+
+    :param sampling_method: PyTorch optimizer to use for sampling. Default is SGLD. Currently implemented alternatives include SGNHT.
+    :type sampling_method: torch.optim.Optimizer
+    :param optimizer_kwargs: Dictionary of keyword arguments to pass to the optimizer. \
+    For SGLD, this includes nbeta.
+    :type optimizer_kwargs: dict
+    :param num_draws: Number of draws to sample per chain.
+    :type num_draws: int
+    :param num_chains: Number of chains to sample from.
+    :type num_chains: int
+    :param num_burnin_steps: Number of burn-in steps to use.
+    :type num_burnin_steps: int
+    :param num_steps_bw_draws: Number of steps between each draw.
+    :type num_steps_bw_draws: int
+    :param init_loss: Initial loss to use for the LLC estimator. If None, the initial loss will be computed using the first batch of data.
+    :type init_loss: float
+    :param grad_accum_steps: Number of gradient accumulation steps to use per backward pass. Note that the effective batch size is batch_size * grad_accum_steps.
+    :type grad_accum_steps: int
     :param cores: Number of cores to use for parallel sampling. Can be either an integer (will use cores starting from device 0) or a list of cores.
     :type cores: int or list of torch.device or str
     :param seed: Seed for reproducibility. If a list of seeds is provided, each chain will be seeded with the corresponding seed. 
     Otherwise, this parameter will be used as an offset that will be added to the chain index to seed each chain.
     :type seed: int or list of int
     :param device: Device to run the sampling on. Can be a torch.device or a string (e.g. "cuda:0"). Supports GPUs and TPUs. To use TPUs:
-    .. code-block:: python
 
+    ``` python
         import os
         os.environ["USE_TPU_BACKEND"] = "1"
         import torch_xla.core.xla_model as xm
         DEVICE = xm.xla_device()
-    \
-    If you are using a TPU, make sure to set the environment variable `USE_TPU_BACKEND` to `1` before importing `devinterp`.
+        # If you are using a TPU, make sure to set the environment variable `USE_TPU_BACKEND` to `1` before importing `devinterp`.
+    ```   
+ 
     :type device: torch.device or str
     :param gpu_idxs: List of GPU indices to use. If None, the device will be used as is. Provide a list of indices \
     and set cores greater than the length of the list to use multiple GPUs.
@@ -160,6 +197,77 @@ def estimate_learning_coeff(
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
 ) -> float:
+    """
+    Estimates the local learning coefficient and returns a dictionary of results.
+
+
+    :param model: PyTorch model to sample from.
+    :type model: torch.nn.Module
+    :param loader: PyTorch DataLoader to sample from.
+    :type loader: torch.utils.data.DataLoader
+    :param callbacks: Additional callbacks to use during sampling. Since this function will automatically add the LLC estimator callback, \
+    please do not include it in this list. An example of an additional callback is `devinterp.slt.mala.MalaAcceptanceRate`, which uses the Metropolis-Adjusted Langevin Algorithm's acceptance step to compute an acceptance rate.
+    :type callbacks: list of callable
+    :type evaluate: callable
+    :param evaluate: Function to evaluate the model. Should take in a model and a batch of data and return a Transformer-like dictionary of metrics. \
+    An example of an evaluate function is:
+    ```python
+    def evaluate(model, data):
+        inputs, outputs = data
+        return F.cross_entropy(model(inputs).logits, outputs), {
+            "logits": model(inputs).logits
+        } 
+    ```
+
+    :param sampling_method: PyTorch optimizer to use for sampling. Default is SGLD. Currently implemented alternatives include SGNHT.
+    :type sampling_method: torch.optim.Optimizer
+    :param optimizer_kwargs: Dictionary of keyword arguments to pass to the optimizer. \
+    For SGLD, this includes nbeta.
+    :type optimizer_kwargs: dict
+    :param num_draws: Number of draws to sample per chain.
+    :type num_draws: int
+    :param num_chains: Number of chains to sample from.
+    :type num_chains: int
+    :param num_burnin_steps: Number of burn-in steps to use.
+    :type num_burnin_steps: int
+    :param num_steps_bw_draws: Number of steps between each draw.
+    :type num_steps_bw_draws: int
+    :param init_loss: Initial loss to use for the LLC estimator. If None, the initial loss will be computed using the first batch of data.
+    :type init_loss: float
+    :param grad_accum_steps: Number of gradient accumulation steps to use per backward pass. Note that the effective batch size is batch_size * grad_accum_steps.
+    :type grad_accum_steps: int
+    :param cores: Number of cores to use for parallel sampling. Can be either an integer (will use cores starting from device 0) or a list of cores.
+    :type cores: int or list of torch.device or str
+    :param seed: Seed for reproducibility. If a list of seeds is provided, each chain will be seeded with the corresponding seed. 
+    Otherwise, this parameter will be used as an offset that will be added to the chain index to seed each chain.
+    :type seed: int or list of int
+    :param device: Device to run the sampling on. Can be a torch.device or a string (e.g. "cuda:0"). Supports GPUs and TPUs. To use TPUs:
+
+    ``` python
+        import os
+        os.environ["USE_TPU_BACKEND"] = "1"
+        import torch_xla.core.xla_model as xm
+        DEVICE = xm.xla_device()
+        # If you are using a TPU, make sure to set the environment variable `USE_TPU_BACKEND` to `1` before importing `devinterp`.
+    ```   
+ 
+    :type device: torch.device or str
+    :param gpu_idxs: List of GPU indices to use. If None, the device will be used as is. Provide a list of indices \
+    and set cores greater than the length of the list to use multiple GPUs.
+    :param verbose: Whether to display progress.
+    :type verbose: bool
+    :param optimize_over_per_model_param: Dictionary of booleans indicating whether to optimize over each parameter of the model. \
+    Keys are parameter names, and values are boolean tensors that match the shape of the parameter. \
+    A value of True (or 1) indicates that this particular element of the parameter should be optimized over. \
+    None by default, which means that we optimize over all parameters.
+    :type optimize_over_per_model_param: dict of str -> torch.Tensor[bool]
+    :param online: Whether to use the online version of the LLC estimator.
+    :type online: bool
+    :param use_amp: Whether to use automatic mixed precision (casts to float16 on GPUs). Significantly speeds up sampling at the cost of a minor loss in precision (default: False).
+    :type use_amp: bool
+    :returns: A single float representing the local learning coefficient.
+    """
+
     return estimate_learning_coeff_with_summary(
         model=model,
         loader=loader,

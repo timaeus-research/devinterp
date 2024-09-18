@@ -23,7 +23,8 @@ class LLCEstimator(SamplerCallback):
     :type num_chains: int
     :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Supports GPUs and TPUs.
+    To use TPUs, be sure to pass in torch_xla.core.xla_model.xla_device() as the device and set the USE_TPU_BACKEND environment flag to "1". Default is 'cpu'
     :type device: str | torch.device, optional
     """
 
@@ -100,7 +101,8 @@ class OnlineLLCEstimator(SamplerCallback):
     :type num_chains: int
     :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Supports GPUs and TPUs. \
+    To use TPUs, be sure to pass in torch_xla.core.xla_model.xla_device() as the device and set the USE_TPU_BACKEND environment flag to "1". Default is 'cpu'
     :type device: str | torch.device, optional
     """
 
