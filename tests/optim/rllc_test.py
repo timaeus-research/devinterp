@@ -222,8 +222,8 @@ def test_rllc_full_normalcrossing_between_dims(
     extra_dim_power,
     sample_point,
 ):
-    torch.manual_seed(42)
-    seed = 42
+    seed = 3
+    torch.manual_seed(seed)
     lr = 0.001
     num_chains = 1
     num_draws = 500
@@ -237,10 +237,6 @@ def test_rllc_full_normalcrossing_between_dims(
     init_loss_1 = get_init_loss_multi_batch(
         train_dataloader, num_chains, model1, evaluate_mse, device="cpu"
     )
-    init_loss_2 = get_init_loss_multi_batch(
-        train_dataloader, num_chains, model2, evaluate_mse, device="cpu"
-    )
-
     llc_estimator_2d = LLCEstimator(  # TODO look at the weights instead
         num_chains=num_chains,
         num_draws=num_draws,
@@ -251,9 +247,9 @@ def test_rllc_full_normalcrossing_between_dims(
         num_chains=num_chains,
         num_draws=num_draws,
         nbeta=default_nbeta(train_dataloader),
-        init_loss=init_loss_2,
+        init_loss=init_loss_1,
     )
-
+    torch.manual_seed(seed)
     sample(
         model1,
         train_dataloader,
@@ -266,6 +262,7 @@ def test_rllc_full_normalcrossing_between_dims(
         verbose=False,
         seed=seed,
     )
+    torch.manual_seed(seed)
     sample(
         model2,
         train_dataloader,
