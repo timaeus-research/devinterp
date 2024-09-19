@@ -4,6 +4,7 @@ from itertools import cycle
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import torch
+from torch_xla.amp import autocast
 import torch_xla.core.xla_model as xm
 from torch import nn
 from torch.multiprocessing import cpu_count, get_context
