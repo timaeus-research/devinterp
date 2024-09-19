@@ -317,7 +317,7 @@ def sample(
 
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
-            loader, num_chains, model, evaluate, device
+            loader, num_chains, model, evaluate, device, seed
         )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
