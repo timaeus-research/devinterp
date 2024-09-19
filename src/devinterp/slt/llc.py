@@ -56,8 +56,8 @@ class LLCEstimator(SamplerCallback):
         self.device = device
         self.eval_field = eval_field
 
-    def update(self, chain: int, draw: int, loss: float):
-        self.losses[chain, draw] = loss
+    def update(self, chain: int, draw: int, loss: torch.tensor):
+        self.losses[chain, draw] = loss.to(self.device)
 
     def finalize(self):
         if USE_TPU_BACKEND and str(self.device).startswith("xla:"):
@@ -136,7 +136,8 @@ class OnlineLLCEstimator(SamplerCallback):
         self.device = device
         self.eval_field = eval_field
 
-    def update(self, chain: int, draw: int, loss: float):
+    def update(self, chain: int, draw: int, loss: torch.tensor):
+        loss = loss.to(self.device)
         self.losses[chain, draw] = loss
         self.llcs[chain, draw] = self.nbeta * (loss - self.init_loss)
 
