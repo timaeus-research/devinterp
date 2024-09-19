@@ -49,11 +49,15 @@ def sample_single_chain(
     optimize_over_per_model_param: Optional[Dict[str, torch.Tensor]] = None,
     init_noise: Optional[float] = None,
     use_alternate_batching=False,  # See George's alternate SGLD sampling method
+    use_amp: bool = False,
     **kwargs,
 ):
     """
     Base function to sample a single chain. This function is called by the `sample` function on both single and multi-core setups.
     """
+    if use_amp:
+        warnings.warn("AMP slows down sampling on TPUs as of torch_xla 2.3.0. Disabling AMP.")
+        use_amp = False
 
     # == Model ==
     model = deepcopy(ref_model).to(device)
@@ -140,8 +144,9 @@ def sample_single_chain(
 
             for j in range(grad_accum_steps):
                 data = next(loader)
-                _loss, _results = evaluate(model, prepare_input(data, device))
-                _mean_loss = _loss.mean() / grad_accum_steps
+                with autocast(device = xm.xla_device(), enabled = use_amp, dtype = torch.float16):
+                    _loss, _results = evaluate(model, prepare_input(data, device))
+                    _mean_loss = _loss.mean() / grad_accum_steps
 
                 if not no_grad:
                     _mean_loss.backward()
@@ -260,6 +265,7 @@ def sample(
     init_noise: Optional[float] = None,
     shuffle: bool = True,
     use_alternate_batching=False,  # See George's alternate SGLD sampling method
+    use_amp: bool = False,
     **kwargs, # NOTE: This is an important catch-all for any additional arguments that may be passed to the function. Please don't remove it.
 ):
     """
@@ -366,6 +372,7 @@ def sample(
         init_noise=init_noise,
         shuffle=shuffle,
         use_alternate_batching=use_alternate_batching,
+        use_amp=use_amp,
     )
 
     def get_args(i):
