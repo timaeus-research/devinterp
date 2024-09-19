@@ -54,8 +54,8 @@ def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_w
         num_steps_bw_draws=1,  # How many steps to take between each sample
         device=device,
         online=True,
-        cores=1,  # How many cores to use for parallelization
-        gpu_idxs=None,  # Which GPUs to use ([0, 1] for using GPU 0 and 1)
+        cores=cores,  # How many cores to use for parallelization
+        gpu_idxs=gpu_idxs,  # Which GPUs to use ([0, 1] for using GPU 0 and 1)
         seed=seed,
         grad_accum_steps=grad_accum_steps,
         use_amp = use_amp,
