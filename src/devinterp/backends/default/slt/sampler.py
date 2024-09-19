@@ -129,9 +129,6 @@ def _sample_single_chain(kwargs):
 def get_args(chain_idx: int, seeds: List[int], device, callbacks, shared_kwargs):
     if isinstance(device, list):
         instance_device = device[chain_idx % len(device)]
-        for callback in callbacks:
-            if hasattr(callback, "device"):
-                callback.device = instance_device
     else:
         instance_device = device
     return dict(
