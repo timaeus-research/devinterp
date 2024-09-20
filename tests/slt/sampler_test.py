@@ -2,14 +2,13 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt.llc import LLCEstimator
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
 from devinterp.utils import default_nbeta, evaluate_mse, get_init_loss_multi_batch
+from torch.utils.data import DataLoader, TensorDataset
 
 
 @pytest.fixture
@@ -57,7 +56,7 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr),
+        optimizer_kwargs=dict(lr=lr, nbeta=default_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -71,7 +70,7 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr),
+        optimizer_kwargs=dict(lr=lr, nbeta=default_nbeta(train_dataloader)),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -162,7 +161,11 @@ def test_grad_accum_convergence(
             model,
             train_dataloader,
             evaluate=evaluate_mse,
-            optimizer_kwargs=dict(lr=lr, localization=1.0),
+            optimizer_kwargs=dict(
+                lr=lr,
+                localization=1.0,
+                nbeta=default_nbeta(train_dataloader),
+            ),
             sampling_method=sampling_method,
             num_chains=num_chains,
             num_draws=num_draws,

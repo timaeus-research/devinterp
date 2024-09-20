@@ -114,10 +114,23 @@ def estimate_learning_coeff_with_summary(
 
     model.to(device)
     # Temperature consistency warning
-    if "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs:
+    if "nbeta" in optimizer_kwargs and not "temperature" in optimizer_kwargs:
         warnings.warn(
             "Using passed in nbeta. Make sure callbacks are also initialized with the same nbeta."
         )
+    elif not "nbeta" in optimizer_kwargs and "temperature" in optimizer_kwargs:
+        warnings.warn(
+            "Temperature is deprecated, please switch to using nbeta here and in callbacks."
+        )
+        warnings.warn(
+            "Using passed in temperature. Make sure callbacks are also initialized with the same temperature."
+        )
+        optimizer_kwargs["nbeta"] = optimizer_kwargs.pop("temperature")
+    elif "nbeta" in optimizer_kwargs and "temperature" in optimizer_kwargs:
+        raise ValueError(
+            "Found temperature and nbeta in optimizer_kwargs. Temperature is deprecated, please switch to using nbeta only (also in callbacks)."
+        )
+
     else:
         warnings.warn("nbeta not set - using default nbeta.")
 
