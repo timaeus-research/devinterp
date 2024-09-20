@@ -2,7 +2,6 @@ import warnings
 from typing import Union
 
 import torch
-
 from devinterp.slt.callback import SamplerCallback
 from devinterp.utils import USE_TPU_BACKEND
 
@@ -51,6 +50,7 @@ class LLCEstimator(SamplerCallback):
             nbeta = temperature
             warnings.warn("Temperature is deprecated. Please use nbeta instead.")
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
+        self.temperature = temperature
 
         self.device = device
         self.eval_field = eval_field
@@ -62,8 +62,6 @@ class LLCEstimator(SamplerCallback):
         if USE_TPU_BACKEND and str(self.device).startswith("xla:"):
             import torch_xla.core.xla_model as xm
 
-            scale = 1.0 / (xm.xrt_world_size())
-            self.losses *= scale
             self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
         avg_losses = self.losses.mean(axis=1)
         self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
@@ -125,7 +123,6 @@ class OnlineLLCEstimator(SamplerCallback):
 
         self.losses = torch.zeros((num_chains, num_draws)).to(device)
         self.llcs = torch.zeros((num_chains, num_draws)).to(device)
-
         assert (
             nbeta is not None or temperature is not None
         ), "Please provide a value for nbeta."
@@ -133,6 +130,7 @@ class OnlineLLCEstimator(SamplerCallback):
             nbeta = temperature
             warnings.warn("Temperature is deprecated. Please use nbeta instead.")
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
+        self.temperature = temperature
 
         self.device = device
         self.eval_field = eval_field

@@ -7,12 +7,6 @@ import cloudpickle
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -25,18 +19,23 @@ from devinterp.utils import (
     prepare_input,
     split_results,
 )
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 def sample_single_chain(
     ref_model: nn.Module,
     loader: DataLoader,
     evaluate: EvaluateFn,
+    optimizer_kwargs: Dict,
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
     grad_accum_steps=1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
-    optimizer_kwargs: Optional[Dict] = None,
     chain: int = 0,
     seed: Optional[int] = None,
     verbose: bool = True,
@@ -56,7 +55,12 @@ def sample_single_chain(
 
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
-    optimizer_kwargs = optimizer_kwargs or {}
+    if "temperature" in optimizer_kwargs:
+        assert (
+            not "nbeta" in optimizer_kwargs
+        ), "Set either nbeta or temperature in optimizer_kwargs, not both"
+        optimizer_kwargs["nbeta"] = optimizer_kwargs.pop("temperature")
+    assert "nbeta" in optimizer_kwargs, "Set nbeta in optimizer_kwargs"
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
@@ -231,8 +235,21 @@ def sample(
     if optimizer_kwargs is not None and (
         "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs
     ):
+        if "nbeta" in optimizer_kwargs:
+            assert not any(
+                getattr(callback, "temperature", None) is not None
+                for callback in callbacks
+            ), "If you're setting nbeta in optimizer_kwargs, don't set temperature in the callbacks."
+        if "temperature" in optimizer_kwargs:
+            assert not any(
+                (
+                    getattr(callback, "nbeta", None) is not None
+                    and getattr(callback, "temperature") is None
+                )
+                for callback in callbacks
+            ), "If you're setting temperature in optimizer_kwargs, don't set nbeta in the callbacks."
         warnings.warn(
-            "If you're setting a nbeta in optimizer_kwargs, please also make sure to set it in the callbacks."
+            "If you're setting a nbeta or temperature in optimizer_kwargs, please also make sure to set it in the callbacks."
         )
 
     device = torch.device(device)

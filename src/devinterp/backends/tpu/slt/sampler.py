@@ -5,11 +5,6 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Un
 
 import torch
 import torch_xla.core.xla_model as xm
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.utils.data import DataLoader
-from tqdm import trange
-
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -20,6 +15,10 @@ from devinterp.utils import (
     prepare_input,
     set_seed,
 )
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.utils.data import DataLoader
+from tqdm import trange
 
 
 def mark_step_if_xla(device):
@@ -33,12 +32,12 @@ def sample_single_chain(
     ref_model: nn.Module,
     loader: torch.utils.data.DataLoader,
     evaluate: Callable[[nn.Module, torch.Tensor], Tuple[torch.Tensor, Dict[str, Any]]],
+    optimizer_kwargs: Dict,
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
     grad_accum_steps: int = 1,
     sampling_method: Type[torch.optim.Optimizer] = SGLD,
-    optimizer_kwargs: Optional[Dict] = None,
     scheduler_cls: Optional[Type[torch.optim.lr_scheduler._LRScheduler]] = None,
     scheduler_kwargs: Optional[Dict] = None,
     chain: int = 0,
@@ -62,7 +61,13 @@ def sample_single_chain(
         set_seed(seed, device=device)
 
     # == Optimizer ==
-    optimizer_kwargs = optimizer_kwargs or {}
+    if "temperature" in optimizer_kwargs:
+        assert (
+            not "nbeta" in optimizer_kwargs
+        ), "Set either nbeta or temperature in optimizer_kwargs, not both"
+        optimizer_kwargs["nbeta"] = optimizer_kwargs.pop("temperature")
+    assert "nbeta" in optimizer_kwargs, "Set nbeta in optimizer_kwargs"
+
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)
 

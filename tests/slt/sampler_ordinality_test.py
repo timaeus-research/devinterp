@@ -70,7 +70,9 @@ def test_linedot_normal_crossing(
             evaluate=evaluate_mse,
             optimizer_kwargs=dict(
                 lr=lr,
-                bounding_box_size=0.5,  # to prevent accidental movement from [1, 0, ...] to origin
+                bounding_box_size=0.5,
+                nbeta=default_nbeta(train_dataloader),
+                # to prevent accidental movement from [1, 0, ...] to origin
             ),
             sampling_method=sampling_method,
             num_chains=num_chains,

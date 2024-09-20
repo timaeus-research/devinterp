@@ -1,18 +1,15 @@
-import typing
 import warnings
 from collections.abc import Sequence
-from typing import Any, Callable, Container, List, Optional, Type, Union
+from typing import Callable, Container, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import torch
-from pydantic import BaseModel, Field
-from tqdm import tqdm, trange
-
-from devinterp.slt.mala import MalaAcceptanceRate
 from devinterp.utils import default_nbeta
+from pydantic import BaseModel
+from tqdm import tqdm
 
 
 # Sampling config validates input parameters while allowing us to use **kwargs later on
@@ -223,6 +220,7 @@ class EpsilonBetaAnalyzer:
         color: Optional[str] = None,
         slider: Optional[str] = None,
         slider_plane: Optional[str] = False,
+        div_out_beta=False,
         **kwargs,
     ) -> go.Figure:
         """
@@ -238,13 +236,22 @@ class EpsilonBetaAnalyzer:
             Example: range_color=[0, 0.15] to set the color range.
         :return: A plotly Figure object containing the LLC sweep visualization.
         """
-        plot_config = {
-            "title": "Local learning coefficient vs. epsilon and beta",
-            "z": "llc/final",
-            "log_y": True,
-            "log_x": True,
-            "log_z": True,
-        }
+        if div_out_beta:
+            plot_config = {
+                "title": "LLC / beta vs. epsilon and beta",
+                "z": "llc_div_beta",
+                "log_y": True,
+                "log_x": True,
+                "log_z": True,
+            }
+        else:
+            plot_config = {
+                "title": "LLC vs. epsilon and beta",
+                "z": "llc/final",
+                "log_y": True,
+                "log_x": True,
+                "log_z": True,
+            }
 
         assert (
             self.sweep_df is not None
@@ -259,7 +266,8 @@ class EpsilonBetaAnalyzer:
         sweep_df["llc/final"] = sweep_df["llc/trace"].apply(
             lambda x: x[:, -num_last_steps_to_average].mean()
         )
-
+        if div_out_beta:
+            sweep_df["llc_div_beta"] = sweep_df["llc/final"] / sweep_df["beta"]
         if true_lambda is not None:
             if type(true_lambda) in [int, float]:
                 sweep_df["true_lambda"] = sweep_df["llc/trace"].apply(
@@ -413,7 +421,7 @@ class EpsilonBetaAnalyzer:
                 scene=dict(
                     xaxis_title="epsilon",
                     yaxis_title="beta",
-                    zaxis_title="lambdahat",
+                    zaxis_title="lambdahat / beta" if div_out_beta else "lambdahat",
                     xaxis_type="log",
                     yaxis_type="log",
                     zaxis_type="log",

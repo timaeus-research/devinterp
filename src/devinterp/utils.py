@@ -1,4 +1,5 @@
 import os
+from functools import partial
 from itertools import islice
 from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Tuple, Union
 
@@ -194,20 +195,18 @@ def get_init_loss_full_batch(dataloader, model, evaluate, device):
     return loss / len(dataloader)
 
 
-def make_evaluate(
-    criterion: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
-) -> EvaluateFn:
-
-    def evaluate(model, data):
-        x, y = data
-        y_pred = model(x)
-        return criterion(y_pred, y), {"output": y_pred}
-
-    return evaluate
+def evaluate(criterion, model, data):
+    x, y = data
+    y_pred = model(x)
+    return criterion(y_pred, y), {"output": y_pred}
 
 
-evaluate_mse = make_evaluate(F.mse_loss)
-evaluate_ce = make_evaluate(F.cross_entropy)
+def make_evaluate(criterion):
+    return partial(evaluate, criterion)
+
+
+evaluate_ce = partial(evaluate, F.cross_entropy)
+evaluate_mse = partial(evaluate, F.mse_loss)
 
 
 def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):
