@@ -4,8 +4,13 @@ from itertools import cycle
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import torch
-from torch_xla.amp import autocast
 import torch_xla.core.xla_model as xm
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.utils.data import DataLoader
+from torch_xla.amp import autocast
+from tqdm import trange
+
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -16,10 +21,6 @@ from devinterp.utils import (
     prepare_input,
     set_seed,
 )
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.utils.data import DataLoader
-from tqdm import trange
 
 
 def mark_step_if_xla(device):
@@ -56,7 +57,9 @@ def sample_single_chain(
     Base function to sample a single chain. This function is called by the `sample` function on both single and multi-core setups.
     """
     if use_amp:
-        warnings.warn("AMP slows down sampling on TPUs as of torch_xla 2.3.0. Disabling AMP.")
+        warnings.warn(
+            "AMP slows down sampling on TPUs as of torch_xla 2.3.0. Disabling AMP."
+        )
         use_amp = False
 
     # == Model ==
@@ -150,7 +153,9 @@ def sample_single_chain(
 
             for j in range(grad_accum_steps):
                 data = next(loader)
-                with autocast(device = xm.xla_device(), enabled = use_amp, dtype = torch.float16):
+                with autocast(
+                    device=xm.xla_device(), enabled=use_amp, dtype=torch.float16
+                ):
                     _loss, _results = evaluate(model, prepare_input(data, device))
                     _mean_loss = _loss.mean() / grad_accum_steps
 
@@ -272,7 +277,7 @@ def sample(
     shuffle: bool = True,
     use_alternate_batching=False,  # See George's alternate SGLD sampling method
     use_amp: bool = False,
-    **kwargs, # NOTE: This is an important catch-all for any additional arguments that may be passed to the function. Please don't remove it.
+    **kwargs,  # NOTE: This is an important catch-all for any additional arguments that may be passed to the function. Please don't remove it.
 ):
     """
     Sample model weights using a given sampling_method, supporting multiple chains/cores,

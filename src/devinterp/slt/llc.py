@@ -2,6 +2,7 @@ import warnings
 from typing import Union
 
 import torch
+
 from devinterp.slt.callback import SamplerCallback
 from devinterp.utils import USE_TPU_BACKEND
 
@@ -122,7 +123,6 @@ class OnlineLLCEstimator(SamplerCallback):
             device
         )
         self.llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
-
 
         self.losses = torch.zeros((num_chains, num_draws)).to(device)
         self.llcs = torch.zeros((num_chains, num_draws)).to(device)

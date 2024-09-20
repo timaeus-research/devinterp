@@ -6,6 +6,11 @@ import cloudpickle
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
@@ -14,17 +19,13 @@ from devinterp.slt.mala import MalaAcceptanceRate
 from devinterp.slt.norms import NoiseNorm
 from devinterp.utils import (
     EvaluateFn,
+    cycle,
     default_nbeta,
     get_init_loss_multi_batch,
     prepare_input,
     split_results,
-    cycle
 )
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader
-from tqdm import tqdm
+
 
 def sample_single_chain(
     ref_model: nn.Module,
@@ -96,7 +97,9 @@ def sample_single_chain(
         for i, data in zip(range(num_steps), cycle(loader)):
             model.train()
             data = prepare_input(data, device)
-            with torch.autocast(device_type = device.type, dtype = torch.float16, enabled = use_amp):
+            with torch.autocast(
+                device_type=device.type, dtype=torch.float16, enabled=use_amp
+            ):
                 results = evaluate(model, data)
                 loss, results = split_results(results)
 
@@ -241,7 +244,12 @@ def sample(
         else:
             init_loss_seed = seed
         init_loss = get_init_loss_multi_batch(
-            loader, num_chains * grad_accum_steps, model, evaluate, device, init_loss_seed,
+            loader,
+            num_chains * grad_accum_steps,
+            model,
+            evaluate,
+            device,
+            init_loss_seed,
         )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
@@ -284,9 +292,13 @@ def sample(
 
     if device.type == "cuda":
         if gpu_idxs is not None:
-            assert cores >= len(gpu_idxs), "Number of cores must be greater than number of devices."
+            assert cores >= len(
+                gpu_idxs
+            ), "Number of cores must be greater than number of devices."
     else:
-        assert gpu_idxs is None, "Multi-GPU sampling is only supported for CUDA devices. Check your device parameter."
+        assert (
+            gpu_idxs is None
+        ), "Multi-GPU sampling is only supported for CUDA devices. Check your device parameter."
 
     if seed is not None:
         warnings.warn(
@@ -339,7 +351,10 @@ def sample(
         with ctx.Pool(cores) as pool:
             pool.map(
                 _sample_single_chain,
-                [get_args(i, seeds, device, callbacks, shared_kwargs) for i in range(num_chains)],
+                [
+                    get_args(i, seeds, device, callbacks, shared_kwargs)
+                    for i in range(num_chains)
+                ],
             )
     else:
         for i in range(num_chains):

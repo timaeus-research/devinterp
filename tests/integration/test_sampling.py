@@ -1,19 +1,19 @@
-import torch
+import time
 import warnings
 
+import numpy as np
+import pytest
 import torch
 from datasets import load_dataset
 from torch.nn import functional as F
 from transformers import AutoModelForImageClassification
-import numpy as np
 
 from devinterp.optim import SGLD
 from devinterp.slt.sampler import estimate_learning_coeff_with_summary
-from devinterp.utils import plot_trace, USE_TPU_BACKEND
-import pytest
-import time
+from devinterp.utils import USE_TPU_BACKEND, plot_trace
 
 warnings.filterwarnings("ignore")
+
 
 def evaluate(model, data):
     inputs, outputs = data
@@ -23,22 +23,35 @@ def evaluate(model, data):
     }  # transformers doesn't output a vector
 
 
-def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_workers = 0,
-              batch_size = 256,
-              grad_accum_steps = 1,
-              use_amp = False):
+def get_stats(
+    device,
+    gpu_idxs=None,
+    cores=1,
+    chains=4,
+    seed=None,
+    num_workers=0,
+    batch_size=256,
+    grad_accum_steps=1,
+    use_amp=False,
+):
     # Load a pretrained MNIST classifier
-    model = AutoModelForImageClassification.from_pretrained("fxmarty/resnet-tiny-mnist").to(
-        device
-    )
+    model = AutoModelForImageClassification.from_pretrained(
+        "fxmarty/resnet-tiny-mnist"
+    ).to(device)
 
     mnist_dataset = load_dataset("mnist")
+
     def preprocess(examples):
         # Convert images to tensors and normalize
-        examples["pixel_values"] = [torch.tensor(np.array(img)).float().unsqueeze(0) / 255.0 for img in examples["image"]]
+        examples["pixel_values"] = [
+            torch.tensor(np.array(img)).float().unsqueeze(0) / 255.0
+            for img in examples["image"]
+        ]
         return examples
 
-    mnist_dataset = mnist_dataset.map(preprocess, batched=True, remove_columns=["image"])
+    mnist_dataset = mnist_dataset.map(
+        preprocess, batched=True, remove_columns=["image"]
+    )
 
     class torchvisionWrapper(torch.utils.data.Dataset):
         def __init__(self, dataset):
@@ -55,7 +68,9 @@ def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_w
     mnist_dataset.set_format(type="torch", columns=["pixel_values", "label"])
     data = torchvisionWrapper(mnist_dataset["train"])
 
-    loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    loader = torch.utils.data.DataLoader(
+        data, batch_size=batch_size, shuffle=True, num_workers=num_workers
+    )
 
     return estimate_learning_coeff_with_summary(
         model,
@@ -73,92 +88,118 @@ def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_w
         gpu_idxs=gpu_idxs,  # Which GPUs to use ([0, 1] for using GPU 0 and 1)
         seed=seed,
         grad_accum_steps=grad_accum_steps,
-        use_amp = use_amp,
+        use_amp=use_amp,
     )
 
-def check(s1, s2, atol=1e-3, reverse = False):
+
+def check(s1, s2, atol=1e-3, reverse=False):
     """
     Check if two stats are close to each other.
-    
+
     """
-    assert s1.keys() == s2.keys(), f"Expected the same keys in both stats, got {s1.keys()} and {s2.keys()}."
-    assert s1["llc/trace"].shape == s2["llc/trace"].shape, f"Expected the same shape for llc/trace, got {s1['llc/trace'].shape} and {s2['llc/trace'].shape}."
+    assert (
+        s1.keys() == s2.keys()
+    ), f"Expected the same keys in both stats, got {s1.keys()} and {s2.keys()}."
+    assert (
+        s1["llc/trace"].shape == s2["llc/trace"].shape
+    ), f"Expected the same shape for llc/trace, got {s1['llc/trace'].shape} and {s2['llc/trace'].shape}."
     valid = np.allclose(s1["llc/trace"], s2["llc/trace"], atol=atol)
     if reverse:
         valid = not valid
-    assert valid, f"Expected {'different' if reverse else 'close'} llc/trace in both stats, got {s1['llc/trace']} and {s2['llc/trace']}."
+    assert (
+        valid
+    ), f"Expected {'different' if reverse else 'close'} llc/trace in both stats, got {s1['llc/trace']} and {s2['llc/trace']}."
+
 
 @pytest.fixture(scope="module")
 def cpu_default():
-    return get_stats("cpu", seed = 100)
+    return get_stats("cpu", seed=100)
+
 
 @pytest.mark.gpu
 @pytest.fixture(scope="module")
 def gpu_default():
-    return get_stats("cuda", seed = 100)
+    return get_stats("cuda", seed=100)
+
 
 def test_cpu_consistent(cpu_default):
     repeat_stats = get_stats("cpu", seed=100)
     check(cpu_default, repeat_stats, 1e-3)
 
+
 def test_cpu_consistent_seeds(cpu_default):
     diff_seed_stats = get_stats("cpu", seed=101)
-    check(cpu_default, diff_seed_stats, 5, reverse = True)
+    check(cpu_default, diff_seed_stats, 5, reverse=True)
+
 
 def test_cpu_multicore(cpu_default):
-    multicore_stats = get_stats("cpu", seed=100, cores = 4)
+    multicore_stats = get_stats("cpu", seed=100, cores=4)
     check(cpu_default, multicore_stats, 1e-4)
 
+
 def test_cpu_multiworker(cpu_default):
-    multiworker_stats = get_stats("cpu", seed=100, num_workers = 4)
+    multiworker_stats = get_stats("cpu", seed=100, num_workers=4)
     check(cpu_default, multiworker_stats, 1e-4)
 
+
 def test_grad_accum(cpu_default: dict):
-    grad_accum_stats = get_stats("cpu", seed=100, cores = 4, grad_accum_steps = 2, batch_size = 128)
+    grad_accum_stats = get_stats(
+        "cpu", seed=100, cores=4, grad_accum_steps=2, batch_size=128
+    )
     check(cpu_default, grad_accum_stats, 1)
+
 
 @pytest.mark.gpu
 def test_gpu_consistent(gpu_default):
     repeat_stats = get_stats("cuda", seed=100)
     check(gpu_default, repeat_stats, 0.2)
 
+
 @pytest.mark.gpu
 def test_gpu_consistent_seeds(gpu_default):
     diff_seed_stats = get_stats("cuda", seed=101)
-    check(gpu_default, diff_seed_stats, 5, reverse = True)
+    check(gpu_default, diff_seed_stats, 5, reverse=True)
+
 
 @pytest.mark.gpu
 def test_gpu_multicore(gpu_default):
-    multicore_stats = get_stats("cuda", seed=100, cores = 4)
+    multicore_stats = get_stats("cuda", seed=100, cores=4)
     check(gpu_default, multicore_stats, 0.2)
+
 
 @pytest.mark.gpu
 def test_gpu_multiworker(gpu_default):
-    multiworker_stats = get_stats("cuda", seed=100, num_workers = 4)
+    multiworker_stats = get_stats("cuda", seed=100, num_workers=4)
     check(gpu_default, multiworker_stats, 0.2)
+
 
 @pytest.mark.gpu
 def test_multigpu(gpu_default):
     if torch.cuda.device_count() > 1:
-        multigpu_stats = get_stats("cuda", seed=100, gpu_idxs = [0, 1], cores = 2)
+        multigpu_stats = get_stats("cuda", seed=100, gpu_idxs=[0, 1], cores=2)
         check(gpu_default, multigpu_stats, 0.2)
     else:
         pytest.skip("Multiple GPUs unavailable.")
 
+
 @pytest.mark.gpu
 def test_multigpu_multicore(gpu_default):
     if torch.cuda.device_count() > 1:
-        multigpu_multicore_stats = get_stats("cuda", seed=100, gpu_idxs = [0, 1], cores = 4)
+        multigpu_multicore_stats = get_stats("cuda", seed=100, gpu_idxs=[0, 1], cores=4)
         check(gpu_default, multigpu_multicore_stats, 0.4)
     else:
         pytest.skip("Multiple GPUs unavailable.")
 
+
 @pytest.mark.gpu
 def test_gpu_grad_accum(gpu_default: dict):
-    grad_accum_stats = get_stats("cuda", seed=100, cores = 4, grad_accum_steps = 2, batch_size = 128)
+    grad_accum_stats = get_stats(
+        "cuda", seed=100, cores=4, grad_accum_steps=2, batch_size=128
+    )
     check(gpu_default, grad_accum_stats, 1)
+
 
 @pytest.mark.gpu
 def test_gpu_amp(gpu_default: dict):
-    amp_stats = get_stats("cuda", seed=100, cores = 4, use_amp = True)
+    amp_stats = get_stats("cuda", seed=100, cores=4, use_amp=True)
     check(gpu_default, amp_stats, 0.2)

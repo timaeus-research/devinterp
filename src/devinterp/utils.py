@@ -82,9 +82,13 @@ def plot_trace(
     plt.show()
 
 
-def default_nbeta(dataloader: Union[DataLoader, int], grad_accum_steps: int = 1) -> float:
+def default_nbeta(
+    dataloader: Union[DataLoader, int], grad_accum_steps: int = 1
+) -> float:
     if isinstance(dataloader, DataLoader):
-        return (dataloader.batch_size * grad_accum_steps) / np.log(dataloader.batch_size * grad_accum_steps)
+        return (dataloader.batch_size * grad_accum_steps) / np.log(
+            dataloader.batch_size * grad_accum_steps
+        )
     elif isinstance(dataloader, int):
         return (dataloader * grad_accum_steps) / np.log(dataloader * grad_accum_steps)
     else:
@@ -155,14 +159,16 @@ def split_results(results: EvalResults) -> Tuple[torch.Tensor, Any]:
 
     return loss, results
 
+
 def get_seeded_dataloader(dataloader, seed):
     gen = torch.Generator()
     gen.manual_seed(seed)
-    return torch.utils.data.DataLoader(dataloader.dataset, 
-                                       batch_size=dataloader.batch_size, 
-                                       generator=gen)
+    return torch.utils.data.DataLoader(
+        dataloader.dataset, batch_size=dataloader.batch_size, generator=gen
+    )
 
-def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device, seed = None):
+
+def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device, seed=None):
     if seed is not None:
         dataloader = get_seeded_dataloader(dataloader, seed)
     model = model.to(device)
@@ -176,7 +182,9 @@ def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device, see
     return loss
 
 
-def get_init_loss_multi_batch(dataloader, n_batches, model, evaluate, device, seed = None):
+def get_init_loss_multi_batch(
+    dataloader, n_batches, model, evaluate, device, seed=None
+):
     if seed is not None:
         dataloader = get_seeded_dataloader(dataloader, seed)
 
@@ -193,10 +201,10 @@ def get_init_loss_multi_batch(dataloader, n_batches, model, evaluate, device, se
     return loss / n_batches
 
 
-def get_init_loss_full_batch(dataloader, model, evaluate, device, seed = None):
+def get_init_loss_full_batch(dataloader, model, evaluate, device, seed=None):
     if seed is not None:
         dataloader = get_seeded_dataloader(dataloader, seed)
-    
+
     model = model.to(device)
     model.train()
     loss = 0.0
@@ -256,7 +264,8 @@ def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-def cycle(iterable, limit = None):
+
+def cycle(iterable, limit=None):
     """
     Use this function to cycle through a dataloader. Unlike itertools.cycle, this function doesn't cache
     values in memory.
@@ -269,7 +278,7 @@ def cycle(iterable, limit = None):
     """
     index = 0
     if limit is None:
-        limit = float('inf')
+        limit = float("inf")
     while True:
         for x in iterable:
             if index >= limit:
