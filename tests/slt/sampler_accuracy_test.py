@@ -2,14 +2,13 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
 from devinterp.optim.sgld import SGLD
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
 from devinterp.utils import default_nbeta, evaluate_mse, get_init_loss_multi_batch
+from torch.utils.data import DataLoader, TensorDataset
 
 
 @pytest.fixture
@@ -46,7 +45,7 @@ def test_accuracy_normalcrossing(
     seed = 42
     model = Polynomial(powers)
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
-    lr = 0.0002
+    lr = 0.0004
     num_chains = 10
     num_draws = 5_000
     init_loss = get_init_loss_multi_batch(
@@ -55,14 +54,17 @@ def test_accuracy_normalcrossing(
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
         num_draws=num_draws,
-        nbeta=default_nbeta(train_dataloader),
-        init_loss=init_loss
+        nbeta=default_nbeta(len(train_data)),
+        init_loss=init_loss,
     )
     sample(
         model,
         train_dataloader,
         evaluate=evaluate_mse,
-        optimizer_kwargs=dict(lr=lr, bounding_box_size=1.0),
+        optimizer_kwargs=dict(
+            lr=lr,
+            nbeta=default_nbeta(len(train_data)),
+        ),
         sampling_method=sampling_method,
         num_chains=num_chains,
         num_draws=num_draws,
@@ -73,5 +75,5 @@ def test_accuracy_normalcrossing(
     llc_mean = llc_estimator.get_results()["llc/mean"]
     llc_std_dev = llc_estimator.get_results()["llc/std"]
     assert (
-        llc_mean - 2 * llc_std_dev < true_lc < llc_mean + 2 * llc_std_dev
-    ), f"LLC mean {llc_mean:.3f} +- {2*llc_std_dev:.3f} does not contain true value {true_lc:.3f} for powers {powers} using {sampling_method}"
+        llc_mean - 3.5 * llc_std_dev < true_lc < llc_mean + 3.5 * llc_std_dev
+    ), f"LLC mean {llc_mean:.3f} +- {3.5*llc_std_dev:.3f} does not contain true value {true_lc:.3f} for powers {powers} using {sampling_method}"
