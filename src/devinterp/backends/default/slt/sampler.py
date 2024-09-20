@@ -1,4 +1,3 @@
-import itertools
 import warnings
 from copy import deepcopy
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
@@ -7,6 +6,12 @@ import cloudpickle
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -14,16 +19,12 @@ from devinterp.slt.mala import MalaAcceptanceRate
 from devinterp.slt.norms import NoiseNorm
 from devinterp.utils import (
     EvaluateFn,
+    cycle,
     default_nbeta,
     get_init_loss_multi_batch,
     prepare_input,
     split_results,
 )
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 
 def sample_single_chain(
@@ -42,6 +43,7 @@ def sample_single_chain(
     device: torch.device = torch.device("cpu"),
     optimize_over_per_model_param: Optional[dict] = None,
     callbacks: List[SamplerCallback] = [],
+    use_amp: bool = False,
     **kwargs,
 ):
     if grad_accum_steps > 1:
@@ -91,17 +93,19 @@ def sample_single_chain(
     with tqdm(
         desc=f"Chain {chain}", total=num_steps // grad_accum_steps, disable=not verbose
     ) as pbar:
-        for i, data in zip(range(num_steps), itertools.cycle(loader)):
+        model.train()
+        for i, data in zip(range(num_steps), cycle(loader)):
             model.train()
             data = prepare_input(data, device)
+            with torch.autocast(
+                device_type=device.type, dtype=torch.float16, enabled=use_amp
+            ):
+                results = evaluate(model, data)
+                loss, results = split_results(results)
 
-            results = evaluate(model, data)
-            loss, results = split_results(results)
-
-            if grad_accum_steps > 1:
-                loss = loss / grad_accum_steps
-                cumulative_loss += loss.item()
-            loss.backward()
+                loss /= grad_accum_steps
+                cumulative_loss += loss
+                loss.backward()
 
             # i+1 instead of i so that the gradient accumulates to an entire batch first
             # otherwise the first draw happens after batch_size/grad_accum_steps samples instead of batch_size samples
@@ -115,11 +119,7 @@ def sample_single_chain(
                 draw = (
                     i - num_burnin_steps
                 ) // num_steps_bw_draws  # required for locals()
-                if grad_accum_steps > 1:
-                    loss = cumulative_loss
-                    cumulative_loss = 0
-                else:
-                    loss = loss.item()
+                loss = cumulative_loss
 
                 with torch.no_grad():
                     for callback in callbacks:
@@ -127,19 +127,28 @@ def sample_single_chain(
 
             if (i + 1) % grad_accum_steps == 0:
                 optimizer.zero_grad()
+                cumulative_loss = 0
                 pbar.update(1)
 
 
 def _sample_single_chain(kwargs):
+    pickled_args = ["evaluate", "loader"]
     evaluate = cloudpickle.loads(kwargs["evaluate"])
-    kwargs = {k: v for k, v in kwargs.items() if k != "evaluate"}
-    return sample_single_chain(**kwargs, evaluate=evaluate)
+    loader = cloudpickle.loads(kwargs["loader"])
+    kwargs = {k: v for k, v in kwargs.items() if k not in pickled_args}
+    return sample_single_chain(**kwargs, evaluate=evaluate, loader=loader)
 
 
-def get_args(chain_idx, seeds, shared_kwargs):
+def get_args(chain_idx: int, seeds: List[int], device, callbacks, shared_kwargs):
+    if isinstance(device, list):
+        instance_device = device[chain_idx % len(device)]
+    else:
+        instance_device = device
     return dict(
         chain=chain_idx,
         seed=seeds[chain_idx],
+        device=instance_device,
+        callbacks=callbacks,
         **shared_kwargs,
     )
 
@@ -162,7 +171,9 @@ def sample(
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
     optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
+    gpu_idxs: Optional[List[int]] = None,
     batch_size: bool = 1,
+    use_amp: bool = False,
     **kwargs,
 ):
     """
@@ -203,7 +214,13 @@ def sample(
     :type device: str or torch.device, optional
     :param verbose: whether to print sample chain progress. Default is True
     :type verbose: bool, optional
-
+    :param optimize_over_per_model_param: Dictionary of booleans indicating whether to optimize over each parameter of the model. \
+    Keys are parameter names, and values are boolean tensors that match the shape of the parameter. \
+    A value of True (or 1) indicates that this particular element of the parameter should be optimized over. \
+    None by default, which means that we optimize over all parameters.
+    :type optimize_over_per_model_param: dict, optional
+    :param use_amp: Whether to use automatic mixed precision. Casts to float16 on GPUs.
+    :type use_amp: bool, optional
     :raises ValueError: if derivative callbacks (f.e. :func:`~devinterp.slt.loss.OnlineLossStatistics`) are passed before base callbacks (f.e. :func:`~devinterp.slt.llc.OnlineLLCEstimator`)
     :raises Warning: if num_burnin_steps < num_draws
     :raises Warning: if num_draws > len(loader)
@@ -222,8 +239,17 @@ def sample(
             "beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
         )
     if not init_loss:
+        if seed is not None and not isinstance(seed, int):
+            init_loss_seed = seed[0]
+        else:
+            init_loss_seed = seed
         init_loss = get_init_loss_multi_batch(
-            loader, num_chains, model, evaluate, device
+            loader,
+            num_chains * grad_accum_steps,
+            model,
+            evaluate,
+            device,
+            init_loss_seed,
         )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
@@ -252,9 +278,27 @@ def sample(
             "If you're setting a nbeta or temperature in optimizer_kwargs, please also make sure to set it in the callbacks."
         )
 
-    device = torch.device(device)
     if cores is None:
         cores = min(cpu_count(), 4)
+
+    if isinstance(device, str):
+        device = torch.device(device)
+
+    if device.type == "cpu" and use_amp:
+        warnings.warn(
+            "Automatic Mixed Precision (AMP) is not supported on CPU devices. Disabling AMP."
+        )
+        use_amp = False
+
+    if device.type == "cuda":
+        if gpu_idxs is not None:
+            assert cores >= len(
+                gpu_idxs
+            ), "Number of cores must be greater than number of devices."
+    else:
+        assert (
+            gpu_idxs is None
+        ), "Multi-GPU sampling is only supported for CUDA devices. Check your device parameter."
 
     if seed is not None:
         warnings.warn(
@@ -278,7 +322,7 @@ def sample(
 
     shared_kwargs = dict(
         ref_model=model,
-        loader=loader,
+        loader=cloudpickle.dumps(loader),
         evaluate=cloudpickle.dumps(evaluate),
         num_draws=num_draws,
         num_burnin_steps=num_burnin_steps,
@@ -287,10 +331,9 @@ def sample(
         grad_accum_steps=grad_accum_steps,
         sampling_method=sampling_method,
         optimizer_kwargs=optimizer_kwargs,
-        device=device,
         verbose=verbose,
-        callbacks=callbacks,
         optimize_over_per_model_param=optimize_over_per_model_param,
+        use_amp=use_amp,
     )
 
     if cores > 1:
@@ -301,20 +344,21 @@ def sample(
         #     join=True,
         #     start_method="spawn",
         # )
-        if device.type == "gpu":
-            warnings.warn(
-                "Using multiprocessing with a single GPU. Multi-GPU support is not yet available."
-            )
 
+        if gpu_idxs is not None:
+            device = [torch.device(f"cuda:{i}") for i in gpu_idxs]
         ctx = get_context("spawn")
         with ctx.Pool(cores) as pool:
             pool.map(
                 _sample_single_chain,
-                [get_args(i, seeds, shared_kwargs) for i in range(num_chains)],
+                [
+                    get_args(i, seeds, device, callbacks, shared_kwargs)
+                    for i in range(num_chains)
+                ],
             )
     else:
         for i in range(num_chains):
-            _sample_single_chain(get_args(i, seeds, shared_kwargs))
+            _sample_single_chain(get_args(i, seeds, device, callbacks, shared_kwargs))
 
     for callback in callbacks:
         if hasattr(callback, "finalize"):

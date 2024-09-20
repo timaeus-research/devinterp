@@ -5,6 +5,12 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Un
 
 import torch
 import torch_xla.core.xla_model as xm
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.utils.data import DataLoader
+from torch_xla.amp import autocast
+from tqdm import trange
+
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -15,10 +21,6 @@ from devinterp.utils import (
     prepare_input,
     set_seed,
 )
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.utils.data import DataLoader
-from tqdm import trange
 
 
 def mark_step_if_xla(device):
@@ -48,11 +50,17 @@ def sample_single_chain(
     optimize_over_per_model_param: Optional[Dict[str, torch.Tensor]] = None,
     init_noise: Optional[float] = None,
     use_alternate_batching=False,  # See George's alternate SGLD sampling method
+    use_amp: bool = False,
     **kwargs,
 ):
     """
     Base function to sample a single chain. This function is called by the `sample` function on both single and multi-core setups.
     """
+    if use_amp:
+        warnings.warn(
+            "AMP slows down sampling on TPUs as of torch_xla 2.3.0. Disabling AMP."
+        )
+        use_amp = False
 
     # == Model ==
     model = deepcopy(ref_model).to(device)
@@ -145,8 +153,11 @@ def sample_single_chain(
 
             for j in range(grad_accum_steps):
                 data = next(loader)
-                _loss, _results = evaluate(model, prepare_input(data, device))
-                _mean_loss = _loss.mean() / grad_accum_steps
+                with autocast(
+                    device=xm.xla_device(), enabled=use_amp, dtype=torch.float16
+                ):
+                    _loss, _results = evaluate(model, prepare_input(data, device))
+                    _mean_loss = _loss.mean() / grad_accum_steps
 
                 if not no_grad:
                     _mean_loss.backward()
@@ -254,6 +265,7 @@ def sample(
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
+    init_loss=None,
     grad_accum_steps: int = 1,
     cores: int = 1,
     seed: Optional[Union[int, List[int]]] = None,
@@ -264,8 +276,8 @@ def sample(
     init_noise: Optional[float] = None,
     shuffle: bool = True,
     use_alternate_batching=False,  # See George's alternate SGLD sampling method
-    init_loss=None,
-    **kwargs,
+    use_amp: bool = False,
+    **kwargs,  # NOTE: This is an important catch-all for any additional arguments that may be passed to the function. Please don't remove it.
 ):
     """
     Sample model weights using a given sampling_method, supporting multiple chains/cores,
@@ -322,7 +334,7 @@ def sample(
 
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
-            loader, num_chains, model, evaluate, device
+            loader, num_chains, model, evaluate, device, seed
         )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
@@ -371,6 +383,7 @@ def sample(
         init_noise=init_noise,
         shuffle=shuffle,
         use_alternate_batching=use_alternate_batching,
+        use_amp=use_amp,
     )
 
     def get_args(i):

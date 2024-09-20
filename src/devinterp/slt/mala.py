@@ -125,7 +125,7 @@ class MalaAcceptanceRate(SamplerCallback):
         # (so we update those only after the calculation)
         self.current_grads = optimizer.dws
         # mala acceptance loss is different from pytorch supplied loss
-        mala_loss = (loss * self.nbeta).item() + optimizer.localization_loss
+        mala_loss = (loss * self.nbeta) + optimizer.localization_loss
         if draw > 1:
             self.mala_acceptance_rate[chain, draw - 1] = mala_acceptance_probability(
                 self.prev_params,

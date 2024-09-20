@@ -82,11 +82,15 @@ def plot_trace(
     plt.show()
 
 
-def default_nbeta(dataloader: Union[DataLoader, int]):
+def default_nbeta(
+    dataloader: Union[DataLoader, int], grad_accum_steps: int = 1
+) -> float:
     if isinstance(dataloader, DataLoader):
-        return dataloader.batch_size / np.log(dataloader.batch_size)
+        return (dataloader.batch_size * grad_accum_steps) / np.log(
+            dataloader.batch_size * grad_accum_steps
+        )
     elif isinstance(dataloader, int):
-        return dataloader / np.log(dataloader)
+        return (dataloader * grad_accum_steps) / np.log(dataloader * grad_accum_steps)
     else:
         raise NotImplementedError(
             f"N*beta for data type {type(dataloader)} not implemented, use DataLoader or int instead."
@@ -156,7 +160,17 @@ def split_results(results: EvalResults) -> Tuple[torch.Tensor, Any]:
     return loss, results
 
 
-def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device):
+def get_seeded_dataloader(dataloader, seed):
+    gen = torch.Generator()
+    gen.manual_seed(seed)
+    return torch.utils.data.DataLoader(
+        dataloader.dataset, batch_size=dataloader.batch_size, generator=gen
+    )
+
+
+def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device, seed=None):
+    if seed is not None:
+        dataloader = get_seeded_dataloader(dataloader, seed)
     model = model.to(device)
     model.train()  # to make sure we're using train loss, comparable to train loss of sampler()
 
@@ -168,7 +182,12 @@ def get_init_loss_one_batch(dataloader, model, evaluate: EvaluateFn, device):
     return loss
 
 
-def get_init_loss_multi_batch(dataloader, n_batches, model, evaluate, device):
+def get_init_loss_multi_batch(
+    dataloader, n_batches, model, evaluate, device, seed=None
+):
+    if seed is not None:
+        dataloader = get_seeded_dataloader(dataloader, seed)
+
     model = model.to(device)
     model.train()
     loss = 0.0
@@ -182,7 +201,10 @@ def get_init_loss_multi_batch(dataloader, n_batches, model, evaluate, device):
     return loss / n_batches
 
 
-def get_init_loss_full_batch(dataloader, model, evaluate, device):
+def get_init_loss_full_batch(dataloader, model, evaluate, device, seed=None):
+    if seed is not None:
+        dataloader = get_seeded_dataloader(dataloader, seed)
+
     model = model.to(device)
     model.train()
     loss = 0.0
@@ -241,3 +263,26 @@ def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):
 
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def cycle(iterable, limit=None):
+    """
+    Use this function to cycle through a dataloader. Unlike itertools.cycle, this function doesn't cache
+    values in memory.
+
+    Note: Be careful with cycling a shuffled interable. The shuffling will be different for each loop dependent on the seed
+    state, unlike with itertools.cycle.
+
+    :param iterable: Iterable to cycle through
+    :param limit: Number of cycles to go through. If None, cycles indefinitely.
+    """
+    index = 0
+    if limit is None:
+        limit = float("inf")
+    while True:
+        for x in iterable:
+            if index >= limit:
+                return
+            else:
+                yield x
+            index += 1

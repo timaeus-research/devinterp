@@ -185,7 +185,6 @@ class SGLD(torch.optim.Optimizer):
                         dw.add_(initial_param_distance, alpha=group["localization"])
 
                     if self.save_mala_vars:
-                        # TODO: Initial param distance is used as a m
                         if group["optimize_over"] is not None:
                             initial_param_distance = (
                                 initial_param_distance * group["optimize_over"]

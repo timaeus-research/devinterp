@@ -2,6 +2,7 @@ import warnings
 from typing import Union
 
 import torch
+
 from devinterp.slt.callback import SamplerCallback
 from devinterp.utils import USE_TPU_BACKEND
 
@@ -22,7 +23,8 @@ class LLCEstimator(SamplerCallback):
     :type num_chains: int
     :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'.
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Supports GPUs and TPUs.
+    To use TPUs, be sure to pass in torch_xla.core.xla_model.xla_device() as the device and set the USE_TPU_BACKEND environment flag to "1". Default is 'cpu'
     :type device: str | torch.device, optional
     """
 
@@ -55,8 +57,8 @@ class LLCEstimator(SamplerCallback):
         self.device = device
         self.eval_field = eval_field
 
-    def update(self, chain: int, draw: int, loss: float):
-        self.losses[chain, draw] = loss
+    def update(self, chain: int, draw: int, loss: torch.tensor):
+        self.losses[chain, draw] = loss.to(self.device)
 
     def finalize(self):
         if USE_TPU_BACKEND and str(self.device).startswith("xla:"):
@@ -98,7 +100,8 @@ class OnlineLLCEstimator(SamplerCallback):
     :type num_chains: int
     :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Default is 'cpu'
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Supports GPUs and TPUs. \
+    To use TPUs, be sure to pass in torch_xla.core.xla_model.xla_device() as the device and set the USE_TPU_BACKEND environment flag to "1". Default is 'cpu'
     :type device: str | torch.device, optional
     """
 
@@ -135,7 +138,8 @@ class OnlineLLCEstimator(SamplerCallback):
         self.device = device
         self.eval_field = eval_field
 
-    def update(self, chain: int, draw: int, loss: float):
+    def update(self, chain: int, draw: int, loss: torch.tensor):
+        loss = loss.to(self.device)
         self.losses[chain, draw] = loss
         self.llcs[chain, draw] = self.nbeta * (loss - self.init_loss)
 
