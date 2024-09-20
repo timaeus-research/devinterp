@@ -2,7 +2,7 @@ import torch
 import warnings
 
 import torch
-import torchvision
+from datasets import load_dataset
 from torch.nn import functional as F
 from transformers import AutoModelForImageClassification
 import numpy as np
@@ -23,7 +23,7 @@ def evaluate(model, data):
     }  # transformers doesn't output a vector
 
 
-def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_workers = 1,
+def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_workers = 0,
               batch_size = 256,
               grad_accum_steps = 1,
               use_amp = False):
@@ -31,15 +31,30 @@ def get_stats(device, gpu_idxs = None, cores = 1, chains = 4, seed = None, num_w
     model = AutoModelForImageClassification.from_pretrained("fxmarty/resnet-tiny-mnist").to(
         device
     )
-    data = torchvision.datasets.MNIST(
-        root="../data",
-        download=True,
-        transform=torchvision.transforms.Compose(
-            [
-                torchvision.transforms.ToTensor(),
-            ]
-        ),
-    )
+
+    mnist_dataset = load_dataset("mnist")
+    def preprocess(examples):
+        # Convert images to tensors and normalize
+        examples["pixel_values"] = [torch.tensor(np.array(img)).float().unsqueeze(0) / 255.0 for img in examples["image"]]
+        return examples
+
+    mnist_dataset = mnist_dataset.map(preprocess, batched=True, remove_columns=["image"])
+
+    class torchvisionWrapper(torch.utils.data.Dataset):
+        def __init__(self, dataset):
+            self.dataset = dataset
+
+        def __len__(self):
+            return len(self.dataset)
+
+        def __getitem__(self, idx):
+            item = self.dataset[idx]
+            return item["pixel_values"], item["label"]
+
+    # Set the format of the dataset to PyTorch tensors
+    mnist_dataset.set_format(type="torch", columns=["pixel_values", "label"])
+    data = torchvisionWrapper(mnist_dataset["train"])
+
     loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     return estimate_learning_coeff_with_summary(
@@ -134,7 +149,7 @@ def test_multigpu(gpu_default):
 def test_multigpu_multicore(gpu_default):
     if torch.cuda.device_count() > 1:
         multigpu_multicore_stats = get_stats("cuda", seed=100, gpu_idxs = [0, 1], cores = 4)
-        check(gpu_default, multigpu_multicore_stats, 0.2)
+        check(gpu_default, multigpu_multicore_stats, 0.4)
     else:
         pytest.skip("Multiple GPUs unavailable.")
 

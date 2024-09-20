@@ -121,9 +121,11 @@ def sample_single_chain(
 
 
 def _sample_single_chain(kwargs):
+    pickled_args = ["evaluate", "loader"]
     evaluate = cloudpickle.loads(kwargs["evaluate"])
-    kwargs = {k: v for k, v in kwargs.items() if k != "evaluate"}
-    return sample_single_chain(**kwargs, evaluate=evaluate)
+    loader = cloudpickle.loads(kwargs["loader"])
+    kwargs = {k: v for k, v in kwargs.items() if k not in pickled_args}
+    return sample_single_chain(**kwargs, evaluate=evaluate, loader=loader)
 
 
 def get_args(chain_idx: int, seeds: List[int], device, callbacks, shared_kwargs):
@@ -287,7 +289,7 @@ def sample(
 
     shared_kwargs = dict(
         ref_model=model,
-        loader=loader,
+        loader=cloudpickle.dumps(loader),
         evaluate=cloudpickle.dumps(evaluate),
         num_draws=num_draws,
         num_burnin_steps=num_burnin_steps,
