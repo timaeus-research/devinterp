@@ -63,7 +63,8 @@ def get_stats(
     mnist_dataset = mnist_dataset.map(
         preprocess, batched=True, remove_columns=["image"]
     )
-
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     # Set the format of the dataset to PyTorch tensors
     mnist_dataset.set_format(type="torch", columns=["pixel_values", "label"])
     loader = torch.utils.data.DataLoader(
@@ -78,7 +79,7 @@ def get_stats(
         loader=loader,
         evaluate=evaluate,
         sampling_method=SGLD,
-        optimizer_kwargs=dict(lr=4e-4, localization=100.0),
+        optimizer_kwargs=dict(lr=4e-4, localization=100.0, nbeta=2.0),
         num_chains=chains,  # How many independent chains to run
         num_draws=10,  # How many samples to draw per chain
         num_burnin_steps=0,  # How many samples to discard at the beginning of each chain
@@ -145,7 +146,7 @@ def test_cpu_multiworker(cpu_default):
 
 
 def test_grad_accum(cpu_default: dict):
-    grad_accum_stats = get_stats("cpu", seed=100, grad_accum_steps=2, batch_size=128)
+    grad_accum_stats = get_stats("cpu", seed=100, grad_accum_steps=16, batch_size=16)
     check(cpu_default, grad_accum_stats, 1)
 
 
