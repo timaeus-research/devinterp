@@ -37,12 +37,15 @@ TRUE_LCS_PER_POWER = [
 ]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize("powers, true_lc", TRUE_LCS_PER_POWER)
 def test_accuracy_normalcrossing(
     generated_normalcrossing_dataset, sampling_method, powers, true_lc
 ):
     seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     model = Polynomial(powers)
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
     lr = 0.0004

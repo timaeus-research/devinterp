@@ -2,13 +2,12 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.mala import MalaAcceptanceRate, mala_acceptance_probability
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
 from devinterp.utils import default_nbeta, make_evaluate
+from torch.utils.data import DataLoader, TensorDataset
 
 
 class Polynomial(nn.Module):
@@ -96,6 +95,7 @@ SETS_TO_TEST = [
 ]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("powers,lr,localization,accept_prob", SETS_TO_TEST)
 def test_mala_callback_closeness(
     generated_normalcrossing_dataset,

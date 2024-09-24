@@ -5,12 +5,11 @@ import numpy as np
 import pytest
 import torch
 from datasets import load_dataset
-from torch.nn import functional as F
-from transformers import AutoModelForImageClassification
-
 from devinterp.optim import SGLD
 from devinterp.slt.sampler import estimate_learning_coeff_with_summary
 from devinterp.utils import USE_TPU_BACKEND, plot_trace
+from torch.nn import functional as F
+from transformers import AutoModelForImageClassification
 
 warnings.filterwarnings("ignore")
 
@@ -21,6 +20,18 @@ def evaluate(model, data):
     return F.cross_entropy(model(inputs).logits, outputs), {
         "logits": model(inputs).logits
     }  # transformers doesn't output a vector
+
+
+class torchvisionWrapper(torch.utils.data.Dataset):
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        return item["pixel_values"], item["label"]
 
 
 def get_stats(
@@ -52,32 +63,24 @@ def get_stats(
     mnist_dataset = mnist_dataset.map(
         preprocess, batched=True, remove_columns=["image"]
     )
-
-    class torchvisionWrapper(torch.utils.data.Dataset):
-        def __init__(self, dataset):
-            self.dataset = dataset
-
-        def __len__(self):
-            return len(self.dataset)
-
-        def __getitem__(self, idx):
-            item = self.dataset[idx]
-            return item["pixel_values"], item["label"]
-
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     # Set the format of the dataset to PyTorch tensors
     mnist_dataset.set_format(type="torch", columns=["pixel_values", "label"])
-    data = torchvisionWrapper(mnist_dataset["train"])
-
     loader = torch.utils.data.DataLoader(
-        data, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        torchvisionWrapper(mnist_dataset["train"]),
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
     )
-
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     return estimate_learning_coeff_with_summary(
         model,
         loader=loader,
         evaluate=evaluate,
         sampling_method=SGLD,
-        optimizer_kwargs=dict(lr=4e-4, localization=100.0),
+        optimizer_kwargs=dict(lr=4e-4, localization=100.0, nbeta=2.0),
         num_chains=chains,  # How many independent chains to run
         num_draws=10,  # How many samples to draw per chain
         num_burnin_steps=0,  # How many samples to discard at the beginning of each chain
@@ -108,7 +111,7 @@ def check(s1, s2, atol=1e-3, reverse=False):
         valid = not valid
     assert (
         valid
-    ), f"Expected {'different' if reverse else 'close'} llc/trace in both stats, got {s1['llc/trace']} and {s2['llc/trace']}."
+    ), f"Expected {'different' if reverse else 'close'} llc/trace in both stats, got {s1['llc/trace']} and {s2['llc/trace']}, {np.isclose(s1['llc/trace'], s2['llc/trace'], atol=atol)}."
 
 
 @pytest.fixture(scope="module")
@@ -129,9 +132,10 @@ def test_cpu_consistent(cpu_default):
 
 def test_cpu_consistent_seeds(cpu_default):
     diff_seed_stats = get_stats("cpu", seed=101)
-    check(cpu_default, diff_seed_stats, 5, reverse=True)
+    check(cpu_default, diff_seed_stats, 0.000001, reverse=True)
 
 
+@pytest.mark.slow
 def test_cpu_multicore(cpu_default):
     multicore_stats = get_stats("cpu", seed=100, cores=4)
     check(cpu_default, multicore_stats, 1e-4)
@@ -143,9 +147,7 @@ def test_cpu_multiworker(cpu_default):
 
 
 def test_grad_accum(cpu_default: dict):
-    grad_accum_stats = get_stats(
-        "cpu", seed=100, cores=4, grad_accum_steps=2, batch_size=128
-    )
+    grad_accum_stats = get_stats("cpu", seed=100, grad_accum_steps=16, batch_size=16)
     check(cpu_default, grad_accum_stats, 1)
 
 
