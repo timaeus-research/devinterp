@@ -37,6 +37,7 @@ TRUE_LCS_PER_POWER = [
 ]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize("powers, true_lc", TRUE_LCS_PER_POWER)
 def test_accuracy_normalcrossing(

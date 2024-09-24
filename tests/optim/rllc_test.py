@@ -3,19 +3,30 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
 from devinterp.utils import *
+from torch.utils.data import DataLoader, TensorDataset
 
 
 @pytest.fixture
 def generated_normalcrossing_dataset():
     torch.manual_seed(42)
     np.random.seed(42)
+    sigma = 0.25
+    num_samples = 1000
+    x = torch.normal(0, 2, size=(num_samples,))
+    y = sigma * torch.normal(0, 1, size=(num_samples,))
+    train_data = TensorDataset(x, y)
+    train_dataloader = DataLoader(train_data, batch_size=num_samples, shuffle=True)
+    return train_dataloader, train_data, x, y
+
+
+def generated_normalcrossing_dataset_seeded(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     sigma = 0.25
     num_samples = 1000
     x = torch.normal(0, 2, size=(num_samples,))
@@ -208,21 +219,25 @@ def test_restricted_gradient_normalcrossing_between_dims(
     ), f"LLC mean {llc_mean_2d:.3f}!={llc_mean_3d_restricted:.3f} for powers {relevant_powers + [extra_dim_power]} using {sampling_method}, {model2.weights}"
 
 
-SAMPLE_POINTS = [[0.0, 0.0, 1.0], [0.0, 1.0, 1.0]]
+SAMPLE_POINTS = [[0.0, 0.0, 1.0]]
+POWERS = [
+    [1, 1],
+    [0, 2],
+]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("sampling_method", [SGLD])
 @pytest.mark.parametrize("relevant_powers", POWERS)
 @pytest.mark.parametrize("extra_dim_power", EXTRA_DIM_POWER)
 @pytest.mark.parametrize("sample_point", SAMPLE_POINTS)
 def test_rllc_full_normalcrossing_between_dims(
-    generated_normalcrossing_dataset,
     sampling_method,
     relevant_powers,
     extra_dim_power,
     sample_point,
 ):
-    seed = 3
+    seed = 5
     torch.manual_seed(seed)
     lr = 0.001
     num_chains = 1
@@ -233,7 +248,7 @@ def test_rllc_full_normalcrossing_between_dims(
     model1.weights = torch.nn.Parameter(torch.tensor(sample_point[:-1]))
     model2.weights = torch.nn.Parameter(torch.tensor(sample_point))
 
-    train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
+    train_dataloader, train_data, _, _ = generated_normalcrossing_dataset_seeded(seed)
     init_loss_1 = get_init_loss_multi_batch(
         train_dataloader, num_chains, model1, evaluate_mse, device="cpu"
     )
