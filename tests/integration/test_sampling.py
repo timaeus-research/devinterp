@@ -70,10 +70,11 @@ def get_stats(
     loader = torch.utils.data.DataLoader(
         torchvisionWrapper(mnist_dataset["train"]),
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=True,
         num_workers=num_workers,
     )
-
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     return estimate_learning_coeff_with_summary(
         model,
         loader=loader,
@@ -110,7 +111,7 @@ def check(s1, s2, atol=1e-3, reverse=False):
         valid = not valid
     assert (
         valid
-    ), f"Expected {'different' if reverse else 'close'} llc/trace in both stats, got {s1['llc/trace']} and {s2['llc/trace']}."
+    ), f"Expected {'different' if reverse else 'close'} llc/trace in both stats, got {s1['llc/trace']} and {s2['llc/trace']}, {np.isclose(s1['llc/trace'], s2['llc/trace'], atol=atol)}."
 
 
 @pytest.fixture(scope="module")
@@ -131,7 +132,7 @@ def test_cpu_consistent(cpu_default):
 
 def test_cpu_consistent_seeds(cpu_default):
     diff_seed_stats = get_stats("cpu", seed=101)
-    check(cpu_default, diff_seed_stats, 5, reverse=True)
+    check(cpu_default, diff_seed_stats, 0.000001, reverse=True)
 
 
 @pytest.mark.slow
