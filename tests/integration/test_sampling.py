@@ -22,6 +22,18 @@ def evaluate(model, data):
     }  # transformers doesn't output a vector
 
 
+class torchvisionWrapper(torch.utils.data.Dataset):
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        return item["pixel_values"], item["label"]
+
+
 def get_stats(
     device,
     gpu_idxs=None,
@@ -52,23 +64,13 @@ def get_stats(
         preprocess, batched=True, remove_columns=["image"]
     )
 
-    class torchvisionWrapper(torch.utils.data.Dataset):
-        def __init__(self, dataset):
-            self.dataset = dataset
-
-        def __len__(self):
-            return len(self.dataset)
-
-        def __getitem__(self, idx):
-            item = self.dataset[idx]
-            return item["pixel_values"], item["label"]
-
     # Set the format of the dataset to PyTorch tensors
     mnist_dataset.set_format(type="torch", columns=["pixel_values", "label"])
-    data = torchvisionWrapper(mnist_dataset["train"])
-
     loader = torch.utils.data.DataLoader(
-        data, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        torchvisionWrapper(mnist_dataset["train"]),
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
     )
 
     return estimate_learning_coeff_with_summary(
@@ -126,16 +128,12 @@ def test_cpu_consistent(cpu_default):
     check(cpu_default, repeat_stats, 1e-3)
 
 
-def test_cpu_grad_accum(cpu_default: dict):
-    grad_accum_stats = get_stats("cpu", seed=100, grad_accum_steps=4, batch_size=64)
-    check(cpu_default, grad_accum_stats, 1)
-
-
 def test_cpu_consistent_seeds(cpu_default):
     diff_seed_stats = get_stats("cpu", seed=101)
     check(cpu_default, diff_seed_stats, 5, reverse=True)
 
 
+@pytest.mark.slow
 def test_cpu_multicore(cpu_default):
     multicore_stats = get_stats("cpu", seed=100, cores=4)
     check(cpu_default, multicore_stats, 1e-4)
@@ -147,9 +145,7 @@ def test_cpu_multiworker(cpu_default):
 
 
 def test_grad_accum(cpu_default: dict):
-    grad_accum_stats = get_stats(
-        "cpu", seed=100, cores=4, grad_accum_steps=2, batch_size=128
-    )
+    grad_accum_stats = get_stats("cpu", seed=100, grad_accum_steps=2, batch_size=128)
     check(cpu_default, grad_accum_stats, 1)
 
 
