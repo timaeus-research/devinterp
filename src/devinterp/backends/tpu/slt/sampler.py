@@ -3,14 +3,9 @@ from copy import deepcopy
 from itertools import cycle
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 
+import numpy as np
 import torch
 import torch_xla.core.xla_model as xm
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.utils.data import DataLoader
-from torch_xla.amp import autocast
-from tqdm import trange
-
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -21,6 +16,11 @@ from devinterp.utils import (
     prepare_input,
     set_seed,
 )
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.utils.data import DataLoader
+from torch_xla.amp import autocast
+from tqdm import trange
 
 
 def mark_step_if_xla(device):
@@ -349,7 +349,7 @@ def sample(
             "You are using seeded runs, for full reproducibility check https://pytorch.org/docs/stable/notes/randomness.html"
         )
         if isinstance(seed, int):
-            seeds = [seed + i for i in range(num_chains)]
+            seeds = np.random.SeedSequence(seed).generate_state(num_chains)
         elif len(seed) != num_chains:
             raise ValueError("Length of seed list must match number of chains")
         else:

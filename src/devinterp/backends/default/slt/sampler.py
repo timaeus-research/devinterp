@@ -1,17 +1,10 @@
 import warnings
 from copy import deepcopy
-from typing import Callable, Dict, List, Literal, Optional, Type, Union
+from typing import Dict, List, Literal, Optional, Type, Union
 
 import cloudpickle
+import numpy as np
 import torch
-import torch.distributed as dist
-import torch.multiprocessing as mp
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -25,6 +18,10 @@ from devinterp.utils import (
     prepare_input,
     split_results,
 )
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 def sample_single_chain(
@@ -305,7 +302,7 @@ def sample(
             "You are using seeded runs, for full reproducibility check https://pytorch.org/docs/stable/notes/randomness.html"
         )
         if isinstance(seed, int):
-            seeds = [seed + i for i in range(num_chains)]
+            seeds = np.random.SeedSequence(seed).generate_state(num_chains)
         elif len(seed) != num_chains:
             raise ValueError("Length of seed list must match number of chains")
         else:
