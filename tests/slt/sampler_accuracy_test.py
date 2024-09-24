@@ -43,6 +43,8 @@ def test_accuracy_normalcrossing(
     generated_normalcrossing_dataset, sampling_method, powers, true_lc
 ):
     seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     model = Polynomial(powers)
     train_dataloader, train_data, _, _ = generated_normalcrossing_dataset
     lr = 0.0004
