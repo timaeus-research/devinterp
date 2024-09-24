@@ -5,12 +5,11 @@ import numpy as np
 import pytest
 import torch
 from datasets import load_dataset
-from torch.nn import functional as F
-from transformers import AutoModelForImageClassification
-
 from devinterp.optim import SGLD
 from devinterp.slt.sampler import estimate_learning_coeff_with_summary
 from devinterp.utils import USE_TPU_BACKEND, plot_trace
+from torch.nn import functional as F
+from transformers import AutoModelForImageClassification
 
 warnings.filterwarnings("ignore")
 
@@ -125,6 +124,11 @@ def gpu_default():
 def test_cpu_consistent(cpu_default):
     repeat_stats = get_stats("cpu", seed=100)
     check(cpu_default, repeat_stats, 1e-3)
+
+
+def test_cpu_grad_accum(cpu_default: dict):
+    grad_accum_stats = get_stats("cpu", seed=100, grad_accum_steps=4, batch_size=64)
+    check(cpu_default, grad_accum_stats, 1)
 
 
 def test_cpu_consistent_seeds(cpu_default):
