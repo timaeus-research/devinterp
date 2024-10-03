@@ -61,10 +61,10 @@ This package was created by [Timaeus](https://timaeus.co). The main contributors
 If this package was useful in your work, please cite it as:
 
 ```BibTeX
-   @misc{devinterp2024,
-      title = {DevInterp},
-      author = {Stan van Wingerden, Jesse Hoogland, George Wang, and William Zhou},
-      year = {2024},
-      howpublished = {\url{https://github.com/timaeus-research/devinterp}},
-   }
+@misc{devinterpcode,
+  title = {DevInterp},
+  author = {van Wingerden, Stan and Hoogland, Jesse and Wang, George and Zhou, William},
+  year = {2024},
+  howpublished = {\url{https://github.com/timaeus-research/devinterp}},
+}
 ```
