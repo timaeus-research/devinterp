@@ -4,7 +4,7 @@ from typing import Union
 import torch
 
 from devinterp.slt.callback import SamplerCallback
-from devinterp.utils import USE_TPU_BACKEND
+from devinterp.utils import USE_TPU_BACKEND, TPU_TYPE
 
 
 class LLCEstimator(SamplerCallback):
@@ -64,7 +64,10 @@ class LLCEstimator(SamplerCallback):
         if USE_TPU_BACKEND and str(self.device).startswith("xla:"):
             import torch_xla.core.xla_model as xm
 
-            self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
+            if TPU_TYPE == "v4":
+                self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
+            elif TPU_TYPE == "v2":
+                self.losses = self.losses.cpu()
         avg_losses = self.losses.mean(axis=1)
         self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
         self.llc_mean = self.llc_per_chain.mean()

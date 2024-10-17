@@ -16,6 +16,7 @@ try:
     USE_TPU_BACKEND = os.environ.get(
         "USE_TPU_BACKEND", "1" if (PJRT_DEVICE == "TPU") else "0"
     )
+    TPU_TYPE = os.environ.get("TPU_TYPE", "v4")
 except ImportError:
     USE_TPU_BACKEND = False
 
