@@ -9,16 +9,11 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
-try:
-    import torch_xla.core.xla_model as xm
-
-    PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "None")
-    USE_TPU_BACKEND = os.environ.get(
-        "USE_TPU_BACKEND", "1" if (PJRT_DEVICE == "TPU") else "0"
-    )
-    TPU_TYPE = os.environ.get("TPU_TYPE", "v4")
-except ImportError:
-    USE_TPU_BACKEND = False
+PJRT_DEVICE = os.environ.get("PJRT_DEVICE", None)
+USE_TPU_BACKEND = os.environ.get(
+    "USE_TPU_BACKEND", True if (PJRT_DEVICE == "TPU") else False
+)
+TPU_TYPE = os.environ.get("TPU_TYPE", None)
 
 
 class Outputs(NamedTuple):
