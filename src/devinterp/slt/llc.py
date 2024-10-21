@@ -66,7 +66,11 @@ class LLCEstimator(SamplerCallback):
 
             if TPU_TYPE == "v4":
                 self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
-            elif TPU_TYPE == "v2":  # (clown emoji)
+            elif TPU_TYPE == "v2":
+                # this only works if we set
+                # store = torch.distributed.TCPStore("127.0.0.1", 12345, 4, xm.get_ordinal() == 0)
+                # torch.distributed.init_process_group(backend="gloo", store=store, rank=xm.get_ordinal()//2, world_size=xm.xrt_world_size()//2)
+                # after xmp.spawn(). sorry!
                 self.losses = self.losses.cpu()
                 torch.distributed.all_reduce(self.losses)
         avg_losses = self.losses.mean(axis=1)
