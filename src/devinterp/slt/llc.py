@@ -2,9 +2,8 @@ import warnings
 from typing import Union
 
 import torch
-
 from devinterp.slt.callback import SamplerCallback
-from devinterp.utils import USE_TPU_BACKEND, TPU_TYPE
+from devinterp.utils import TPU_TYPE, USE_TPU_BACKEND
 
 
 class LLCEstimator(SamplerCallback):
@@ -66,13 +65,15 @@ class LLCEstimator(SamplerCallback):
 
             if TPU_TYPE == "v4":
                 self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
-            elif TPU_TYPE == "v2":
+            elif TPU_TYPE == "v2/v3":
                 # this only works if we set
                 # store = torch.distributed.TCPStore("127.0.0.1", 12345, 4, xm.get_ordinal() == 0)
                 # torch.distributed.init_process_group(backend="gloo", store=store, rank=xm.get_ordinal()//2, world_size=xm.xrt_world_size()//2)
                 # after xmp.spawn(). sorry!
                 self.losses = self.losses.cpu()
                 torch.distributed.all_reduce(self.losses)
+            else:
+                raise NotImplementedError(f"TPU type {TPU_TYPE} not supported")
         avg_losses = self.losses.mean(axis=1)
         self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
         self.llc_mean = self.llc_per_chain.mean()
