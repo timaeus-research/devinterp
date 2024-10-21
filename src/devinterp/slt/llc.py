@@ -66,8 +66,10 @@ class LLCEstimator(SamplerCallback):
 
             if TPU_TYPE == "v4":
                 self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
-            elif TPU_TYPE == "v2":
+            elif TPU_TYPE == "v2":  # (clown emoji)
                 self.losses = self.losses.cpu()
+                torch.distributed.all_reduce(self.losses)
+                print(self.losses)
         avg_losses = self.losses.mean(axis=1)
         self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
         self.llc_mean = self.llc_per_chain.mean()
