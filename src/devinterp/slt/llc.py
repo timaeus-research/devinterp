@@ -71,7 +71,10 @@ class LLCEstimator(SamplerCallback):
                 # torch.distributed.init_process_group(backend="gloo", store=store, rank=xm.get_ordinal()//2, world_size=xm.xrt_world_size()//2)
                 # after xmp.spawn(). sorry!
                 self.losses = self.losses.cpu()
-                torch.distributed.all_reduce(self.losses)
+                try:
+                    torch.distributed.all_reduce(self.losses)
+                except ValueError:
+                    pass
             else:
                 raise NotImplementedError(f"TPU type {TPU_TYPE} not supported")
         avg_losses = self.losses.mean(axis=1)
