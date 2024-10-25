@@ -73,10 +73,15 @@ class LLCEstimator(SamplerCallback):
                 self.losses = self.losses.cpu()
                 try:
                     torch.distributed.all_reduce(self.losses)
-                except ValueError:
+                except ValueError:  # fallback for if we run on a single TPU core
                     pass
             else:
                 raise NotImplementedError(f"TPU type {TPU_TYPE} not supported")
+
+        try:
+            torch.distributed.all_reduce(self.losses)
+        except ValueError:
+            pass
         avg_losses = self.losses.mean(axis=1)
         self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
         self.llc_mean = self.llc_per_chain.mean()
