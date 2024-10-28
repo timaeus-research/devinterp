@@ -77,7 +77,9 @@ class LLCEstimator(SamplerCallback):
                     pass
             else:
                 raise NotImplementedError(f"TPU type {TPU_TYPE} not supported")
-        elif str(self.device).startswith("cuda"):  # if we've ran on multi-GPU, we should do a reduce as well. see above for how this would work
+        elif str(self.device).startswith(
+            "cuda"
+        ):  # if we've ran on multi-GPU, we should do a reduce as well. see above for how this would work
             try:
                 torch.distributed.all_reduce(self.losses)
             except ValueError:
