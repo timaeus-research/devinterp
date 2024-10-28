@@ -77,11 +77,11 @@ class LLCEstimator(SamplerCallback):
                     pass
             else:
                 raise NotImplementedError(f"TPU type {TPU_TYPE} not supported")
-
-        try:
-            torch.distributed.all_reduce(self.losses)
-        except ValueError:
-            pass
+        elif str(self.device).startswith("cuda"):  # if we've ran on multi-GPU, we should do a reduce as well. see above for how this would work
+            try:
+                torch.distributed.all_reduce(self.losses)
+            except ValueError:
+                pass
         avg_losses = self.losses.mean(axis=1)
         self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
         self.llc_mean = self.llc_per_chain.mean()
