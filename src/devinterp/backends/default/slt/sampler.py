@@ -47,10 +47,6 @@ def sample_single_chain(
         assert isinstance(grad_accum_steps, int), "grad_accum_steps must be an integer."
         num_steps_bw_draws *= grad_accum_steps
         num_burnin_steps *= grad_accum_steps
-    if num_draws > len(loader):
-        warnings.warn(
-            "You are taking more sample batches than there are dataloader batches available, this removes some randomness from sampling but is probably fine. (All sample batches beyond the number dataloader batches are cycled from the start, f.e. 9 samples from [A, B, C] would be [B, A, C, B, A, C, B, A, C].)"
-        )
 
     # Initialize new model and optimizer for this chain
     model = deepcopy(ref_model).to(device)
