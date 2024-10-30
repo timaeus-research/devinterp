@@ -191,7 +191,6 @@ def get_init_loss_multi_batch(
     model = model.to(device)
     model.train()
     loss = 0.0
-    n_batches = min(n_batches, len(dataloader))
 
     with torch.no_grad():
         for data in islice(dataloader, n_batches):
