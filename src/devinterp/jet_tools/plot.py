@@ -11,7 +11,7 @@ from PyMoments import kstat
 
 # plot stats for each dim (flattened)
 # todo rename, this is second order but 1-place stats
-def plot_second_order_one_place_stats(wt, n, method="zeros"):
+def plot_second_order_one_place_stats(wt, n, title="zeros"):
     wt = np.array([wt[0]])  # TODO average across the three chains
     num_chains = len(wt)
     num_draws = len(wt[0])
@@ -26,12 +26,12 @@ def plot_second_order_one_place_stats(wt, n, method="zeros"):
     fig, ax1 = plt.subplots()  # Create a figure and a primary axe
     for tensor_index, std in enumerate(np.array(all_stds_per_i).T):
         ax1.plot(i_values, std, label=f"std {tensor_index}")
-    plt.title(method)
+    plt.title(title)
     plt.show()
 
 
 # todo rename this is 2-place stats
-def plot_second_order_two_place_stats(wt, n, method="zeros"):
+def plot_second_order_two_place_stats(wt, n, title="zeros"):
     num_chains = len(wt)
     num_draws = len(wt[0])
     all_stds_x_per_i = []
@@ -61,29 +61,12 @@ def plot_second_order_two_place_stats(wt, n, method="zeros"):
     # Add legends for both axes
     ax1.legend(loc="upper left")
     # ax2.legend(loc='upper right')
+    plt.title(title)
 
     plt.show()
 
 
-def plot_third_order_stats(wt, n, method="zeros"):
-    num_chains = len(wt)
-    num_draws = len(wt[0])
-    diff_third_cum_xxx_per_i = []
-    diff_third_cum_yyy_per_i = []
-    diff_third_cum_xxy_per_i = []
-    diff_third_cum_xyy_per_i = []
-    i_values = np.arange(1, num_draws - 3, 1)
-    for i in i_values:
-        diffs = ith_place_nth_diff(wt, i, n)
-        diffs = diffs.reshape(-1, diffs.shape[-1])
-        diff_third_cum_xxx_per_i.append(kstat(diffs, (0, 0, 0)))
-        diff_third_cum_yyy_per_i.append(kstat(diffs, (1, 1, 1)))
-        diff_third_cum_xxy_per_i.append(kstat(diffs, (0, 0, 1)))
-        diff_third_cum_xyy_per_i.append(kstat(diffs, (0, 1, 1)))
-    fig, ax1 = plt.subplots()  # Create a figure and a primary axes
-
-
-def plot_third_order_stats_per_dim(wt, n, method="zeros"):
+def plot_third_order_stats_per_dim(wt, n, title="zeros"):
     num_chains = len(wt)
     num_draws = len(wt[0])
     diff_third_cum_xxx_per_i = []
@@ -109,7 +92,7 @@ def plot_third_order_stats_per_dim(wt, n, method="zeros"):
 
     # Add legend
     ax1.legend(loc="upper left")
-
+    plt.title(title)
     plt.show()
 
 
