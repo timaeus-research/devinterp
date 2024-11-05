@@ -9,3 +9,4 @@ scipy>=1.10.1
 torch>=2.0.1
 tqdm>=4.65.0
 cloudpickle>=3.0.0
+PyMoments
