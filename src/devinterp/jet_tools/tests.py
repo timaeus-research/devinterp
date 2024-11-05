@@ -1,4 +1,4 @@
-from jet_tools.diffs import ith_place_first_diff
+from .diffs import ith_place_first_diff
 import numpy as np
 import pytest
 

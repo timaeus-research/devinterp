@@ -1,14 +1,13 @@
 from dataclasses import dataclass
 from typing import List
 
+from devinterp.slt.callbacks import SamplerCallback
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 import torch.nn as nn
 
-from jet_tools.utils import prepare_input
-
-from devinterp.callbacks import SamplerCallback
+from .utils import prepare_input
 
 
 # some necessary functions

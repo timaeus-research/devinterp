@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from jet_tools.diffs import ith_place_nth_diff, joint_ith_place_nth_diff
+from .diffs import ith_place_nth_diff, joint_ith_place_nth_diff
 import numpy as np
 import torch
 import torch.nn as nn
