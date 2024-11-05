@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 
-from devinterp.slt.callbacks import SamplerCallback
+from devinterp.slt.callback import SamplerCallback
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
