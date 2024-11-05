@@ -113,7 +113,7 @@ def plot_third_order_stats_per_dim(wt, n, method="zeros"):
     plt.show()
 
 
-def plot_trajectories(weight_trajectories, names, model, n_bins):
+def plot_trajectories(weight_trajectories, names, model, n_bins=20):
     fig, axes = plt.subplots(1, len(weight_trajectories), figsize=(6, 6))
     if len(weight_trajectories) == 1:
         axes = [axes]
@@ -161,7 +161,7 @@ def plot_trajectories(weight_trajectories, names, model, n_bins):
     plt.show()
 
 
-def plot_multi_trajectories(wt, i_range, diffs_range, legend):
+def plot_multi_trajectories(wt, i_range, diffs_range, legend, model, n_bins=20):
     num_chains = len(wt)
     for n in diffs_range:
         for i in i_range:
@@ -169,6 +169,8 @@ def plot_multi_trajectories(wt, i_range, diffs_range, legend):
             plot_trajectories(
                 diffs,
                 names=[legend + f"_{chain} n={n} i={i}" for chain in range(num_chains)],
+                model=model,
+                n_bins=n_bins,
             )
 
 
