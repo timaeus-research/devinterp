@@ -10,7 +10,6 @@ from PyMoments import kstat
 
 
 # plot stats for each dim (flattened)
-# todo rename, this is second order but 1-place stats
 def plot_second_order_one_place_stats(wt, n, title="zeros"):
     wt = np.array([wt[0]])  # TODO average across the three chains
     num_chains = len(wt)
@@ -30,7 +29,6 @@ def plot_second_order_one_place_stats(wt, n, title="zeros"):
     plt.show()
 
 
-# todo rename this is 2-place stats
 def plot_second_order_two_place_stats(wt, n, title="zeros"):
     num_chains = len(wt)
     num_draws = len(wt[0])
