@@ -209,7 +209,9 @@ def compute_binned_averages_multi_with_std(A, xmin, xmax, ymin, ymax, n):
 
     # Iterate over each element in A
     for k in range(A.shape[0]):
+        print(A[k])
         x, y = A[k, 0], A[k, 1]
+        print(x, y)
         values = A[k, 2:]  # Extract the values starting from the third column
 
         # Check which bin (i, j) the point (x, y) belongs to
@@ -317,7 +319,6 @@ def plot_vector_field_with_colors(A, C, xmin, xmax, ymin, ymax, i, n, legend):
 
 
 def plot_vector_field_jets(wt, i_range, diffs_range, num_bins, legend):
-    num_chains = len(wt)
     xmin = np.min(wt[:, :, 0])
     xmax = np.max(wt[:, :, 0])
     ymin = np.min(wt[:, :, 1])
@@ -325,6 +326,7 @@ def plot_vector_field_jets(wt, i_range, diffs_range, num_bins, legend):
     for n in diffs_range:
         for i in i_range:
             diffs = np.concatenate(joint_ith_place_nth_diff(wt, i, n))
+            print(np.shape(diffs))
             vect_field, colors = compute_binned_averages_multi_with_std(
                 diffs, xmin, xmax, ymin, ymax, num_bins
             )
