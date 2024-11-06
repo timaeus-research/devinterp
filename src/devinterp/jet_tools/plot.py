@@ -11,7 +11,6 @@ from PyMoments import kstat
 
 # plot stats for each dim (flattened)
 def plot_second_order_one_place_stats(wt, n, title="zeros"):
-    wt = np.array([wt[0]])  # TODO average across the three chains
     num_chains = len(wt)
     num_draws = len(wt[0])
     all_stds_per_i = []
@@ -19,12 +18,11 @@ def plot_second_order_one_place_stats(wt, n, title="zeros"):
     i_values = np.arange(1, num_draws // n - 2, 1)
     for i in i_values:
         diffs = ith_place_nth_diff(wt, i, n)
-        std_per_i = np.std(diffs, axis=1)[0]
-        print
+        std_per_i = np.std(diffs, axis=1)
         all_stds_per_i.append(std_per_i)
     fig, ax1 = plt.subplots()  # Create a figure and a primary axe
     for tensor_index, std in enumerate(np.array(all_stds_per_i).T):
-        ax1.plot(i_values, std, label=f"std {tensor_index}")
+        ax1.plot(i_values, std[0], label=f"std {tensor_index}")
     plt.title(title)
     plt.show()
 
@@ -64,29 +62,22 @@ def plot_second_order_two_place_stats(wt, n, title="zeros"):
     plt.show()
 
 
-def plot_third_order_stats_per_dim(wt, n, title="zeros"):
-    num_chains = len(wt)
+def plot_third_order_stats_per_dim(wt, n, title="zeros", up_to_dim=3):
     num_draws = len(wt[0])
-    diff_third_cum_xxx_per_i = []
-    diff_third_cum_yyy_per_i = []
-    diff_third_cum_zzz_per_i = []
-    diff_third_cum_aaa_per_i = []
+    diff_third_cum_per_i_per_n = [[] for _ in range(up_to_dim)]
+
     i_values = np.arange(1, num_draws - 3, 1)
     for i in i_values:
         diffs = ith_place_nth_diff(wt, i, n)
         diffs = diffs.reshape(-1, diffs.shape[-1])
-        diff_third_cum_xxx_per_i.append(kstat(diffs, (0, 0, 0)))
-        diff_third_cum_yyy_per_i.append(kstat(diffs, (1, 1, 1)))
-        diff_third_cum_zzz_per_i.append(kstat(diffs, (2, 2, 2)))
-        diff_third_cum_aaa_per_i.append(kstat(diffs, (3, 3, 3)))
+        for dim in range(up_to_dim):
+            diff_third_cum_per_i_per_n[dim].append(kstat(diffs, (dim, dim, dim)))
 
     fig, ax1 = plt.subplots()  # Create a figure and a primary axes
 
     # Plot data on the primary y-axis
-    ax1.plot(i_values, diff_third_cum_xxx_per_i, label="xxx")
-    ax1.plot(i_values, diff_third_cum_yyy_per_i, label="yyy")
-    ax1.plot(i_values, diff_third_cum_zzz_per_i, label="zzz")
-    ax1.plot(i_values, diff_third_cum_aaa_per_i, label="aaa")
+    for dim_number, diff_third_cum in enumerate(diff_third_cum_per_i_per_n):
+        ax1.plot(i_values, diff_third_cum, label=f"dim={dim_number}")
 
     # Add legend
     ax1.legend(loc="upper left")
@@ -126,12 +117,13 @@ def plot_trajectories(weight_trajectories, names, model, n_bins=20):
             [
                 weight
                 for weight in weight_trajectory
-                if w1_range[0] <= weight[0] <= w1_range[-1]
-                and w2_range[0] <= weight[1] <= w2_range[-1]
+                if w1_range[0] <= weight[0][0] <= w1_range[-1]
+                and w2_range[0] <= weight[0][1] <= w2_range[-1]
             ]
         )
+        print(np.shape(draws_array))
         sns.scatterplot(
-            x=draws_array[:, 0], y=draws_array[:, 1], marker="x", ax=axes[i], s=10
+            x=draws_array[:, 0, 0], y=draws_array[:, 0, 1], marker="x", ax=axes[i], s=10
         )
         axes[i].axhline(0, linestyle="--", color="gray")
         axes[i].axvline(0, linestyle="--", color="gray")
@@ -149,7 +141,9 @@ def plot_multi_trajectories(wt, i_range, diffs_range, legend, model, n_bins=20):
             diffs = ith_place_nth_diff(wt, i, n)
             plot_trajectories(
                 diffs,
-                names=[legend + f"_{chain} n={n} i={i}" for chain in range(num_chains)],
+                names=[
+                    (legend + f"_{chain} n={n} i={i}") for chain in range(num_chains)
+                ],
                 model=model,
                 n_bins=n_bins,
             )
