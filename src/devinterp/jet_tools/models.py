@@ -1,11 +1,13 @@
+from copy import deepcopy
 from dataclasses import dataclass
-from typing import List
+from typing import List, Union
 
-from devinterp.slt.callback import SamplerCallback
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, TensorDataset
 import torch.nn as nn
+from torch.utils.data import DataLoader, IterableDataset, TensorDataset
+
+from devinterp.slt.callback import SamplerCallback
 
 from .utils import prepare_input
 
@@ -225,13 +227,6 @@ class DLN(nn.Module):
         return model_output
 
 
-from copy import deepcopy
-from typing import Any, Dict, List, Tuple, Union
-
-import torch
-from torch.utils.data import IterableDataset
-
-
 class ContinuousDataset(IterableDataset):
     def __init__(self, teacher_model, input_dist="normal", seed=None):
         self.teacher_model = deepcopy(teacher_model).to("cpu")
@@ -325,6 +320,31 @@ class WeightCallback(SamplerCallback):
     def get_results(self):
         return {
             "ws/trace": self.ws,
+        }
+
+    def __call__(self, chain: int, draw: int, model, **kwargs):
+        self.update(chain, draw, model)
+
+
+class GradientCallback(SamplerCallback):
+    def __init__(self, num_chains: int, num_draws: int, model, device="cpu"):
+        self.num_chains = num_chains
+        self.num_draws = num_draws
+        self.grads = np.zeros(
+            (num_chains, num_draws, *torch.stack(list(model.parameters())).shape),
+            dtype=np.float32,
+        )
+        self.device = device
+
+    def update(self, chain: int, draw: int, model):
+        grads = [p.grad for p in model.parameters()]
+        if any(g is None for g in grads):
+            raise ValueError("Gradients have not been computed")
+        self.grads[chain, draw] = torch.stack(grads).cpu().detach()
+
+    def get_results(self):
+        return {
+            "grads/trace": self.grads,
         }
 
     def __call__(self, chain: int, draw: int, model, **kwargs):

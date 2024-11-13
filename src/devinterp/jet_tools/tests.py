@@ -1,6 +1,5 @@
 from .diffs import ith_place_first_diff
 import numpy as np
-import pytest
 
 
 def test_ith_place_first_diff():

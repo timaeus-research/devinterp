@@ -28,9 +28,43 @@ def plot_second_order_one_place_stats(wt, n, title="zeros"):
     for tensor_index, std in enumerate(np.array(all_stds_per_i).T):
         ax1.plot(i_values, std[0], label=f"std dim {tensor_index}")
     ax1.plot(i_values, all_norms_per_i, label=f"norm")
+    plt.legend(loc="lower center")
+    plt.title(title)
+    plt.show()
+
+
+def plot_second_order_one_place_dot_products(
+    wt, gd, n, i_to_plot_draws_for=None, title="zeros"
+):
+    num_draws = len(wt[0])
+    num_chains = len(wt)
+    all_dot_products = []
+    i_values = np.arange(1, num_draws // n - 2, 1)
+    for i in i_values:
+        # note the sign flip, np.diff returns a[i+1] - a[i] and we need the opposite
+        diffs = -ith_place_nth_diff(wt, i, n)
+        # Dot product across parameter dimensions
+        dot_product = np.sum(diffs * gd[:, : len(diffs[0])], axis=2)
+        if i == i_to_plot_draws_for:
+            # cumulative average
+            cum_draws = np.cumsum(dot_product, axis=1)[0] / np.arange(
+                1, num_draws - i + 1
+            )
+        mean_dot = np.mean(dot_product, axis=1)  # Mean across draws
+        all_dot_products.append(mean_dot)
+
+    fig, ax1 = plt.subplots()
+    ax1.plot(i_values, all_dot_products, label="dot product")
+    plt.xlabel("ith diff")
     plt.title(title)
     plt.legend(loc="upper right")
     plt.show()
+    if i_to_plot_draws_for is not None:
+        fig, ax1 = plt.subplots()
+        ax1.plot(np.arange(0, num_draws - i_to_plot_draws_for, 1), cum_draws, label="")
+        plt.xlabel("draws")
+        plt.title(title + f", i={i_to_plot_draws_for}")
+        plt.show()
 
 
 def plot_second_order_two_place_stats(wt, n, title="zeros"):
