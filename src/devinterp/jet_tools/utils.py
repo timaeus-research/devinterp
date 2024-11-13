@@ -1,5 +1,6 @@
-import torch
 from typing import Any, Mapping, Union
+
+import torch
 
 
 def prepare_input(

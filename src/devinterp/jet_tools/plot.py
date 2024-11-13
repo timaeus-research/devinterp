@@ -1,15 +1,15 @@
 from copy import deepcopy
 
-from .diffs import ith_place_nth_diff, joint_ith_place_nth_diff
+import ipywidgets as widgets
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
-import seaborn as sns
+from IPython.display import display
 from PyMoments import kstat
 
-import ipywidgets as widgets
-from IPython.display import display
+from .diffs import ith_place_nth_diff, joint_ith_place_nth_diff
 
 
 # plot stats for each dim (flattened)
@@ -467,7 +467,7 @@ def plot_combined_analysis(wt, gd, num_bins=15, title="Combined Analysis"):
     )
 
     diffs_slider = widgets.IntSlider(
-        value=1, min=1, max=50, step=1, description="diff:", continuous_update=False
+        value=1, min=1, max=15, step=1, description="diff:", continuous_update=False
     )
 
     # Get the range for both dimensions
@@ -478,21 +478,22 @@ def plot_combined_analysis(wt, gd, num_bins=15, title="Combined Analysis"):
     x_bins = np.linspace(x_min, x_max, num_bins)
     y_bins = np.linspace(y_min, y_max, num_bins)
 
+    Y, X = np.meshgrid(y_bins, x_bins)
+    X_flat, Y_flat = X.flatten(), Y.flatten()
+
     def update_plot(i_to_plot_for, num_draws_to_plot_for, diff_to_plot_for):
         if num_draws_to_plot_for < i_to_plot_for:
             print("num_draws_to_plot_for must be greater than i_to_plot_for")
             return
 
-        plt.close("all")  # Clear any previous figures
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
-
         # Left plot: Second order dot products
         wt_to_plot_for = wt[:, :num_draws_to_plot_for]
         gd_to_plot_for = gd[:, :num_draws_to_plot_for]
-        diffs_per_draw = -ith_place_nth_diff(wt_to_plot_for, i_to_plot_for, diff_to_plot_for)
+        diffs_per_draw = -ith_place_nth_diff(
+            wt_to_plot_for, i_to_plot_for, diff_to_plot_for
+        )
         dot_product_per_draw = np.sum(
-            diffs_per_draw * gd_to_plot_for[:, : len(diffs_per_draw[0])],
-            axis=2,
+            diffs_per_draw * gd_to_plot_for[:, : len(diffs_per_draw[0])], axis=2
         )
         location_per_draw = wt_to_plot_for[:, : len(diffs_per_draw[0])]
 
@@ -503,24 +504,6 @@ def plot_combined_analysis(wt, gd, num_bins=15, title="Combined Analysis"):
             weights=dot_product_per_draw[0, :num_draws_to_plot_for],
             density=True,
         )
-
-        im1 = ax1.imshow(
-            H.T,
-            origin="lower",
-            extent=[x_min, x_max, y_min, y_max],
-            aspect="auto",
-            cmap="viridis",
-        )
-        plt.colorbar(im1, ax=ax1, label="Dot Product")
-        ax1.set_xlabel("X")
-        ax1.set_ylabel("Y")
-        ax1.set_title(f"Dot Products, i={i_to_plot_for}")
-
-        # Right plot: Vector field
-        x = np.linspace(x_min, x_max, num_bins)
-        y = np.linspace(y_min, y_max, num_bins)
-        Y, X = np.meshgrid(y, x)
-        X_flat, Y_flat = X.flatten(), Y.flatten()
 
         diffs = np.concatenate(
             joint_ith_place_nth_diff(wt_to_plot_for, i_to_plot_for, diff_to_plot_for)
@@ -533,13 +516,29 @@ def plot_combined_analysis(wt, gd, num_bins=15, title="Combined Analysis"):
         V = vect_field[:, :, 1].flatten()  # y-component
         color_values = colors[:, :, 0].flatten()
 
-        quiver = ax2.quiver(
-            X_flat, Y_flat, U, V, color_values, cmap="viridis"
+        plt.close("all")  # Clear any previous figures
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+
+        im1 = ax1.imshow(
+            H.T,
+            origin="lower",
+            extent=[x_min, x_max, y_min, y_max],
+            aspect="auto",
+            cmap="viridis",
         )
+        plt.colorbar(im1, ax=ax1, label="Dot Product")
+        ax1.set_xlabel("X")
+        ax1.set_ylabel("Y")
+        ax1.set_title(
+            f"Sum of ({diff_to_plot_for}nd order diff) ⋅ grad over first {num_draws_to_plot_for} draws, i={i_to_plot_for}"
+        )
+        quiver = ax2.quiver(X_flat, Y_flat, U, V, color_values, cmap="viridis")
         plt.colorbar(quiver, ax=ax2, label="Standard deviations")
         ax2.set_xlabel("X")
         ax2.set_ylabel("Y")
-        ax2.set_title(f"Vector Field, diff={diff_to_plot_for}, i={i_to_plot_for}")
+        ax2.set_title(
+            f"Vector Field of {diff_to_plot_for}nd order diff over first {num_draws_to_plot_for} draws,  i={i_to_plot_for}"
+        )
         ax2.set_xlim(x_min, x_max)
         ax2.set_ylim(y_min, y_max)
 
@@ -552,6 +551,6 @@ def plot_combined_analysis(wt, gd, num_bins=15, title="Combined Analysis"):
         update_plot,
         i_to_plot_for=i_slider,
         num_draws_to_plot_for=draws_slider,
-        diff_to_plot_for=diffs_slider
+        diff_to_plot_for=diffs_slider,
     )
     display(widget)
