@@ -143,30 +143,11 @@ def plot_trajectories(weight_trajectories, names, model, n_bins=20):
     fig, axes = plt.subplots(1, len(weight_trajectories), figsize=(6, 6))
     if len(weight_trajectories) == 1:
         axes = [axes]
-    model_copy = deepcopy(model)
     range_size = 5
     w1_range = np.linspace(-range_size, range_size, 21)
     w2_range = np.linspace(-range_size, range_size, 21)
-    w1_vals, w2_vals = np.meshgrid(w1_range, w2_range)
-    Z = np.zeros_like(w1_vals, dtype=float)
-
-    for i in range(w1_vals.shape[0]):
-        for j in range(w1_vals.shape[1]):
-            w1 = w1_vals[i, j]
-            w2 = w2_vals[i, j]
-            model_copy.weights = nn.Parameter(
-                torch.tensor([w1, w2], dtype=torch.float32).to("cpu")
-            )
-            Z[i, j] = (
-                model_copy.to("cpu")(torch.tensor(1.0).to("cpu")).item() ** 2
-            ) + 0.0001 * w1 * w2  # MSE, so square this
-
-    custom_levels = np.linspace(Z.min(), Z.max() * 0.04, n_bins)
 
     for i, weight_trajectory in enumerate(weight_trajectories):
-        # axes[i].contourf(
-        #     w1_vals, w2_vals, Z, levels=custom_levels, cmap=contour_cmap, alpha=0.8
-        # )
         draws_array = np.array(
             [
                 weight
@@ -175,7 +156,6 @@ def plot_trajectories(weight_trajectories, names, model, n_bins=20):
                 and w2_range[0] <= weight[0][1] <= w2_range[-1]
             ]
         )
-        print(np.shape(draws_array))
         sns.scatterplot(
             x=draws_array[:, 0, 0], y=draws_array[:, 0, 1], marker="x", ax=axes[i], s=10
         )
