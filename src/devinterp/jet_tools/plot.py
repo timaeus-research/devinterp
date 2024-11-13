@@ -14,16 +14,22 @@ def plot_second_order_one_place_stats(wt, n, title="zeros"):
     num_chains = len(wt)
     num_draws = len(wt[0])
     all_stds_per_i = []
-    all_mean_dists_per_n = []
+    all_norms_per_i = []
     i_values = np.arange(1, num_draws // n - 2, 1)
     for i in i_values:
         diffs = ith_place_nth_diff(wt, i, n)
+        # Calculate norm of differences across all chains
+        diff_norms = np.linalg.norm(diffs, axis=2)  # Norm across parameter dimensions
+        mean_norm = np.mean(diff_norms, axis=1)  # Mean across chains
+        all_norms_per_i.append(mean_norm)
         std_per_i = np.std(diffs, axis=1)
         all_stds_per_i.append(std_per_i)
     fig, ax1 = plt.subplots()  # Create a figure and a primary axe
     for tensor_index, std in enumerate(np.array(all_stds_per_i).T):
-        ax1.plot(i_values, std[0], label=f"std {tensor_index}")
+        ax1.plot(i_values, std[0], label=f"std dim {tensor_index}")
+    ax1.plot(i_values, all_norms_per_i, label=f"norm")
     plt.title(title)
+    plt.legend(loc="upper right")
     plt.show()
 
 
@@ -33,9 +39,15 @@ def plot_second_order_two_place_stats(wt, n, title="zeros"):
     all_stds_x_per_i = []
     all_stds_y_per_i = []
     cov_x_y_per_i = []
+    all_norms_per_i = []
     i_values = np.arange(1, num_draws // n - 2, 1)
+
     for i in i_values:
         diffs = ith_place_nth_diff(wt, i, n)
+        # Calculate norm of differences across all chains
+        diff_norms = np.linalg.norm(diffs, axis=2)  # Norm across parameter dimensions
+        mean_norm = np.mean(diff_norms, axis=1)  # Mean across chains
+        all_norms_per_i.append(mean_norm)
         std_x_y = np.std(diffs, axis=1)[0]
         cov_x_y = kstat(diffs.reshape(-1, diffs.shape[-1]), (0, 1))
         all_stds_x_per_i.append(std_x_y[0])
@@ -48,6 +60,7 @@ def plot_second_order_two_place_stats(wt, n, title="zeros"):
     ax1.plot(i_values, all_stds_x_per_i, label="xx")
     ax1.plot(i_values, all_stds_y_per_i, label="yy")
     ax1.plot(i_values, cov_x_y_per_i, label="xy")
+    ax1.plot(i_values, all_norms_per_i, label="norm")
 
     # ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
 
