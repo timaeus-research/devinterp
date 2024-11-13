@@ -78,41 +78,42 @@ def plot_second_order_one_place_dot_products_2d(wt, gd, n, title="zeros"):
     # Create sliders
     i_slider = widgets.IntSlider(
         value=100,
-        min=1,
-        max=1000,
-        step=1,
+        min=10,
+        max=2000,
+        step=10,
         description="i_to_plot_for:",
         continuous_update=False,
     )
 
     draws_slider = widgets.IntSlider(
         value=10000,
-        min=1000,
-        max=50000,
-        step=1000,
+        min=100,
+        max=10000,
+        step=100,
         description="num_draws:",
         continuous_update=False,
     )
 
     def update_plot(i_to_plot_for, num_draws_to_plot_for):
+        if num_draws_to_plot_for < i_to_plot_for:
+            print("num_draws_to_plot_for must be greater than i_to_plot_for")
+            return
+        wt_to_plot_for = wt[:, :num_draws_to_plot_for]
+        gd_to_plot_for = gd[:, :num_draws_to_plot_for]
         # note the sign flip, np.diff returns a[i+1] - a[i] and we need the opposite
-        diffs_per_draw = -ith_place_nth_diff(wt, i_to_plot_for, n)
+        diffs_per_draw = -ith_place_nth_diff(wt_to_plot_for, i_to_plot_for, n)
         # Dot product across parameter dimensions
         dot_product_per_draw = np.sum(
-            diffs_per_draw * gd[:, : len(diffs_per_draw[0])], axis=2
+            diffs_per_draw * gd_to_plot_for[:, : len(diffs_per_draw[0])], axis=2
         )
-        location_per_draw = wt[:, : len(diffs_per_draw[0])]
+        location_per_draw = wt_to_plot_for[:, : len(diffs_per_draw[0])]
 
         # Create 2D histogram of dot products
         num_bins = 20
 
         # Get the range for both dimensions
-        x_min, x_max = np.min(location_per_draw[..., 0]), np.max(
-            location_per_draw[..., 0]
-        )
-        y_min, y_max = np.min(location_per_draw[..., 1]), np.max(
-            location_per_draw[..., 1]
-        )
+        x_min, x_max = np.min(wt[..., 0]), np.max(wt[..., 0])
+        y_min, y_max = np.min(wt[..., 1]), np.max(wt[..., 1])
 
         # Create bins
         x_bins = np.linspace(x_min, x_max, num_bins)
@@ -126,7 +127,7 @@ def plot_second_order_one_place_dot_products_2d(wt, gd, n, title="zeros"):
             weights=dot_product_per_draw[0, :num_draws_to_plot_for],
             density=True,
         )
-
+        plt.close("all")  # Clear any previous figures
         plt.figure(figsize=(10, 8))
         plt.imshow(
             H.T,
@@ -142,9 +143,10 @@ def plot_second_order_one_place_dot_products_2d(wt, gd, n, title="zeros"):
         plt.show()
 
     # Create interactive widget
-    widgets.interactive(
+    widget = widgets.interactive(
         update_plot, i_to_plot_for=i_slider, num_draws_to_plot_for=draws_slider
     )
+    display(widget)
 
 
 def plot_second_order_two_place_stats(wt, n, title="zeros"):
