@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from PyMoments import kstat
 
+import ipywidgets as widgets
+from IPython.display import display
+
 
 # plot stats for each dim (flattened)
 def plot_second_order_one_place_stats(wt, n, title="zeros"):
@@ -69,84 +72,6 @@ def plot_second_order_one_place_dot_products(
         plt.xlabel("draws")
         plt.title(title + f", i={i_to_plot_draws_for}")
         plt.show()
-
-
-def plot_second_order_one_place_dot_products_2d(wt, gd, n, title="zeros"):
-    import ipywidgets as widgets
-    from IPython.display import display
-
-    # Create sliders
-    i_slider = widgets.IntSlider(
-        value=100,
-        min=10,
-        max=2000,
-        step=10,
-        description="i_to_plot_for:",
-        continuous_update=False,
-    )
-
-    draws_slider = widgets.IntSlider(
-        value=10000,
-        min=100,
-        max=10000,
-        step=100,
-        description="num_draws:",
-        continuous_update=False,
-    )
-
-    def update_plot(i_to_plot_for, num_draws_to_plot_for):
-        if num_draws_to_plot_for < i_to_plot_for:
-            print("num_draws_to_plot_for must be greater than i_to_plot_for")
-            return
-        wt_to_plot_for = wt[:, :num_draws_to_plot_for]
-        gd_to_plot_for = gd[:, :num_draws_to_plot_for]
-        # note the sign flip, np.diff returns a[i+1] - a[i] and we need the opposite
-        diffs_per_draw = -ith_place_nth_diff(wt_to_plot_for, i_to_plot_for, n)
-        # Dot product across parameter dimensions
-        dot_product_per_draw = np.sum(
-            diffs_per_draw * gd_to_plot_for[:, : len(diffs_per_draw[0])], axis=2
-        )
-        location_per_draw = wt_to_plot_for[:, : len(diffs_per_draw[0])]
-
-        # Create 2D histogram of dot products
-        num_bins = 20
-
-        # Get the range for both dimensions
-        x_min, x_max = np.min(wt[..., 0]), np.max(wt[..., 0])
-        y_min, y_max = np.min(wt[..., 1]), np.max(wt[..., 1])
-
-        # Create bins
-        x_bins = np.linspace(x_min, x_max, num_bins)
-        y_bins = np.linspace(y_min, y_max, num_bins)
-
-        # Create 2D histogram with dot products as weights
-        H, xedges, yedges = np.histogram2d(
-            location_per_draw[0, :, 0],  # x coordinates from first chain
-            location_per_draw[0, :, 1],  # y coordinates from first chain
-            bins=[x_bins, y_bins],
-            weights=dot_product_per_draw[0, :num_draws_to_plot_for],
-            density=True,
-        )
-        plt.close("all")  # Clear any previous figures
-        plt.figure(figsize=(10, 8))
-        plt.imshow(
-            H.T,
-            origin="lower",
-            extent=[x_min, x_max, y_min, y_max],
-            aspect="auto",
-            cmap="viridis",
-        )
-        plt.colorbar(label="Dot Product")
-        plt.xlabel("X")
-        plt.ylabel("Y")
-        plt.title(f"{title}, i={i_to_plot_for}")
-        plt.show()
-
-    # Create interactive widget
-    widget = widgets.interactive(
-        update_plot, i_to_plot_for=i_slider, num_draws_to_plot_for=draws_slider
-    )
-    display(widget)
 
 
 def plot_second_order_two_place_stats(wt, n, title="zeros"):
@@ -318,9 +243,6 @@ def compute_binned_averages(A, xmin, xmax, ymin, ymax, n):
     return B
 
 
-import numpy as np
-
-
 def compute_binned_averages_multi_with_std(A, xmin, xmax, ymin, ymax, n):
     # Number of columns to average over
     m = A.shape[1] - 2
@@ -338,9 +260,7 @@ def compute_binned_averages_multi_with_std(A, xmin, xmax, ymin, ymax, n):
 
     # Iterate over each element in A
     for k in range(A.shape[0]):
-        print(A[k])
         x, y = A[k, 0], A[k, 1]
-        print(x, y)
         values = A[k, 2:]  # Extract the values starting from the third column
 
         # Check which bin (i, j) the point (x, y) belongs to
@@ -370,95 +290,268 @@ def compute_binned_averages_multi_with_std(A, xmin, xmax, ymin, ymax, n):
             np.divide(B_sum_squares[:, :, l], count, where=(count > 0))
             - B_avg[:, :, l] ** 2
         )
-
     return B_avg, B_std
 
 
-def plot_vector_field(A, xmin, xmax, ymin, ymax):
-    n = A.shape[0]  # Assuming A is of shape (n, n, 2)
+def plot_second_order_one_place_dot_products_2d(wt, gd, n, num_bins=15, title="zeros"):
+    import ipywidgets as widgets
+    from IPython.display import display
 
-    # Create the grid points for the plot
-    x = np.linspace(xmin, xmax, n)
-    y = np.linspace(ymin, ymax, n)
+    # Create sliders
+    i_slider = widgets.IntSlider(
+        value=100,
+        min=10,
+        max=2000,
+        step=10,
+        description="i_to_plot_for:",
+        continuous_update=False,
+    )
 
-    # Create meshgrid for plotting
-    X, Y = np.meshgrid(x, y)
+    draws_slider = widgets.IntSlider(
+        value=10000,
+        min=100,
+        max=10000,
+        step=100,
+        description="num_draws:",
+        continuous_update=False,
+    )
+    # Get the range for both dimensions
+    x_min, x_max = np.min(wt[..., 0]), np.max(wt[..., 0])
+    y_min, y_max = np.min(wt[..., 1]), np.max(wt[..., 1])
 
-    # Extract the vector components from A
-    U = A[:, :, 0]  # x-component of the vector field
-    V = A[:, :, 1]  # y-component of the vector field
+    # Create bins
+    x_bins = np.linspace(x_min, x_max, num_bins)
+    y_bins = np.linspace(y_min, y_max, num_bins)
 
-    # Create the plot
-    plt.figure(figsize=(6, 6))
-    plt.quiver(X, Y, U, V)
+    def update_plot(i_to_plot_for, num_draws_to_plot_for):
+        if num_draws_to_plot_for < i_to_plot_for:
+            print("num_draws_to_plot_for must be greater than i_to_plot_for")
+            return
+        wt_to_plot_for = wt[:, :num_draws_to_plot_for]
+        gd_to_plot_for = gd[:, :num_draws_to_plot_for]
+        # note the sign flip, np.diff returns a[i+1] - a[i] and we need the opposite
+        diffs_per_draw = -ith_place_nth_diff(wt_to_plot_for, i_to_plot_for, n)
+        # Dot product across parameter dimensions
+        dot_product_per_draw = np.sum(
+            diffs_per_draw * gd_to_plot_for[:, : len(diffs_per_draw[0])],
+            axis=2,
+        )
+        location_per_draw = wt_to_plot_for[:, : len(diffs_per_draw[0])]
 
-    # Set labels and plot title
-    plt.xlabel("X")
-    plt.ylabel("Y")
-    plt.title("2D Vector Field")
+        # Create 2D histogram with dot products as weights
+        H, xedges, yedges = np.histogram2d(
+            location_per_draw[0, :, 0],  # x coordinates from first chain
+            location_per_draw[0, :, 1],  # y coordinates from first chain
+            bins=[x_bins, y_bins],
+            weights=dot_product_per_draw[0, :num_draws_to_plot_for],
+            density=True,
+        )
+        plt.close("all")  # Clear any previous figures
+        plt.figure(figsize=(10, 8))
+        plt.imshow(
+            H.T,
+            origin="lower",
+            extent=[x_min, x_max, y_min, y_max],
+            aspect="auto",
+            cmap="viridis",
+        )
+        plt.colorbar(label="Dot Product")
+        plt.xlabel("X")
+        plt.ylabel("Y")
+        plt.title(f"{title}, i={i_to_plot_for}")
+        plt.show()
 
-    # Set limits for x and y axis
-    plt.xlim(xmin, xmax)
-    plt.ylim(ymin, ymax)
+    # Create interactive widget
+    widget = widgets.interactive(
+        update_plot, i_to_plot_for=i_slider, num_draws_to_plot_for=draws_slider
+    )
+    display(widget)
 
-    plt.gca().set_aspect("equal", adjustable="box")  # Equal scaling for axes
-    plt.show()
 
+def plot_vector_field_with_colors(wts_flattened, num_bins=15, title="SGLD"):
 
-def plot_vector_field_with_colors(A, C, xmin, xmax, ymin, ymax, i, n, legend):
-    num_bins = A.shape[0]
+    # Create sliders
+    i_slider = widgets.IntSlider(
+        value=100,
+        min=10,
+        max=2000,
+        step=10,
+        description="i_to_plot_for:",
+        continuous_update=False,
+    )
 
+    diffs_slider = widgets.IntSlider(
+        value=1, min=1, max=50, step=1, description="diff:", continuous_update=False
+    )
+    xmin = np.min(wts_flattened[:, :, 0])
+    xmax = np.max(wts_flattened[:, :, 0])
+    ymin = np.min(wts_flattened[:, :, 1])
+    ymax = np.max(wts_flattened[:, :, 1])
     # Create the grid points for the plot
     x = np.linspace(xmin, xmax, num_bins)
     y = np.linspace(ymin, ymax, num_bins)
 
     # Create meshgrid for plotting
-    X, Y = np.meshgrid(x, y)
-
-    # Extract the vector components from A
-    U = A[:, :, 0]  # x-component of the vector field
-    V = A[:, :, 1]  # y-component of the vector field
+    Y, X = np.meshgrid(y, x)
 
     # Flatten the grid and the vectors for plotting
     X_flat = X.flatten()
     Y_flat = Y.flatten()
-    U_flat = U.flatten()
-    V_flat = V.flatten()
 
-    # Extract the values from C and flatten for coloring
-    color_values = C[:, :].flatten()
+    def update_plot(i_to_plot_for, diff_to_plot_for):
+        diffs = np.concatenate(
+            joint_ith_place_nth_diff(wts_flattened, i_to_plot_for, diff_to_plot_for)
+        )
+        vect_field, colors = compute_binned_averages_multi_with_std(
+            diffs, xmin, xmax, ymin, ymax, num_bins
+        )
+        # Extract the vector components from A
+        U = vect_field[:, :, 0]  # x-component of the vector field
+        V = vect_field[:, :, 1]  # y-component of the vector field
 
-    # Create the plot
-    plt.figure(figsize=(6, 6))
+        U_flat = U.flatten()
+        V_flat = V.flatten()
+        # Extract the values from C and flatten for coloring
+        color_values = colors[:, :, 0].flatten()
 
-    # Use quiver to plot the vector field, with color based on the array C
-    quiver = plt.quiver(X_flat, Y_flat, U_flat, V_flat, color_values, cmap="viridis")
+        # Create the plot
+        plt.close("all")  # Clear any previous figures
+        plt.figure(figsize=(6, 6))
 
-    # Add a colorbar to represent the color values from C
-    plt.colorbar(quiver, label="Colored by standard deviations")
+        # Use quiver to plot the vector field, with color based on the array C
+        quiver = plt.quiver(
+            X_flat, Y_flat, U_flat, V_flat, color_values, cmap="viridis"
+        )
 
-    # Set labels and plot title
-    plt.xlabel("X")
-    plt.ylabel("Y")
-    plt.title(legend + f" n={n}, i={i}")
+        # Add a colorbar to represent the color values from C
+        plt.colorbar(quiver, label="Colored by standard deviations")
 
-    # Set limits for x and y axis
-    plt.xlim(xmin, xmax)
-    plt.ylim(ymin, ymax)
+        # Set labels and plot title
+        plt.xlabel("X")
+        plt.ylabel("Y")
+        plt.title(title + f" diff={diff_to_plot_for}, i={i_to_plot_for}")
+
+        # Set limits for x and y axis
+        plt.xlim(xmin, xmax)
+        plt.ylim(ymin, ymax)
+        plt.show()
+
+    # Create interactive widget
+    widget = widgets.interactive(
+        update_plot, i_to_plot_for=i_slider, diff_to_plot_for=diffs_slider
+    )
+    display(widget)
 
 
-def plot_vector_field_jets(wt, i_range, diffs_range, num_bins, legend):
-    xmin = np.min(wt[:, :, 0])
-    xmax = np.max(wt[:, :, 0])
-    ymin = np.min(wt[:, :, 1])
-    ymax = np.max(wt[:, :, 1])
-    for n in diffs_range:
-        for i in i_range:
-            diffs = np.concatenate(joint_ith_place_nth_diff(wt, i, n))
-            print(np.shape(diffs))
-            vect_field, colors = compute_binned_averages_multi_with_std(
-                diffs, xmin, xmax, ymin, ymax, num_bins
-            )
-            plot_vector_field_with_colors(
-                vect_field, colors[:, :, 0], xmin, xmax, ymin, ymax, i, n, legend
-            )
+def plot_combined_analysis(wt, gd, num_bins=15, title="Combined Analysis"):
+    import ipywidgets as widgets
+    from IPython.display import display
+
+    # Create sliders
+    i_slider = widgets.IntSlider(
+        value=100,
+        min=10,
+        max=2000,
+        step=10,
+        description="i_to_plot_for:",
+        continuous_update=False,
+    )
+
+    draws_slider = widgets.IntSlider(
+        value=10000,
+        min=100,
+        max=10000,
+        step=100,
+        description="num_draws:",
+        continuous_update=False,
+    )
+
+    diffs_slider = widgets.IntSlider(
+        value=1, min=1, max=50, step=1, description="diff:", continuous_update=False
+    )
+
+    # Get the range for both dimensions
+    x_min, x_max = np.min(wt[..., 0]), np.max(wt[..., 0])
+    y_min, y_max = np.min(wt[..., 1]), np.max(wt[..., 1])
+
+    # Create bins
+    x_bins = np.linspace(x_min, x_max, num_bins)
+    y_bins = np.linspace(y_min, y_max, num_bins)
+
+    def update_plot(i_to_plot_for, num_draws_to_plot_for, diff_to_plot_for):
+        if num_draws_to_plot_for < i_to_plot_for:
+            print("num_draws_to_plot_for must be greater than i_to_plot_for")
+            return
+
+        plt.close("all")  # Clear any previous figures
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+
+        # Left plot: Second order dot products
+        wt_to_plot_for = wt[:, :num_draws_to_plot_for]
+        gd_to_plot_for = gd[:, :num_draws_to_plot_for]
+        diffs_per_draw = -ith_place_nth_diff(wt_to_plot_for, i_to_plot_for, diff_to_plot_for)
+        dot_product_per_draw = np.sum(
+            diffs_per_draw * gd_to_plot_for[:, : len(diffs_per_draw[0])],
+            axis=2,
+        )
+        location_per_draw = wt_to_plot_for[:, : len(diffs_per_draw[0])]
+
+        H, _, _ = np.histogram2d(
+            location_per_draw[0, :, 0],
+            location_per_draw[0, :, 1],
+            bins=[x_bins, y_bins],
+            weights=dot_product_per_draw[0, :num_draws_to_plot_for],
+            density=True,
+        )
+
+        im1 = ax1.imshow(
+            H.T,
+            origin="lower",
+            extent=[x_min, x_max, y_min, y_max],
+            aspect="auto",
+            cmap="viridis",
+        )
+        plt.colorbar(im1, ax=ax1, label="Dot Product")
+        ax1.set_xlabel("X")
+        ax1.set_ylabel("Y")
+        ax1.set_title(f"Dot Products, i={i_to_plot_for}")
+
+        # Right plot: Vector field
+        x = np.linspace(x_min, x_max, num_bins)
+        y = np.linspace(y_min, y_max, num_bins)
+        Y, X = np.meshgrid(y, x)
+        X_flat, Y_flat = X.flatten(), Y.flatten()
+
+        diffs = np.concatenate(
+            joint_ith_place_nth_diff(wt_to_plot_for, i_to_plot_for, diff_to_plot_for)
+        )
+        vect_field, colors = compute_binned_averages_multi_with_std(
+            diffs, x_min, x_max, y_min, y_max, num_bins
+        )
+
+        U = vect_field[:, :, 0].flatten()  # x-component
+        V = vect_field[:, :, 1].flatten()  # y-component
+        color_values = colors[:, :, 0].flatten()
+
+        quiver = ax2.quiver(
+            X_flat, Y_flat, U, V, color_values, cmap="viridis"
+        )
+        plt.colorbar(quiver, ax=ax2, label="Standard deviations")
+        ax2.set_xlabel("X")
+        ax2.set_ylabel("Y")
+        ax2.set_title(f"Vector Field, diff={diff_to_plot_for}, i={i_to_plot_for}")
+        ax2.set_xlim(x_min, x_max)
+        ax2.set_ylim(y_min, y_max)
+
+        plt.suptitle(title)
+        plt.tight_layout()
+        plt.show()
+
+    # Create interactive widget
+    widget = widgets.interactive(
+        update_plot,
+        i_to_plot_for=i_slider,
+        num_draws_to_plot_for=draws_slider,
+        diff_to_plot_for=diffs_slider
+    )
+    display(widget)
