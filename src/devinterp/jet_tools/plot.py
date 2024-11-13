@@ -47,7 +47,7 @@ def plot_second_order_one_place_dot_products(
         dot_product = np.sum(diffs * gd[:, : len(diffs[0])], axis=2)
         if i == i_to_plot_draws_for:
             # cumulative average
-            cum_draws = np.cumsum(dot_product, axis=1)[0] / np.arange(
+            cum_avg_dot_up_to_draw = np.cumsum(dot_product, axis=1)[0] / np.arange(
                 1, num_draws - i + 1
             )
         mean_dot = np.mean(dot_product, axis=1)  # Mean across draws
@@ -61,10 +61,90 @@ def plot_second_order_one_place_dot_products(
     plt.show()
     if i_to_plot_draws_for is not None:
         fig, ax1 = plt.subplots()
-        ax1.plot(np.arange(0, num_draws - i_to_plot_draws_for, 1), cum_draws, label="")
+        ax1.plot(
+            np.arange(0, num_draws - i_to_plot_draws_for, 1),
+            cum_avg_dot_up_to_draw,
+            label="",
+        )
         plt.xlabel("draws")
         plt.title(title + f", i={i_to_plot_draws_for}")
         plt.show()
+
+
+def plot_second_order_one_place_dot_products_2d(wt, gd, n, title="zeros"):
+    import ipywidgets as widgets
+    from IPython.display import display
+
+    # Create sliders
+    i_slider = widgets.IntSlider(
+        value=100,
+        min=1,
+        max=1000,
+        step=1,
+        description="i_to_plot_for:",
+        continuous_update=False,
+    )
+
+    draws_slider = widgets.IntSlider(
+        value=10000,
+        min=1000,
+        max=50000,
+        step=1000,
+        description="num_draws:",
+        continuous_update=False,
+    )
+
+    def update_plot(i_to_plot_for, num_draws_to_plot_for):
+        # note the sign flip, np.diff returns a[i+1] - a[i] and we need the opposite
+        diffs_per_draw = -ith_place_nth_diff(wt, i_to_plot_for, n)
+        # Dot product across parameter dimensions
+        dot_product_per_draw = np.sum(
+            diffs_per_draw * gd[:, : len(diffs_per_draw[0])], axis=2
+        )
+        location_per_draw = wt[:, : len(diffs_per_draw[0])]
+
+        # Create 2D histogram of dot products
+        num_bins = 20
+
+        # Get the range for both dimensions
+        x_min, x_max = np.min(location_per_draw[..., 0]), np.max(
+            location_per_draw[..., 0]
+        )
+        y_min, y_max = np.min(location_per_draw[..., 1]), np.max(
+            location_per_draw[..., 1]
+        )
+
+        # Create bins
+        x_bins = np.linspace(x_min, x_max, num_bins)
+        y_bins = np.linspace(y_min, y_max, num_bins)
+
+        # Create 2D histogram with dot products as weights
+        H, xedges, yedges = np.histogram2d(
+            location_per_draw[0, :, 0],  # x coordinates from first chain
+            location_per_draw[0, :, 1],  # y coordinates from first chain
+            bins=[x_bins, y_bins],
+            weights=dot_product_per_draw[0, :num_draws_to_plot_for],
+            density=True,
+        )
+
+        plt.figure(figsize=(10, 8))
+        plt.imshow(
+            H.T,
+            origin="lower",
+            extent=[x_min, x_max, y_min, y_max],
+            aspect="auto",
+            cmap="viridis",
+        )
+        plt.colorbar(label="Dot Product")
+        plt.xlabel("X")
+        plt.ylabel("Y")
+        plt.title(f"{title}, i={i_to_plot_for}")
+        plt.show()
+
+    # Create interactive widget
+    widgets.interactive(
+        update_plot, i_to_plot_for=i_slider, num_draws_to_plot_for=draws_slider
+    )
 
 
 def plot_second_order_two_place_stats(wt, n, title="zeros"):
