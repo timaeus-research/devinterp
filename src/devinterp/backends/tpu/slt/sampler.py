@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Un
 import numpy as np
 import torch
 import torch_xla.core.xla_model as xm
+import torch_xla.core.xla_model as xr
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -235,14 +236,14 @@ def _sample_single_chain(kwargs):
 
 def _sample_single_chain_xla(kwargs):
     device = kwargs.pop("device")
-    ordinal = xm.get_ordinal()
+    ordinal = xr.global_ordinal()
     num_chains = kwargs["num_chains"]
     seeds = kwargs.pop("seeds")
 
     if ordinal > num_chains:
         return
 
-    for chain in range(ordinal, num_chains, xm.xrt_world_size()):
+    for chain in range(ordinal, num_chains, xr.world_size()):
         seed = seeds[chain]
 
         for callback in kwargs["callbacks"]:
@@ -394,9 +395,9 @@ def sample(
         )
 
     if "xla" in str(device):
-        if num_chains % xm.xrt_world_size() != 0:
+        if num_chains % xr.world_size() != 0:
             raise ValueError(
-                f"Number of chains ({num_chains}) must be divisible by number of TPU cores ({xm.xrt_world_size()})"
+                f"Number of chains ({num_chains}) must be divisible by number of TPU cores ({xr.world_size()})"
             )
 
         if seed is None:

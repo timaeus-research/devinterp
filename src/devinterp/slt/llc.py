@@ -67,8 +67,9 @@ class LLCEstimator(SamplerCallback):
                 self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
             elif TPU_TYPE == "v2/v3":
                 # this only works if we set
-                # store = torch.distributed.TCPStore("127.0.0.1", 12345, 4, xm.get_ordinal() == 0)
-                # torch.distributed.init_process_group(backend="gloo", store=store, rank=xm.get_ordinal()//2, world_size=xm.xrt_world_size()//2)
+                # import torch_xla.runtime as xr
+                # store = torch.distributed.TCPStore("127.0.0.1", 12345, 4, xr.global_ordinal() == 0)
+                # torch.distributed.init_process_group(backend="gloo", store=store, rank=xr.global_ordinal()//2, world_size=xr.world_size()//2)
                 # after xmp.spawn(). sorry!
                 self.losses = self.losses.cpu()
                 try:
