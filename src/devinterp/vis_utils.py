@@ -4,16 +4,24 @@ from typing import Callable, Container, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import torch
 from devinterp.utils import default_nbeta
-from pydantic import BaseModel
 from tqdm import tqdm
+
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+except ImportError:
+    px = None
+    go = None
+    warnings.warn(
+        "Plotly is not installed. Visualization features will be unavailable. "
+        "Install with `pip install devinterp[vis]` to enable them."
+    )
 
 
 # Sampling config validates input parameters while allowing us to use **kwargs later on
-class SweepConfig(BaseModel):
+class SweepConfig:
     epsilon_range: List[float]
     beta_range: List[float]
     llc_estimator: Callable
@@ -222,20 +230,14 @@ class EpsilonBetaAnalyzer:
         slider_plane: Optional[str] = False,
         div_out_beta=False,
         **kwargs,
-    ) -> go.Figure:
-        """
-        Plot the results of the LLC sweep.
+    ):
+        if px is None or go is None:
+            warnings.warn(
+                "Plotting is unavailable because Plotly is not installed. "
+                "Install with `pip install devinterp[vis]` to enable visualization."
+            )
+            return None
 
-        :param true_lambda: True value of lambda for comparison (optional). Can be a scalar, a list, or a string column name of sweep_df.
-            Will plot a horizontal plane at the true_lambda value.
-        :param num_last_steps_to_average: Number of last steps to average for final LLC value.
-        :param color: Column name to use for coloring the scatter points.
-        :param slider: Column name to use for creating a slider in the plot.
-        :param slider_plane: If True, adds a plane for each slider value.
-        :param kwargs: Additional keyword arguments to pass to the plotting function.
-            Example: range_color=[0, 0.15] to set the color range.
-        :return: A plotly Figure object containing the LLC sweep visualization.
-        """
         if div_out_beta:
             plot_config = {
                 "title": "LLC / beta vs. epsilon and beta",
@@ -273,7 +275,7 @@ class EpsilonBetaAnalyzer:
                 sweep_df["true_lambda"] = sweep_df["llc/trace"].apply(
                     lambda x: true_lambda
                 )
-            elif type(true_lambda) == str:
+            elif isinstance(true_lambda, str):
                 sweep_df["true_lambda"] = sweep_df[true_lambda]
             else:
                 sweep_df["true_lambda"] = true_lambda
