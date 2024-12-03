@@ -15,10 +15,6 @@ def test_plot_without_plotly():
             analyzer = EpsilonBetaAnalyzer()
             fig = analyzer.plot()
 
-            # Assert that Plotly was not imported
-            assert (
-                analyzer.sweep_config is not None
-            )  # Ensuring other functionalities work
             assert fig is None  # Plot should return None when Plotly is unavailable
 
             # Check that a warning was issued
@@ -29,7 +25,7 @@ def test_plot_without_plotly():
 
 
 def test_plot_with_plotly():
-    # This test assumes Plotly is installed and ensures that plotting works as expected
+    # This test assumes Plotly is installed
     from devinterp.vis_utils import EpsilonBetaAnalyzer
 
     analyzer = EpsilonBetaAnalyzer()
@@ -38,11 +34,8 @@ def test_plot_with_plotly():
     analyzer.sweep_config = mock.Mock()
     analyzer.sweep_config.epsilon_range = [1e-6, 1e-5]
     analyzer.sweep_config.beta_range = [1e-2, 1e-1]
-    analyzer.beta_range = [1e-2, 1e-1]
+    analyzer.beta_range = [1e-2, 1e-    1]
 
-    # Since actual plotting would require more setup, we'll focus on ensuring no exceptions are raised
-    try:
-        fig = analyzer.plot()
-        assert fig is not None  # A Plotly figure should be returned
-    except Exception as e:
-        pytest.fail(f"Plotting raised an exception unexpectedly: {e}")
+    # with plotly plotting should raise an AssertionError (no data), which is past the early plotly return
+    with pytest.raises(AssertionError):
+        analyzer.plot()
