@@ -1,4 +1,5 @@
 import os
+import warnings
 from functools import partial
 from itertools import islice
 from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Tuple, Union
@@ -82,11 +83,23 @@ def default_nbeta(
     dataloader: Union[DataLoader, int], grad_accum_steps: int = 1
 ) -> float:
     if isinstance(dataloader, DataLoader):
-        return (dataloader.batch_size * grad_accum_steps) / np.log(
-            dataloader.batch_size * grad_accum_steps
-        )
+        default_nbeta = dataloader.batch_size * grad_accum_steps
+        if default_nbeta <= 1:
+            warnings.warn(
+                "default nbeta is undefined for batch_size * grad_accum_steps == 1, falling back to default value of 1"
+            )
+            return 1
+        else:
+            return default_nbeta / np.log(default_nbeta)
     elif isinstance(dataloader, int):
-        return (dataloader * grad_accum_steps) / np.log(dataloader * grad_accum_steps)
+        default_nbeta = dataloader * grad_accum_steps
+        if default_nbeta <= 1:
+            warnings.warn(
+                "default nbeta is undefined for batch_size * grad_accum_steps == 1, falling back to default value of 1"
+            )
+            return 1
+        else:
+            return default_nbeta / np.log(default_nbeta)
     else:
         raise NotImplementedError(
             f"N*beta for data type {type(dataloader)} not implemented, use DataLoader or int instead."
@@ -236,6 +249,8 @@ def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):
     """
     import random
 
+    # np.random.SeedSequence outputs np.uint32, but random.seed() expects int
+    seed = int(seed)
     torch.manual_seed(seed)
     random.seed(seed)
 

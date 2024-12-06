@@ -64,7 +64,9 @@ def sample_single_chain(
         optimizer_kwargs.setdefault("save_mala_vars", True)
     if any(isinstance(callback, NoiseNorm) for callback in callbacks):
         optimizer_kwargs.setdefault("save_noise", True)
-    optimizer_kwargs.setdefault("nbeta", default_nbeta(loader))
+    optimizer_kwargs.setdefault(
+        "nbeta", default_nbeta(loader, grad_accum_steps=grad_accum_steps)
+    )
     if optimize_over_per_model_param:
         param_groups = []
         for name, parameter in model.named_parameters():

@@ -70,12 +70,27 @@ def sample_single_chain(
         set_seed(seed, device=device)
 
     # == Optimizer ==
-    if "temperature" in optimizer_kwargs:
-        assert (
-            not "nbeta" in optimizer_kwargs
-        ), "Set either nbeta or temperature in optimizer_kwargs, not both"
-        optimizer_kwargs["nbeta"] = optimizer_kwargs.pop("temperature")
-    assert "nbeta" in optimizer_kwargs, "Set nbeta in optimizer_kwargs"
+
+    # Temperature consistency warning
+    if optimizer_kwargs is not None and (
+        "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs
+    ):
+        if "nbeta" in optimizer_kwargs:
+            assert not any(
+                getattr(callback, "temperature", None) is not None
+                for callback in callbacks
+            ), "If you're setting nbeta in optimizer_kwargs, don't set temperature in the callbacks."
+        if "temperature" in optimizer_kwargs:
+            assert not any(
+                (
+                    getattr(callback, "nbeta", None) is not None
+                    and getattr(callback, "temperature") is None
+                )
+                for callback in callbacks
+            ), "If you're setting temperature in optimizer_kwargs, don't set nbeta in the callbacks."
+        warnings.warn(
+            "If you're setting a nbeta or temperature in optimizer_kwargs, please also make sure to set it in the callbacks."
+        )
 
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
         optimizer_kwargs.setdefault("save_mala_vars", True)

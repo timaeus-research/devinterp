@@ -19,8 +19,7 @@ def test_plot_without_plotly():
 
             # Check that a warning was issued
             mock_warn.warn.assert_called_with(
-                "Plotting is unavailable because Plotly is not installed. "
-                "Install devinterp[vis] to enable visualization."
+                "Plotting is unavailable because Plotly is not installed. Install with `pip install devinterp[vis]` to enable visualization."
             )
 
 

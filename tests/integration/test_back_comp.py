@@ -1,3 +1,5 @@
+from unittest import mock
+
 import numpy as np
 import pytest
 import torch
@@ -5,7 +7,7 @@ from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
-from devinterp.utils import evaluate_mse, get_init_loss_multi_batch
+from devinterp.utils import default_nbeta, evaluate_mse, get_init_loss_multi_batch
 from torch.utils.data import DataLoader, TensorDataset
 
 
@@ -143,4 +145,25 @@ def test_dont_allow_both_temp_and_nbeta(
             num_draws=num_draws,
             callbacks=[llc_estimator],
             verbose=False,
+        )
+
+
+def test_warn_on_default_nbeta():
+    with mock.patch("devinterp.utils.warnings") as mock_warn:
+
+        nbeta = default_nbeta(
+            DataLoader(TensorDataset(torch.randn(100, 10)), batch_size=1),
+            grad_accum_steps=1,
+        )
+        # Check that a warning was issued
+        mock_warn.warn.assert_called_with(
+            "default nbeta is undefined for batch_size * grad_accum_steps == 1, falling back to default value of 1"
+        )
+    with mock.patch("devinterp.utils.warnings") as mock_warn:
+
+        nbeta = default_nbeta(1, grad_accum_steps=1)
+
+        # Check that a warning was issued
+        mock_warn.warn.assert_called_with(
+            "default nbeta is undefined for batch_size * grad_accum_steps == 1, falling back to default value of 1"
         )

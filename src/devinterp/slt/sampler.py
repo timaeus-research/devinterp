@@ -2,8 +2,6 @@ import warnings
 from typing import Callable, Dict, List, Literal, Optional, Type, Union
 
 import torch
-from torch.utils.data import DataLoader
-
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.utils import (
@@ -12,6 +10,7 @@ from devinterp.utils import (
     default_nbeta,
     get_init_loss_multi_batch,
 )
+from torch.utils.data import DataLoader
 
 if USE_TPU_BACKEND:
     from devinterp.backends.tpu.slt.sampler import sample
@@ -139,7 +138,7 @@ def estimate_learning_coeff_with_summary(
     )
     if not init_loss:
         init_loss = get_init_loss_multi_batch(
-            loader, num_chains, model, evaluate, device
+            loader, num_chains * grad_accum_steps, model, evaluate, device
         )
         # alternative: init_loss = get_init_loss_full_batch(loader, model, evaluate, device)
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
@@ -181,6 +180,7 @@ def estimate_learning_coeff_with_summary(
         optimize_over_per_model_param=optimize_over_per_model_param,
         gpu_idxs=gpu_idxs,
         use_amp=use_amp,
+        init_loss=init_loss,
     )
 
     results = {}

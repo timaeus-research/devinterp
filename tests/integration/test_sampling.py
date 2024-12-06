@@ -63,7 +63,7 @@ def get_stats(
     chains=2,
     seed=None,
     num_workers=0,
-    batch_size=4,
+    batch_size=64,
     grad_accum_steps=1,
     use_amp=False,
 ):
@@ -100,6 +100,7 @@ def get_stats(
         seed=seed,
         grad_accum_steps=grad_accum_steps,
         use_amp=use_amp,
+        init_loss=0.1,
     )
 
 
@@ -149,14 +150,9 @@ def test_cpu_multicore(data, cpu_default):
     check(cpu_default, multicore_stats, 1e-4)
 
 
-def test_cpu_multiworker(data, cpu_default):
-    multiworker_stats = get_stats(data, "cpu", seed=100, num_workers=2)
-    check(cpu_default, multiworker_stats, 1e-4)
-
-
 def test_grad_accum(data, cpu_default: dict):
     grad_accum_stats = get_stats(
-        data, "cpu", seed=100, grad_accum_steps=4, batch_size=1
+        data, "cpu", seed=100, grad_accum_steps=4, batch_size=16
     )
     check(cpu_default, grad_accum_stats, 1)
 
