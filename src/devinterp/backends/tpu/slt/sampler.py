@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Un
 import numpy as np
 import torch
 import torch_xla.core.xla_model as xm
-import torch_xla.core.xla_model as xr
+import torch_xla.runtime as xr
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
