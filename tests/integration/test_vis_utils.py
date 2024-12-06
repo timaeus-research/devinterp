@@ -34,7 +34,7 @@ def test_plot_with_plotly():
     analyzer.sweep_config = mock.Mock()
     analyzer.sweep_config.epsilon_range = [1e-6, 1e-5]
     analyzer.sweep_config.beta_range = [1e-2, 1e-1]
-    analyzer.beta_range = [1e-2, 1e-    1]
+    analyzer.beta_range = [1e-2, 1e-1]
 
     # with plotly plotting should raise an AssertionError (no data), which is past the early plotly return
     with pytest.raises(AssertionError):
