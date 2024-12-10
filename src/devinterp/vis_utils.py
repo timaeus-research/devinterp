@@ -231,6 +231,19 @@ class EpsilonBetaAnalyzer:
         div_out_beta=False,
         **kwargs,
     ):
+        """
+        Plot the results of the LLC sweep.
+
+        :param true_lambda: True value of lambda for comparison (optional). Can be a scalar, a list, or a string column name of sweep_df.
+            Will plot a horizontal plane at the true_lambda value.
+        :param num_last_steps_to_average: Number of last steps to average for final LLC value.
+        :param color: Column name to use for coloring the scatter points.
+        :param slider: Column name to use for creating a slider in the plot.
+        :param slider_plane: If True, adds a plane for each slider value.
+        :param kwargs: Additional keyword arguments to pass to the plotting function.
+            Example: range_color=[0, 0.15] to set the color range.
+        :return: A plotly Figure object containing the LLC sweep visualization.
+        """
         if px is None or go is None:
             warnings.warn(
                 "Plotting is unavailable because Plotly is not installed. "

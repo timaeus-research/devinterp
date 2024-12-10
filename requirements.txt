@@ -1,6 +1,5 @@
 einops>=0.6.1
 matplotlib>=3.7.5
-nbformat>=4.2.0
 numpy>=1.23.5
 pandas>=1.5.3
 torch~=2.5.1
