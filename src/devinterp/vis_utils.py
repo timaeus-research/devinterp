@@ -245,7 +245,7 @@ class EpsilonBetaAnalyzer:
         :return: A plotly Figure object containing the LLC sweep visualization.
         """
         if px is None or go is None:
-            warnings.warn(
+            raise ImportError(
                 "Plotting is unavailable because Plotly is not installed. "
                 "Install with `pip install devinterp[vis]` to enable visualization."
             )
