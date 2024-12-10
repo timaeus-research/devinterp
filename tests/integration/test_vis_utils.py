@@ -13,14 +13,8 @@ def test_plot_without_plotly():
             from devinterp.vis_utils import EpsilonBetaAnalyzer
 
             analyzer = EpsilonBetaAnalyzer()
-            fig = analyzer.plot()
-
-            assert fig is None  # Plot should return None when Plotly is unavailable
-
-            # Check that a warning was issued
-            mock_warn.warn.assert_called_with(
-                "Plotting is unavailable because Plotly is not installed. Install with `pip install devinterp[vis]` to enable visualization."
-            )
+            with pytest.raises(ImportError):
+                analyzer.plot()
 
 
 def test_plot_with_plotly():
