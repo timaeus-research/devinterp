@@ -249,7 +249,6 @@ class EpsilonBetaAnalyzer:
                 "Plotting is unavailable because Plotly is not installed. "
                 "Install with `pip install devinterp[vis]` to enable visualization."
             )
-            return None
 
         if div_out_beta:
             plot_config = {
