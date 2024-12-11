@@ -74,12 +74,9 @@ class LLCEstimator(SamplerCallback):
                         ">>> torch.distributed.init_process_group(backend='gloo', store=store, rank=xr.global_ordinal()//2, world_size=xr.world_size()//2)"
                     )
                 self.losses = self.losses.cpu()
-                torch.distributed.all_reduce(self.losses)
-                self.losses = self.losses.cpu()
-                try:
+                if torch.distributed.is_initialized():
                     torch.distributed.all_reduce(self.losses)
-                except ValueError:  # fallback for if we run on a single TPU core
-                    pass
+
             else:
                 raise NotImplementedError(f"TPU type {TPU_TYPE} not supported")
         elif str(self.device).startswith(
