@@ -66,16 +66,16 @@ class LLCEstimator(SamplerCallback):
             if TPU_TYPE == "v4":
                 self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
             elif TPU_TYPE == "v2/v3":
-                if not torch.distributed.is_initialized():
+                self.losses = self.losses.cpu()
+                if torch.distributed.is_initialized():
+                    torch.distributed.all_reduce(self.losses)
+                else:
                     warnings.warn(
                         "torch.distributed has not been initialized. If running on TPU v2/v3, and you want to run chains in parallel, you need to initialize torch.distributed after calling xmp.spawn() as follows:"
                         ">>> import torch_xla.runtime as xr"
                         ">>> store = torch.distributed.TCPStore('127.0.0.1', 12345, 4, xr.global_ordinal() == 0)"
                         ">>> torch.distributed.init_process_group(backend='gloo', store=store, rank=xr.global_ordinal()//2, world_size=xr.world_size()//2)"
                     )
-                self.losses = self.losses.cpu()
-                if torch.distributed.is_initialized():
-                    torch.distributed.all_reduce(self.losses)
 
             else:
                 raise NotImplementedError(f"TPU type {TPU_TYPE} not supported")
