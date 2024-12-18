@@ -50,7 +50,7 @@ class SumModel(nn.Module):
 
     def forward(self, x):
         multiplied = torch.sum(self.weights**self.powers)
-        x = x + multiplied
+        x = x * multiplied
         return x
 
 
