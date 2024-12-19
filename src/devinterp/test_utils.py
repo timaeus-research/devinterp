@@ -34,3 +34,25 @@ class ReducedRankRegressor(nn.Module):
     def forward(self, x):
         x = self.fc1(x)
         return self.fc2(x)
+
+
+class DummyNaNModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(2, 1)
+        self.counter = 0  # Add counter to track number of forward passes
+
+        # Initialize with normal weights first
+        with torch.no_grad():
+            self.linear.weight.fill_(1.0)
+            self.linear.bias.fill_(0.0)
+
+    def forward(self, x):
+        self.counter += 1
+
+        # After 5 runs, switch weights to inf to produce NaNs
+        if self.counter > 100:
+            with torch.no_grad():
+                self.linear.weight.fill_(float("inf"))
+
+        return self.linear(x)
