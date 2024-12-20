@@ -1,0 +1,125 @@
+# serializer version: 1
+# name: test_SGLD_metrics_tracking[SGLD][test_SGLD_metrics_tracking]
+  dict({
+    'distance': array(0., dtype=float32),
+    'grad_norm': array(0.05733979, dtype=float32),
+    'noise_norm': array(0.5136473, dtype=float32),
+    'weight_norm': array(1.3351691, dtype=float32),
+  })
+# ---
+# name: test_SGLD_metrics_tracking[sgld][test_SGLD_metrics_tracking]
+  dict({
+    'distance': array(0., dtype=float32),
+    'grad_norm': array(0.05733979, dtype=float32),
+    'noise_norm': array(0.5136473, dtype=float32),
+    'weight_norm': array(1.3351691, dtype=float32),
+  })
+# ---
+# name: test_SGLD_selective_metrics[SGLD][test_SGLD_selective_metrics]
+  dict({
+    'grad_norm': array(0.05733979, dtype=float32),
+    'weight_norm': array(1.3351691, dtype=float32),
+  })
+# ---
+# name: test_SGLD_selective_metrics[sgld][test_SGLD_selective_metrics]
+  dict({
+    'grad_norm': array(0.05733979, dtype=float32),
+    'weight_norm': array(1.3351691, dtype=float32),
+  })
+# ---
+# name: test_SGLD_vs_SGD[SGLD-0.0001][test_SGLD_vs_SGD_0.0001]
+  dict({
+    'model1': dict({
+      'bias': array([0.830089], dtype=float32),
+      'weight': array([[0.7646196]], dtype=float32),
+    }),
+    'model2': dict({
+      'bias': array([0.830089], dtype=float32),
+      'weight': array([[0.7646196]], dtype=float32),
+    }),
+  })
+# ---
+# name: test_SGLD_vs_SGD[SGLD-0.001][test_SGLD_vs_SGD_0.001]
+  dict({
+    'model1': dict({
+      'bias': array([0.83081883], dtype=float32),
+      'weight': array([[0.76534945]], dtype=float32),
+    }),
+    'model2': dict({
+      'bias': array([0.83081883], dtype=float32),
+      'weight': array([[0.76534945]], dtype=float32),
+    }),
+  })
+# ---
+# name: test_SGLD_vs_SGD[SGLD-0.01][test_SGLD_vs_SGD_0.01]
+  dict({
+    'model1': dict({
+      'bias': array([0.838117], dtype=float32),
+      'weight': array([[0.7726476]], dtype=float32),
+    }),
+    'model2': dict({
+      'bias': array([0.838117], dtype=float32),
+      'weight': array([[0.7726476]], dtype=float32),
+    }),
+  })
+# ---
+# name: test_SGLD_vs_SGD[SGLD-0.1][test_SGLD_vs_SGD_0.1]
+  dict({
+    'model1': dict({
+      'bias': array([0.9110986], dtype=float32),
+      'weight': array([[0.8456292]], dtype=float32),
+    }),
+    'model2': dict({
+      'bias': array([0.9110986], dtype=float32),
+      'weight': array([[0.8456292]], dtype=float32),
+    }),
+  })
+# ---
+# name: test_SGLD_vs_SGD[sgld-0.0001][test_SGLD_vs_SGD_0.0001]
+  dict({
+    'model1': dict({
+      'bias': array([0.830089], dtype=float32),
+      'weight': array([[0.7646196]], dtype=float32),
+    }),
+    'model2': dict({
+      'bias': array([0.830089], dtype=float32),
+      'weight': array([[0.7646196]], dtype=float32),
+    }),
+  })
+# ---
+# name: test_SGLD_vs_SGD[sgld-0.001][test_SGLD_vs_SGD_0.001]
+  dict({
+    'model1': dict({
+      'bias': array([0.83081883], dtype=float32),
+      'weight': array([[0.76534945]], dtype=float32),
+    }),
+    'model2': dict({
+      'bias': array([0.83081883], dtype=float32),
+      'weight': array([[0.76534945]], dtype=float32),
+    }),
+  })
+# ---
+# name: test_SGLD_vs_SGD[sgld-0.01][test_SGLD_vs_SGD_0.01]
+  dict({
+    'model1': dict({
+      'bias': array([0.838117], dtype=float32),
+      'weight': array([[0.7726476]], dtype=float32),
+    }),
+    'model2': dict({
+      'bias': array([0.838117], dtype=float32),
+      'weight': array([[0.7726476]], dtype=float32),
+    }),
+  })
+# ---
+# name: test_SGLD_vs_SGD[sgld-0.1][test_SGLD_vs_SGD_0.1]
+  dict({
+    'model1': dict({
+      'bias': array([0.9110986], dtype=float32),
+      'weight': array([[0.8456292]], dtype=float32),
+    }),
+    'model2': dict({
+      'bias': array([0.9110986], dtype=float32),
+      'weight': array([[0.8456292]], dtype=float32),
+    }),
+  })
+# ---

@@ -92,8 +92,11 @@ def sample_single_chain(
             "If you're setting a nbeta or temperature in optimizer_kwargs, please also make sure to set it in the callbacks."
         )
 
+    optimizer_metrics = optimizer_kwargs.get("metrics", [])
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
-        optimizer_kwargs.setdefault("save_mala_vars", True)
+        optimizer_metrics.extend(["dws", "localization_loss"])
+
+    optimizer_kwargs["metrics"] = optimizer_metrics
 
     param_groups = []
 

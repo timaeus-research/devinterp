@@ -74,8 +74,6 @@ def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
             weight_decay=0.0,
             localization=0.0,
             nbeta=nbeta,
-            save_noise=False,
-            save_mala_vars=False,
         ),
         num_draws=num_draws,
         num_chains=num_chains,

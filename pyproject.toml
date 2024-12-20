@@ -22,9 +22,10 @@ classifiers = [
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-dev = ["pytest==7.4.3", "transformers", "datasets", "transformer_lens"]
-docs = ["sphinx", "sphinx-math-dollar", "sphinx-rtd-theme", "sphinx-autobuild"]
+dev = ["pytest==7.4.3", "transformers", "datasets", "transformer_lens", "syrupy"]
+docs = ["sphinx", "sphinx-math-dollar", "sphinx-rtd-theme", "sphinx-autobuild", "myst_parser"]
 vis = ["plotly>=5.20.0"]
+
 
 [project.urls]
 "Homepage" = "https://github.com/timaeus-research/devinterp"

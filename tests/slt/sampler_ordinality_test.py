@@ -3,13 +3,12 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-
-from devinterp.optim.sgld import SGLD
+from devinterp.optim import SGLD, SGMCMC
 from devinterp.slt.llc import LLCEstimator
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
 from devinterp.utils import *
+from torch.utils.data import DataLoader, TensorDataset
 
 
 @pytest.fixture
@@ -25,7 +24,7 @@ def generated_linedot_normalcrossing_dataset():
     return train_dataloader, train_data, x, y
 
 
-@pytest.mark.parametrize("sampling_method", [SGLD])
+@pytest.mark.parametrize("sampling_method", [SGLD, SGMCMC.sgld])
 @pytest.mark.parametrize(
     "model", [Polynomial, LinePlusDot]
 )  # LinePlusDot currently not tested, TODO
