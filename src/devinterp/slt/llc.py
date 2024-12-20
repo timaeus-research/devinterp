@@ -1,3 +1,4 @@
+import os
 import warnings
 from typing import Union
 
@@ -62,7 +63,12 @@ class LLCEstimator(SamplerCallback):
         self.losses[chain, draw] = loss.to(self.device)
 
     def finalize(self):
-        if USE_TPU_BACKEND and str(self.device).startswith("xla:"):
+        if os.environ.get("USE_SPMD", "0") == "1" and not str(self.device).startswith(
+            "cpu:"
+        ):
+            # no need to reduce if we're using SPMD
+            pass
+        elif USE_TPU_BACKEND and str(self.device).startswith("xla:"):
             import torch_xla.core.xla_model as xm
 
             if TPU_TYPE == "v4":
