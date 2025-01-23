@@ -95,7 +95,16 @@ class LLCEstimator(SamplerCallback):
             except ValueError:
                 pass
         avg_losses = self.losses.mean(axis=1)
-        self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
+        # bypass automatic bfloat16 issues
+        if os.environ.get("XLA_USE_BF16", "0") == "1" and str(self.device).startswith(
+            "xla:"
+        ):
+            self.llc_per_chain = self.nbeta.to(device="cpu", dtype=torch.float32) * (
+                avg_losses.to(device="cpu", dtype=torch.float32)
+                - self.init_loss.to(device="cpu", dtype=torch.float32)
+            )
+        else:
+            self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
         self.llc_mean = self.llc_per_chain.mean()
         self.llc_std = self.llc_per_chain.std()
 
