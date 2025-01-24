@@ -732,8 +732,13 @@ class SGMCMC(Optimizer):
         """Return metrics if there's only one param group"""
 
         # For other attributes, check if they exist in param_groups
-        if len(self.param_groups) == 1:
-            if name in self.param_groups[0]["metrics"]:
-                return self.param_groups[0]["metrics"][name]
-
-        raise AttributeError(f"'SGMCMC' object has no attribute '{name}'")
+        if len(self.param_groups) != 1:
+            warnings.warn(
+                "metrics is only available for single-parameter groups. Returning first group's metrics."
+            )
+        if name in self.param_groups[0]:
+            return self.param_groups[0][name]
+        elif name in self.param_groups[0]["metrics"]:
+            return self.param_groups[0]["metrics"][name]
+        else:
+            raise AttributeError(f"'SGMCMC' object has no attribute '{name}'")
