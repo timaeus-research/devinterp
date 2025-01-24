@@ -1,10 +1,10 @@
+import os
 import warnings
 from typing import Union
 
 import torch
-
 from devinterp.slt.callback import SamplerCallback
-from devinterp.utils import USE_TPU_BACKEND
+from devinterp.utils import TPU_TYPE, USE_TPU_BACKEND
 
 
 class LLCEstimator(SamplerCallback):
@@ -58,15 +58,53 @@ class LLCEstimator(SamplerCallback):
         self.eval_field = eval_field
 
     def update(self, chain: int, draw: int, loss: torch.tensor):
+        if torch.isnan(loss).any():
+            raise RuntimeError(f"NaN detected in loss at chain {chain}, draw {draw}")
         self.losses[chain, draw] = loss.to(self.device)
 
     def finalize(self):
-        if USE_TPU_BACKEND and str(self.device).startswith("xla:"):
+        if os.environ.get("USE_SPMD", "0") == "1" and not str(self.device).startswith(
+            "cpu:"
+        ):
+            # no need to reduce if we're using SPMD
+            pass
+        elif USE_TPU_BACKEND and str(self.device).startswith("xla:"):
             import torch_xla.core.xla_model as xm
 
-            self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
+            if TPU_TYPE == "v4":
+                self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
+            elif TPU_TYPE == "v2/v3":
+                self.losses = self.losses.cpu()
+                if torch.distributed.is_initialized():
+                    torch.distributed.all_reduce(self.losses)
+                else:
+                    warnings.warn(
+                        "torch.distributed has not been initialized. If running on TPU v2/v3, and you want to run chains in parallel, you need to initialize torch.distributed after calling xmp.spawn() as follows:"
+                        ">>> import torch_xla.runtime as xr"
+                        ">>> store = torch.distributed.TCPStore('127.0.0.1', 12345, 4, xr.global_ordinal() == 0)"
+                        ">>> torch.distributed.init_process_group(backend='gloo', store=store, rank=xr.global_ordinal()//2, world_size=xr.world_size()//2)"
+                    )
+
+            else:
+                raise NotImplementedError(f"TPU type {TPU_TYPE} not supported")
+        elif str(self.device).startswith(
+            "cuda"
+        ):  # if we've ran on multi-GPU, we should do a reduce as well. see above for how this would work
+            try:
+                torch.distributed.all_reduce(self.losses)
+            except ValueError:
+                pass
         avg_losses = self.losses.mean(axis=1)
-        self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
+        # bypass automatic bfloat16 issues
+        if os.environ.get("XLA_USE_BF16", "0") == "1" and str(self.device).startswith(
+            "xla:"
+        ):
+            self.llc_per_chain = self.nbeta.to(device="cpu", dtype=torch.float32) * (
+                avg_losses.to(device="cpu", dtype=torch.float32)
+                - self.init_loss.to(device="cpu", dtype=torch.float32)
+            )
+        else:
+            self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
         self.llc_mean = self.llc_per_chain.mean()
         self.llc_std = self.llc_per_chain.std()
 
@@ -139,6 +177,8 @@ class OnlineLLCEstimator(SamplerCallback):
         self.eval_field = eval_field
 
     def update(self, chain: int, draw: int, loss: torch.tensor):
+        if torch.isnan(loss).any():
+            raise RuntimeError(f"NaN detected in loss at chain {chain}, draw {draw}")
         loss = loss.to(self.device)
         self.losses[chain, draw] = loss
         self.llcs[chain, draw] = self.nbeta * (loss - self.init_loss)

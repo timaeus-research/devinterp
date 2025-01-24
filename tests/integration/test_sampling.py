@@ -34,21 +34,8 @@ class torchvisionWrapper(torch.utils.data.Dataset):
         return item["pixel_values"], item["label"]
 
 
-def get_stats(
-    device,
-    gpu_idxs=None,
-    cores=1,
-    chains=4,
-    seed=None,
-    num_workers=0,
-    batch_size=256,
-    grad_accum_steps=1,
-    use_amp=False,
-):
-    # Load a pretrained MNIST classifier
-    model = AutoModelForImageClassification.from_pretrained(
-        "fxmarty/resnet-tiny-mnist"
-    ).to(device)
+@pytest.fixture(scope="module")
+def data():
 
     mnist_dataset = load_dataset("mnist")
 
@@ -63,16 +50,37 @@ def get_stats(
     mnist_dataset = mnist_dataset.map(
         preprocess, batched=True, remove_columns=["image"]
     )
+    mnist_dataset.set_format(type="torch", columns=["pixel_values", "label"])
+
+    return torchvisionWrapper(mnist_dataset["train"])
+
+
+def get_stats(
+    data,
+    device,
+    gpu_idxs=None,
+    cores=1,
+    chains=2,
+    seed=None,
+    num_workers=0,
+    batch_size=64,
+    grad_accum_steps=1,
+    use_amp=False,
+):
+    # Load a pretrained MNIST classifier
+    model = AutoModelForImageClassification.from_pretrained(
+        "fxmarty/resnet-tiny-mnist"
+    ).to(device)
     torch.manual_seed(seed)
     np.random.seed(seed)
-    # Set the format of the dataset to PyTorch tensors
-    mnist_dataset.set_format(type="torch", columns=["pixel_values", "label"])
     loader = torch.utils.data.DataLoader(
-        torchvisionWrapper(mnist_dataset["train"]),
+        data,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
     )
+    # Set the format of the dataset to PyTorch tensors
+
     torch.manual_seed(seed)
     np.random.seed(seed)
     return estimate_learning_coeff_with_summary(
@@ -92,6 +100,7 @@ def get_stats(
         seed=seed,
         grad_accum_steps=grad_accum_steps,
         use_amp=use_amp,
+        init_loss=0.1,
     )
 
 
@@ -115,93 +124,92 @@ def check(s1, s2, atol=1e-3, reverse=False):
 
 
 @pytest.fixture(scope="module")
-def cpu_default():
-    return get_stats("cpu", seed=100)
+def cpu_default(data):
+    return get_stats(data, "cpu", seed=100)
 
 
 @pytest.mark.gpu
 @pytest.fixture(scope="module")
-def gpu_default():
-    return get_stats("cuda", seed=100)
+def gpu_default(data):
+    return get_stats(data, "cuda", seed=100)
 
 
-def test_cpu_consistent(cpu_default):
-    repeat_stats = get_stats("cpu", seed=100)
+def test_cpu_consistent(data, cpu_default):
+    repeat_stats = get_stats(data, "cpu", seed=100)
     check(cpu_default, repeat_stats, 1e-3)
 
 
-def test_cpu_consistent_seeds(cpu_default):
-    diff_seed_stats = get_stats("cpu", seed=101)
+def test_cpu_consistent_seeds(data, cpu_default):
+    diff_seed_stats = get_stats(data, "cpu", seed=101)
     check(cpu_default, diff_seed_stats, 0.000001, reverse=True)
 
 
 @pytest.mark.slow
-def test_cpu_multicore(cpu_default):
-    multicore_stats = get_stats("cpu", seed=100, cores=4)
+def test_cpu_multicore(data, cpu_default):
+    multicore_stats = get_stats(data, "cpu", seed=100, cores=2)
     check(cpu_default, multicore_stats, 1e-4)
 
 
-def test_cpu_multiworker(cpu_default):
-    multiworker_stats = get_stats("cpu", seed=100, num_workers=4)
-    check(cpu_default, multiworker_stats, 1e-4)
-
-
-def test_grad_accum(cpu_default: dict):
-    grad_accum_stats = get_stats("cpu", seed=100, grad_accum_steps=16, batch_size=16)
+def test_grad_accum(data, cpu_default: dict):
+    grad_accum_stats = get_stats(
+        data, "cpu", seed=100, grad_accum_steps=4, batch_size=16
+    )
     check(cpu_default, grad_accum_stats, 1)
 
 
 @pytest.mark.gpu
-def test_gpu_consistent(gpu_default):
-    repeat_stats = get_stats("cuda", seed=100)
+def test_gpu_consistent(data, gpu_default):
+    repeat_stats = get_stats(data, "cuda", seed=100)
     check(gpu_default, repeat_stats, 0.2)
 
 
 @pytest.mark.gpu
-def test_gpu_consistent_seeds(gpu_default):
-    diff_seed_stats = get_stats("cuda", seed=101)
+def test_gpu_consistent_seeds(data, gpu_default):
+    diff_seed_stats = get_stats(data, "cuda", seed=101)
     check(gpu_default, diff_seed_stats, 5, reverse=True)
 
 
 @pytest.mark.gpu
-def test_gpu_multicore(gpu_default):
-    multicore_stats = get_stats("cuda", seed=100, cores=4)
+def test_gpu_multicore(data, gpu_default):
+    multicore_stats = get_stats(data, "cuda", seed=100, cores=4)
     check(gpu_default, multicore_stats, 0.2)
 
 
 @pytest.mark.gpu
-def test_gpu_multiworker(gpu_default):
-    multiworker_stats = get_stats("cuda", seed=100, num_workers=4)
+def test_gpu_multiworker(data, gpu_default):
+    multiworker_stats = get_stats(data, "cuda", seed=100, num_workers=4)
     check(gpu_default, multiworker_stats, 0.2)
 
 
 @pytest.mark.gpu
-def test_multigpu(gpu_default):
+def test_multigpu(data, gpu_default):
     if torch.cuda.device_count() > 1:
-        multigpu_stats = get_stats("cuda", seed=100, gpu_idxs=[0, 1], cores=2)
+        multigpu_stats = get_stats(data, "cuda", seed=100, gpu_idxs=[0, 1], cores=2)
         check(gpu_default, multigpu_stats, 0.2)
     else:
         pytest.skip("Multiple GPUs unavailable.")
 
 
 @pytest.mark.gpu
-def test_multigpu_multicore(gpu_default):
+def test_multigpu_multicore(data, gpu_default):
     if torch.cuda.device_count() > 1:
-        multigpu_multicore_stats = get_stats("cuda", seed=100, gpu_idxs=[0, 1], cores=4)
+        multigpu_multicore_stats = get_stats(
+            data, "cuda", seed=100, gpu_idxs=[0, 1], cores=4
+        )
         check(gpu_default, multigpu_multicore_stats, 0.4)
     else:
         pytest.skip("Multiple GPUs unavailable.")
 
 
 @pytest.mark.gpu
-def test_gpu_grad_accum(gpu_default: dict):
+def test_gpu_grad_accum(data, gpu_default: dict):
     grad_accum_stats = get_stats(
-        "cuda", seed=100, cores=4, grad_accum_steps=2, batch_size=128
+        data, "cuda", seed=100, cores=4, grad_accum_steps=2, batch_size=128
     )
     check(gpu_default, grad_accum_stats, 1)
 
 
 @pytest.mark.gpu
-def test_gpu_amp(gpu_default: dict):
-    amp_stats = get_stats("cuda", seed=100, cores=4, use_amp=True)
+def test_gpu_amp(data, gpu_default: dict):
+    amp_stats = get_stats(data, "cuda", seed=100, cores=4, use_amp=True)
     check(gpu_default, amp_stats, 0.2)

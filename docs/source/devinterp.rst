@@ -15,6 +15,14 @@ Subpackages
 Submodules
 ----------
 
+devinterp.test\_utils module
+----------------------------
+
+.. automodule:: devinterp.test_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 devinterp.utils module
 ----------------------
 

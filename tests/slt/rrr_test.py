@@ -3,7 +3,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 from devinterp.backends.default.slt.sampler import sample
-from devinterp.optim.sgld import SGLD
+from devinterp.optim import SGLD, SGMCMC
 from devinterp.slt.llc import LLCEstimator
 from devinterp.test_utils import *
 from devinterp.utils import default_nbeta, evaluate_mse, get_init_loss_multi_batch
@@ -57,7 +57,7 @@ def generated_rrr_dataset(m, n):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("sampling_method", [SGLD])
+@pytest.mark.parametrize("sampling_method", [SGLD, SGMCMC.sgld])
 @pytest.mark.parametrize(
     "m,h,n",
     [

@@ -1,4 +1,5 @@
 import warnings
+from typing import List, Optional
 
 import numpy as np
 import torch
@@ -54,18 +55,41 @@ class SGNHT(torch.optim.Optimizer):
         save_noise=False,
         save_mala_vars=False,
         nbeta=1.0,
+        metrics: Optional[List[str]] = None,
     ):
+        warnings.warn(
+            "SGNHT has been deprecated. Please use SGMCMC.sgnht instead.",
+            DeprecationWarning,
+        )
+
+        if metrics:
+            valid_metrics = {
+                "noise",
+                "dws",
+                "localization_loss",
+            }
+            invalid_metrics = set(metrics) - valid_metrics
+            if invalid_metrics:
+                raise ValueError(
+                    f"Invalid metrics: {invalid_metrics}. Valid metrics are: {valid_metrics}"
+                )
+
+            save_noise = save_noise or "noise" in metrics
+            save_mala_vars = (
+                save_mala_vars or "dws" in metrics or "localization_loss" in metrics
+            )
+
         if save_noise:
             warnings.warn(
-                "Warning: NoiseNorm not implemented for SGNHT! If you insist on using NoiseNorm, use SGLD instead."
+                "NoiseNorm not implemented for SGNHT! If you insist on using NoiseNorm, use SGLD instead."
             )
         if save_mala_vars:
             warnings.warn(
-                "Warning: MALA not implemented for SGNHT! If you insist on using MALA, use SGLD instead."
+                "MALA not implemented for SGNHT! If you insist on using MALA, use SGLD instead."
             )
         if nbeta == 1.0:
             warnings.warn(
-                "Warning: nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.default_nbeta(dataloader) instead"
+                "nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.default_nbeta(dataloader) instead"
             )
 
         defaults = dict(
@@ -73,6 +97,8 @@ class SGNHT(torch.optim.Optimizer):
             diffusion_factor=diffusion_factor,
             bounding_box_size=bounding_box_size,
             nbeta=nbeta,
+            save_noise=save_noise,
+            save_mala_vars=save_mala_vars,
         )
         super(SGNHT, self).__init__(params, defaults)
 

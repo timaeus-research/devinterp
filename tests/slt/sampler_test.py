@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from devinterp.optim.sgld import SGLD
+from devinterp.optim import SGLD, SGMCMC
 from devinterp.optim.sgnht import SGNHT
 from devinterp.slt.llc import LLCEstimator
 from devinterp.slt.sampler import sample
@@ -24,7 +24,7 @@ def generated_normalcrossing_dataset():
     return train_dataloader, train_data, x, y
 
 
-@pytest.mark.parametrize("sampling_method", [SGLD, SGNHT])
+@pytest.mark.parametrize("sampling_method", [SGLD, SGNHT, SGMCMC.sgld])
 def test_seeding(generated_normalcrossing_dataset, sampling_method):
     torch.manual_seed(42)
     seed = 42
@@ -86,7 +86,7 @@ def test_seeding(generated_normalcrossing_dataset, sampling_method):
 
 
 # @pytest.mark.parametrize("batch_sizes", [[1, 10, 100, 1000]])
-# @pytest.mark.parametrize("sampling_method", [SGLD])
+@pytest.mark.parametrize("sampling_method", [SGLD, SGMCMC.sgld])
 # @pytest.mark.parametrize("model", [Polynomial])
 def unused_test_batch_size_convergence(
     generated_normalcrossing_dataset, batch_sizes, sampling_method, model

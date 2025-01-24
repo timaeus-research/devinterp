@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from devinterp.optim.sgld import SGLD
+from devinterp.optim import SGLD, SGMCMC
 from devinterp.slt.mala import MalaAcceptanceRate, mala_acceptance_probability
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
@@ -97,12 +97,14 @@ SETS_TO_TEST = [
 
 @pytest.mark.slow
 @pytest.mark.parametrize("powers,lr,localization,accept_prob", SETS_TO_TEST)
+@pytest.mark.parametrize("sampling_method", [SGLD, SGMCMC.sgld])
 def test_mala_callback_closeness(
     generated_normalcrossing_dataset,
     powers,
     lr,
     localization,
     accept_prob,
+    sampling_method,
 ):
     seed = 0
     for seed in range(10):
@@ -127,7 +129,7 @@ def test_mala_callback_closeness(
                 localization=localization,
                 nbeta=default_nbeta(train_dataloader),
             ),
-            sampling_method=SGLD,
+            sampling_method=sampling_method,
             num_chains=num_chains,
             num_draws=num_draws,
             callbacks=[mala_estimator],

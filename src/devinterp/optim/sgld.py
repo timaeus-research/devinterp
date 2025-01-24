@@ -1,6 +1,6 @@
 import warnings
 from collections import defaultdict
-from typing import Callable, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import torch
 
@@ -93,7 +93,38 @@ class SGLD(torch.optim.Optimizer):
         weight_norm=False,
         distance=False,
         temperature: Optional[float] = None,
+        metrics: Optional[List[str]] = None,
     ):
+        warnings.warn(
+            "SGLD has been deprecated. Please use SGMCMC.sgld instead.",
+            DeprecationWarning,
+        )
+
+        if metrics:
+            valid_metrics = {
+                "noise",
+                "dws",
+                "localization_loss",
+                "noise_norm",
+                "grad_norm",
+                "weight_norm",
+                "distance",
+            }
+            invalid_metrics = set(metrics) - valid_metrics
+            if invalid_metrics:
+                raise ValueError(
+                    f"Invalid metrics: {invalid_metrics}. Valid metrics are: {valid_metrics}"
+                )
+
+            save_noise = save_noise or "noise" in metrics
+            save_mala_vars = (
+                save_mala_vars or "dws" in metrics or "localization_loss" in metrics
+            )
+            noise_norm = noise_norm or "noise_norm" in metrics
+            grad_norm = grad_norm or "grad_norm" in metrics
+            weight_norm = weight_norm or "weight_norm" in metrics
+            distance = distance or "distance" in metrics
+
         if temperature is not None:
             nbeta = temperature
             warnings.warn(
@@ -191,14 +222,12 @@ class SGLD(torch.optim.Optimizer):
                             )
                         # localization_loss = (p.data - initial_param)^2 * group["optimize_over"]^2 * group["localization"] / 2
                         #                                                           ^ boolean
-                        distance = (initial_param_distance.detach() ** 2).sum() * group[
-                            "localization"
-                        ]
-                        self.localization_loss += distance / 2
+                        distance = (initial_param_distance.detach() ** 2).sum()
+                        self.localization_loss += distance * group["localization"] / 2
                         self.dws.append(dw.clone())
 
                         if group["distance"] is not False:
-                            group["distance"] += (distance**0.5) * group["lr"]
+                            group["distance"] += distance
 
                     # Add Gaussian noise
                     noise = torch.normal(
@@ -231,9 +260,6 @@ class SGLD(torch.optim.Optimizer):
                             .detach()
                         )
 
-                    if group["weight_norm"] is not False:
-                        group["weight_norm"] += (p.data**2).sum().detach()
-
                     if group["noise_norm"] is not False:
                         group["noise_norm"] += (noise**2).sum().detach()
 
@@ -254,6 +280,9 @@ class SGLD(torch.optim.Optimizer):
                             + group["bounding_box_size"],
                         )
 
+                    if group["weight_norm"] is not False:
+                        group["weight_norm"] += (p.data**2).sum().detach()
+
                 for hp in ["noise_norm", "grad_norm", "distance", "weight_norm"]:
                     if group[hp] is not False:
                         group[hp] = (group[hp] ** 0.5).detach()
@@ -262,7 +291,10 @@ class SGLD(torch.optim.Optimizer):
         """
         Return iteration-level metrics if requested.
         """
-        if name in ["noise_norm", "grad_norm", "distance", "weight_norm", "lr"]:
-            return next(group[name] for group in self.param_groups)
+        for group in self.param_groups:
+            # If the metric key is missing or set to False, raise AttributeError
+            if name not in group or group[name] is False:
+                raise AttributeError(f"'SGLD' object has no tracked metric '{name}'")
+            return group[name]
 
         raise AttributeError(f"'SGLD' object has no attribute '{name}'")

@@ -4,16 +4,24 @@ from typing import Callable, Container, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import torch
 from devinterp.utils import default_nbeta
-from pydantic import BaseModel
 from tqdm import tqdm
+
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+except ImportError:
+    px = None
+    go = None
+    warnings.warn(
+        "Plotly is not installed. Visualization features will be unavailable. "
+        "Install with `pip install devinterp[vis]` to enable them."
+    )
 
 
 # Sampling config validates input parameters while allowing us to use **kwargs later on
-class SweepConfig(BaseModel):
+class SweepConfig:
     epsilon_range: List[float]
     beta_range: List[float]
     llc_estimator: Callable
@@ -222,7 +230,7 @@ class EpsilonBetaAnalyzer:
         slider_plane: Optional[str] = False,
         div_out_beta=False,
         **kwargs,
-    ) -> go.Figure:
+    ):
         """
         Plot the results of the LLC sweep.
 
@@ -236,6 +244,12 @@ class EpsilonBetaAnalyzer:
             Example: range_color=[0, 0.15] to set the color range.
         :return: A plotly Figure object containing the LLC sweep visualization.
         """
+        if px is None or go is None:
+            raise ImportError(
+                "Plotting is unavailable because Plotly is not installed. "
+                "Install with `pip install devinterp[vis]` to enable visualization."
+            )
+
         if div_out_beta:
             plot_config = {
                 "title": "LLC / beta vs. epsilon and beta",
@@ -273,7 +287,7 @@ class EpsilonBetaAnalyzer:
                 sweep_df["true_lambda"] = sweep_df["llc/trace"].apply(
                     lambda x: true_lambda
                 )
-            elif type(true_lambda) == str:
+            elif isinstance(true_lambda, str):
                 sweep_df["true_lambda"] = sweep_df[true_lambda]
             else:
                 sweep_df["true_lambda"] = true_lambda

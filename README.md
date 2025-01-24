@@ -68,3 +68,13 @@ If this package was useful in your work, please cite it as:
   howpublished = {\url{https://github.com/timaeus-research/devinterp}},
 }
 ```
+
+## Optional Dependencies
+
+DevInterp offers additional visualization functionalities that are not included in the base installation. To enable these features, install the package with the `vis` extra:
+
+```sh
+pip install devinterp[vis]
+```
+
+This will install `plotly`, which is required for the visualization utilities provided in `vis_utils.py`.

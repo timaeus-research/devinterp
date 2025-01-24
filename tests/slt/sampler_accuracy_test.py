@@ -2,8 +2,7 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-from devinterp.optim.sgld import SGLD
-from devinterp.optim.sgnht import SGNHT
+from devinterp.optim import SGLD, SGMCMC
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.slt.sampler import sample
 from devinterp.test_utils import *
@@ -38,7 +37,7 @@ TRUE_LCS_PER_POWER = [
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("sampling_method", [SGLD])
+@pytest.mark.parametrize("sampling_method", [SGLD, SGMCMC.sgld])
 @pytest.mark.parametrize("powers, true_lc", TRUE_LCS_PER_POWER)
 def test_accuracy_normalcrossing(
     generated_normalcrossing_dataset, sampling_method, powers, true_lc

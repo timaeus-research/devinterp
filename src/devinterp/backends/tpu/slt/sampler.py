@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Un
 import numpy as np
 import torch
 import torch_xla.core.xla_model as xm
+import torch_xla.runtime as xr
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -69,15 +70,33 @@ def sample_single_chain(
         set_seed(seed, device=device)
 
     # == Optimizer ==
-    if "temperature" in optimizer_kwargs:
-        assert (
-            not "nbeta" in optimizer_kwargs
-        ), "Set either nbeta or temperature in optimizer_kwargs, not both"
-        optimizer_kwargs["nbeta"] = optimizer_kwargs.pop("temperature")
-    assert "nbeta" in optimizer_kwargs, "Set nbeta in optimizer_kwargs"
 
+    # Temperature consistency warning
+    if optimizer_kwargs is not None and (
+        "nbeta" in optimizer_kwargs or "temperature" in optimizer_kwargs
+    ):
+        if "nbeta" in optimizer_kwargs:
+            assert not any(
+                getattr(callback, "temperature", None) is not None
+                for callback in callbacks
+            ), "If you're setting nbeta in optimizer_kwargs, don't set temperature in the callbacks."
+        if "temperature" in optimizer_kwargs:
+            assert not any(
+                (
+                    getattr(callback, "nbeta", None) is not None
+                    and getattr(callback, "temperature") is None
+                )
+                for callback in callbacks
+            ), "If you're setting temperature in optimizer_kwargs, don't set nbeta in the callbacks."
+        warnings.warn(
+            "If you're setting a nbeta or temperature in optimizer_kwargs, please also make sure to set it in the callbacks."
+        )
+
+    optimizer_metrics = optimizer_kwargs.get("metrics", [])
     if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
-        optimizer_kwargs.setdefault("save_mala_vars", True)
+        optimizer_metrics.extend(["dws", "localization_loss"])
+
+    optimizer_kwargs["metrics"] = optimizer_metrics
 
     param_groups = []
 
@@ -235,14 +254,14 @@ def _sample_single_chain(kwargs):
 
 def _sample_single_chain_xla(kwargs):
     device = kwargs.pop("device")
-    ordinal = xm.get_ordinal()
+    ordinal = xr.global_ordinal()
     num_chains = kwargs["num_chains"]
     seeds = kwargs.pop("seeds")
 
     if ordinal > num_chains:
         return
 
-    for chain in range(ordinal, num_chains, xm.xrt_world_size()):
+    for chain in range(ordinal, num_chains, xr.world_size()):
         seed = seeds[chain]
 
         for callback in kwargs["callbacks"]:
@@ -394,9 +413,9 @@ def sample(
         )
 
     if "xla" in str(device):
-        if num_chains % xm.xrt_world_size() != 0:
+        if num_chains % xr.world_size() != 0:
             raise ValueError(
-                f"Number of chains ({num_chains}) must be divisible by number of TPU cores ({xm.xrt_world_size()})"
+                f"Number of chains ({num_chains}) must be divisible by number of TPU cores ({xr.world_size()})"
             )
 
         if seed is None:

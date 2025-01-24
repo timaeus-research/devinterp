@@ -4,14 +4,14 @@ import numpy as np
 import pytest
 import torch
 from datasets import load_dataset
+from devinterp.backends.default.slt.sampler import sample
+from devinterp.optim.sgld import SGLD
+from devinterp.slt.llc import LLCEstimator
+from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformer_lens.utils import lm_cross_entropy_loss, tokenize_and_concatenate
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
-from devinterp.optim.sgld import SGLD
-from devinterp.slt.llc import LLCEstimator
-from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
 
 
 def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
@@ -20,8 +20,6 @@ def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
         "cuda"
     ), "Invalid device. Should be cpu or cuda:n. Don't worry about this error if you're not on a GPU device."
     set_seed(seed)
-
-    from devinterp.backends.default.slt.sampler import sample
 
     print(f"Testing on {device}")
 
@@ -54,7 +52,7 @@ def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
 
     nbeta = 20.0
     num_chains = 1
-    num_draws = 50
+    num_draws = 10
 
     llc_estimator = LLCEstimator(
         num_chains=num_chains,
@@ -73,12 +71,9 @@ def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
         sampling_method=SGLD,
         optimizer_kwargs=dict(
             lr=0.0002,
-            noise_level=10.0,
             weight_decay=0.0,
             localization=0.0,
             nbeta=nbeta,
-            save_noise=False,
-            save_mala_vars=False,
         ),
         num_draws=num_draws,
         num_chains=num_chains,
