@@ -6,6 +6,11 @@ from typing import Dict, List, Literal, Optional, Type, Union
 import cloudpickle
 import numpy as np
 import torch
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -19,10 +24,6 @@ from devinterp.utils import (
     prepare_input,
     split_results,
 )
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 
 def sample_single_chain(
@@ -258,10 +259,6 @@ def sample(
 
     :returns: None (access LLCs or other observables through `callback_object.get_results()`)
     """
-    if num_burnin_steps < num_draws:
-        warnings.warn(
-            "You are taking more draws than burn-in steps, your LLC estimates will likely be underestimates. Please check LLC chain convergence."
-        )
     if num_draws > len(loader):
         warnings.warn(
             "You are taking more sample batches than there are dataloader batches available, "
@@ -329,9 +326,6 @@ def sample(
         )
 
     if seed is not None:
-        warnings.warn(
-            "You are using seeded runs, for full reproducibility check https://pytorch.org/docs/stable/notes/randomness.html"
-        )
         if isinstance(seed, int):
             seeds = np.random.SeedSequence(seed).generate_state(num_chains)
         elif len(seed) != num_chains:

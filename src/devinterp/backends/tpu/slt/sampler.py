@@ -8,6 +8,12 @@ import numpy as np
 import torch
 import torch_xla.core.xla_model as xm
 import torch_xla.runtime as xr
+from torch import nn
+from torch.multiprocessing import cpu_count, get_context
+from torch.utils.data import DataLoader
+from torch_xla.amp import autocast
+from tqdm import trange
+
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
@@ -18,11 +24,6 @@ from devinterp.utils import (
     prepare_input,
     set_seed,
 )
-from torch import nn
-from torch.multiprocessing import cpu_count, get_context
-from torch.utils.data import DataLoader
-from torch_xla.amp import autocast
-from tqdm import trange
 
 
 def mark_step_if_xla(device):
@@ -250,12 +251,6 @@ def sample_single_chain(
                 mark_step_if_xla(device)
             optimizer.zero_grad()
 
-    # except ChainHealthError as e:
-    #     warnings.warn(f"Chain failed: {e}")
-
-    # if scheduler:
-    #     del scheduler
-
 
 def _sample_single_chain(kwargs):
     return sample_single_chain(**kwargs)
@@ -353,17 +348,9 @@ def sample(
     :type verbose: bool, optional
 
     :raises ValueError: if derivative callbacks (f.e. :func:`~devinterp.slt.loss.OnlineLossStatistics`) are passed before base callbacks (f.e. :func:`~devinterp.slt.llc.OnlineLLCEstimator`)
-    :raises Warning: if num_burnin_steps < num_draws
-    :raises Warning: if num_draws > len(loader)
-    :raises Warning: if using seeded runs
 
     :returns: None (access LLCs or other observables through `callback_object.get_results()`)
     """
-    if num_burnin_steps < num_draws:
-        warnings.warn(
-            "You are taking more draws than burn-in steps, your LLC estimates will likely be underestimates. Please check LLC chain convergence."
-        )
-
     callbacks_list = (
         callbacks if isinstance(callbacks, list) else list(callbacks.values())
     )
@@ -381,9 +368,6 @@ def sample(
         cores = min(4, cpu_count())
 
     if seed is not None:
-        warnings.warn(
-            "You are using seeded runs, for full reproducibility check https://pytorch.org/docs/stable/notes/randomness.html"
-        )
         if isinstance(seed, int):
             seeds = np.random.SeedSequence(seed).generate_state(num_chains)
         elif len(seed) != num_chains:

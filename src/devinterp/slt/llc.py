@@ -3,6 +3,7 @@ import warnings
 from typing import Union
 
 import torch
+
 from devinterp.slt.callback import SamplerCallback
 from devinterp.utils import TPU_TYPE, USE_TPU_BACKEND
 
@@ -45,12 +46,7 @@ class LLCEstimator(SamplerCallback):
         )
         self.init_loss = init_loss
 
-        assert nbeta is not None or temperature is not None, (
-            "Please provide a value for nbeta."
-        )
-        if nbeta is None and temperature is not None:
-            nbeta = temperature
-            warnings.warn("Temperature is deprecated. Please use nbeta instead.")
+        assert nbeta is not None, "Please provide a value for nbeta."
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
         self.temperature = temperature
 
@@ -189,12 +185,7 @@ class OnlineLLCEstimator(SamplerCallback):
 
         self.losses = torch.zeros((num_chains, num_draws)).to(device)
         self.llcs = torch.zeros((num_chains, num_draws)).to(device)
-        assert nbeta is not None or temperature is not None, (
-            "Please provide a value for nbeta."
-        )
-        if nbeta is None and temperature is not None:
-            nbeta = temperature
-            warnings.warn("Temperature is deprecated. Please use nbeta instead.")
+        assert nbeta is not None, "Please provide a value for nbeta."
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
         self.temperature = temperature
 

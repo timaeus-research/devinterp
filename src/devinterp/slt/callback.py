@@ -22,7 +22,7 @@ class SamplerCallback:
 
     def share_memory_(self):
         if self.device == "mps":
-            warnings.warn("Cannot share memory with MPS device.")
+            raise ValueError("Cannot share memory with MPS device.")
             return self
 
         for attr in dir(self):
