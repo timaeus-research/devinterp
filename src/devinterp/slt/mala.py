@@ -100,8 +100,6 @@ class MalaAcceptanceRate(SamplerCallback):
         self.learning_rate = learning_rate
         if nbeta is None:
             assert temperature is not None, "Please provide a value for nbeta."
-            self.nbeta = temperature
-            warnings.warn("Temperature is deprecated. Please use nbeta instead.")
         else:
             self.nbeta = nbeta
 
