@@ -3,6 +3,7 @@ from pprint import pp
 import numpy as np
 import pytest
 import torch
+import os
 from datasets import load_dataset
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
@@ -11,6 +12,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformer_lens.utils import lm_cross_entropy_loss, tokenize_and_concatenate
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# This is not imported for this test because GitHub CI/CD doesn't have the module to import from
+PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "CPU")
 
 
 def _test_hf(model, dataset, device: str):
@@ -104,6 +108,9 @@ def _test_hf(model, dataset, device: str):
 
 @pytest.mark.tpu
 @pytest.mark.slow
+@pytest.mark.skipif(
+    PJRT_DEVICE != "TPU", reason="PJRT_DEVICE must be equal to TPU to run TPU tests."
+)
 def test_hf():
     # Load the model and tokenizer
     model = AutoModelForCausalLM.from_pretrained("roneneldan/TinyStories-1M")
