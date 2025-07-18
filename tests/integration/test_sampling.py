@@ -3,11 +3,15 @@ import warnings
 import numpy as np
 import pytest
 import torch
+import os
 from datasets import load_dataset
 from devinterp.optim import SGLD
 from devinterp.slt.sampler import estimate_learning_coeff_with_summary
 from torch.nn import functional as F
 from transformers import AutoModelForImageClassification
+
+# This is not imported for this test because GitHub CI/CD doesn't have the module to import from
+PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "CPU")
 
 warnings.filterwarnings("ignore")
 
@@ -126,6 +130,9 @@ def cpu_default(data):
 
 
 @pytest.mark.gpu
+@pytest.mark.skipif(
+    PJRT_DEVICE != "CUDA", reason="PJRT_DEVICE must be equal to CUDA to run GPU tests."
+)
 @pytest.fixture(scope="module")
 def gpu_default(data):
     return get_stats(data, "cuda", seed=100)
@@ -155,24 +162,36 @@ def test_grad_accum(data, cpu_default: dict):
 
 
 @pytest.mark.gpu
+@pytest.mark.skipif(
+    PJRT_DEVICE != "CUDA", reason="PJRT_DEVICE must be equal to CUDA to run GPU tests."
+)
 def test_gpu_consistent(data, gpu_default):
     repeat_stats = get_stats(data, "cuda", seed=100)
     check(gpu_default, repeat_stats, 0.2)
 
 
 @pytest.mark.gpu
+@pytest.mark.skipif(
+    PJRT_DEVICE != "CUDA", reason="PJRT_DEVICE must be equal to CUDA to run GPU tests."
+)
 def test_gpu_multicore(data, gpu_default):
     multicore_stats = get_stats(data, "cuda", seed=100, cores=4)
     check(gpu_default, multicore_stats, 0.2)
 
 
 @pytest.mark.gpu
+@pytest.mark.skipif(
+    PJRT_DEVICE != "CUDA", reason="PJRT_DEVICE must be equal to CUDA to run GPU tests."
+)
 def test_gpu_multiworker(data, gpu_default):
     multiworker_stats = get_stats(data, "cuda", seed=100, num_workers=4)
     check(gpu_default, multiworker_stats, 0.2)
 
 
 @pytest.mark.gpu
+@pytest.mark.skipif(
+    PJRT_DEVICE != "CUDA", reason="PJRT_DEVICE must be equal to CUDA to run GPU tests."
+)
 def test_multigpu(data, gpu_default):
     if torch.cuda.device_count() > 1:
         multigpu_stats = get_stats(data, "cuda", seed=100, gpu_idxs=[0, 1], cores=2)
@@ -182,6 +201,9 @@ def test_multigpu(data, gpu_default):
 
 
 @pytest.mark.gpu
+@pytest.mark.skipif(
+    PJRT_DEVICE != "CUDA", reason="PJRT_DEVICE must be equal to CUDA to run GPU tests."
+)
 def test_multigpu_multicore(data, gpu_default):
     if torch.cuda.device_count() > 1:
         multigpu_multicore_stats = get_stats(
@@ -193,6 +215,9 @@ def test_multigpu_multicore(data, gpu_default):
 
 
 @pytest.mark.gpu
+@pytest.mark.skipif(
+    PJRT_DEVICE != "CUDA", reason="PJRT_DEVICE must be equal to CUDA to run GPU tests."
+)
 def test_gpu_grad_accum(data, gpu_default: dict):
     grad_accum_stats = get_stats(
         data, "cuda", seed=100, cores=4, gradient_accumulation_steps=2, batch_size=128
@@ -201,6 +226,9 @@ def test_gpu_grad_accum(data, gpu_default: dict):
 
 
 @pytest.mark.gpu
+@pytest.mark.skipif(
+    PJRT_DEVICE != "CUDA", reason="PJRT_DEVICE must be equal to CUDA to run GPU tests."
+)
 def test_gpu_bf16(data, gpu_default: dict):
     bf16_stats = get_stats(data, "cuda", seed=100, cores=4, dtype=torch.bfloat16)
     check(gpu_default, bf16_stats, 0.2)

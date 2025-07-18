@@ -3,6 +3,7 @@ from pprint import pp
 import numpy as np
 import pytest
 import torch
+import os
 from datasets import load_dataset
 from devinterp.backends.default.slt.sampler import sample
 from devinterp.optim.sgld import SGLD
@@ -12,6 +13,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformer_lens.utils import lm_cross_entropy_loss, tokenize_and_concatenate
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# This is not imported for this test because GitHub CI/CD doesn't have the module to import from
+PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "CPU")
 
 
 def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
@@ -94,6 +98,9 @@ def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
 )
 @pytest.mark.gpu
 @pytest.mark.slow
+@pytest.mark.skipif(
+    PJRT_DEVICE != "CUDA", reason="PJRT_DEVICE must be equal to CUDA to run GPU tests."
+)
 def test_hf():
     # Load the model and tokenizer
     model = AutoModelForCausalLM.from_pretrained("roneneldan/TinyStories-1M")
