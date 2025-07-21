@@ -1,5 +1,4 @@
-import warnings
-from typing import Callable, List, Union
+from typing import Callable, Union, Sequence
 
 import torch
 
@@ -51,7 +50,7 @@ class SamplerCallback:
         raise NotImplementedError
 
 
-def validate_callbacks(callbacks: List[Callable]):
+def validate_callbacks(callbacks: Sequence[Callable]):
     for i, callback in enumerate(callbacks):
         if isinstance(callback, SamplerCallback) and hasattr(callback, "base_callback"):
             base_callback = callback.base_callback
