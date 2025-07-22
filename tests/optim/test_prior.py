@@ -55,7 +55,7 @@ def test_gaussian_prior_distance_sq():
     # Test distance with center
     state = {"prior_center": torch.tensor([0.5, 1.0, 1.5])}
     dist = prior.distance_sq(param, state)
-    expected = ((param - state["prior_center"]) ** 2).sum()
+    expected = ((param - state["prior_center"]) ** 2).sum(dtype=torch.float32)
     assert torch.equal(dist, expected)
 
 
@@ -112,7 +112,7 @@ def test_custom_key():
     # Test that distance_sq uses custom key
     state["custom_key"] = torch.zeros(3)
     dist = prior.distance_sq(param, state)
-    assert torch.equal(dist, (param**2).sum())
+    assert torch.equal(dist, (param**2).sum(dtype=torch.float32))
 
 
 def test_uniform_prior():

@@ -208,7 +208,9 @@ class NHTPreconditioning(Preconditioner):
         grad_correction = -thermostat * momentum
 
         # Update thermostat based on kinetic energy
-        kinetic_energy = torch.sum(momentum * momentum) / momentum.numel()
+        kinetic_energy = (
+            torch.sum(momentum * momentum, dtype=torch.float32) / momentum.numel()
+        )
         state["thermostat"] += kinetic_energy - 1.0
 
         return PreconditionerCoefs(

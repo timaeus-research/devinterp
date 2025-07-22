@@ -59,16 +59,18 @@ class OnlineLossStatistics(SamplerCallback):
         losses = self.base_callback.losses[chain, :t]
         relative_losses = losses - init_loss
 
-        self.percent_neg_steps[chain, draw] = (relative_losses < 0).sum() / (t)
+        self.percent_neg_steps[chain, draw] = (relative_losses < 0).sum(
+            dtype=torch.float32
+        ) / (t)
 
         prev_percent = self.percent_mean_neg_steps[chain, draw - 1] if draw > 0 else 0
         self.percent_mean_neg_steps[chain, draw] = (
-            (t - 1) * prev_percent + (relative_losses.mean() < 0)
+            (t - 1) * prev_percent + (relative_losses.mean(dtype=torch.float32) < 0)
         ) / t
 
         self.percent_thresholded_neg_steps[chain, draw] = (
             relative_losses < -estimated_noise
-        ).sum() / t
+        ).sum(dtype=torch.float32) / t
 
         # only compute if estimated noise is nonzero; this might not happen if e.g. using same random seed for all chains
         if estimated_noise > 0:

@@ -408,16 +408,16 @@ class SGMCMC(Optimizer):
                 if "grad_norm" in metrics and p.grad is not None:
                     metrics["grad_norm"] += (
                         (p.grad.data * group["nbeta"] * 0.5 * group["lr"]) ** 2
-                    ).sum()
+                    ).sum(dtype=torch.float32)
 
                 if "weight_norm" in metrics:
-                    metrics["weight_norm"] += (p.data**2).sum()
+                    metrics["weight_norm"] += (p.data**2).sum(dtype=torch.float32)
 
                 if "noise" in metrics:
                     metrics["noise"].append(noise)
 
                 if "noise_norm" in metrics:
-                    metrics["noise_norm"] += (noise**2).sum()
+                    metrics["noise_norm"] += (noise**2).sum(dtype=torch.float32)
 
         # Finalize scalar metrics
         for group in self.param_groups:

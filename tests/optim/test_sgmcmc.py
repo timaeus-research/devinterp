@@ -435,7 +435,7 @@ def test_SGMCMC_param_groups(snapshot):
     for group_idx, layer_params in enumerate(params_before):
         for name, p_before in layer_params.items():
             p_after = dict(model[group_idx].named_parameters())[name]
-            param_diff = (p_after - p_before).abs().mean()
+            param_diff = (p_after - p_before).abs().mean(dtype=torch.float32)
 
             # Group 0 should have larger updates due to higher learning rate
             if group_idx == 0:

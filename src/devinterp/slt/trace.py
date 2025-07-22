@@ -86,7 +86,9 @@ class OnlineTraceStatistics(SamplerCallback):
 
     def __call__(self, draw: int, **kwargs):
         attribute = getattr(self.base_callback, self.attribute)
-        self.mean_by_chain[:, draw] = attribute[:, : draw + 1].mean(axis=1)
+        self.mean_by_chain[:, draw] = attribute[:, : draw + 1].mean(
+            axis=1, dtype=torch.float32
+        )
         self.std_by_chain[:, draw] = attribute[:, : draw + 1].std(axis=1)
-        self.mean_by_draw[draw] = attribute[:, draw].mean()
+        self.mean_by_draw[draw] = attribute[:, draw].mean(dtype=torch.float32)
         self.std_by_draw[draw] = attribute[:, draw].std()

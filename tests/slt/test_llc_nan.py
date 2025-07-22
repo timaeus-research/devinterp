@@ -33,7 +33,7 @@ def test_sampling_nan_error(DummyNaNModel):
     # Define loss function
     def loss_fn(model, data):
         x = data[0]  # Unpack the single input tensor
-        return model(x).mean()
+        return model(x).mean(dtype=torch.float32), {}
 
     with pytest.raises(RuntimeError, match="NaN detected in loss at chain 0, draw 97"):
         estimate_learning_coeff(

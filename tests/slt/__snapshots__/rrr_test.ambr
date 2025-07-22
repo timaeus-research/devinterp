@@ -1,61 +1,61 @@
 # serializer version: 1
 # name: test_accuracy_rrr[perturbed-case_1_even_5x4x5-SGLD]
-  -950.279052734375
+  -950.2211303710938
 # ---
 # name: test_accuracy_rrr[perturbed-case_1_even_5x4x5-sgld]
-  -950.279052734375
+  -950.2211303710938
 # ---
 # name: test_accuracy_rrr[perturbed-case_1_odd_5x3x5-SGLD]
-  -540.136474609375
+  -539.4931640625
 # ---
 # name: test_accuracy_rrr[perturbed-case_1_odd_5x3x5-sgld]
-  -540.136474609375
+  -539.4931640625
 # ---
 # name: test_accuracy_rrr[perturbed-case_2_4x3x8-SGLD]
-  -428.4161071777344
+  -428.4173278808594
 # ---
 # name: test_accuracy_rrr[perturbed-case_2_4x3x8-sgld]
-  -428.4161071777344
+  -428.4173278808594
 # ---
 # name: test_accuracy_rrr[perturbed-case_3_8x3x4-SGLD]
-  -1717.2952880859375
+  -1717.2637939453125
 # ---
 # name: test_accuracy_rrr[perturbed-case_3_8x3x4-sgld]
-  -1717.2952880859375
+  -1717.2637939453125
 # ---
 # name: test_accuracy_rrr[perturbed-case_4_3x8x4-SGLD]
-  -5700.07275390625
+  -5706.357421875
 # ---
 # name: test_accuracy_rrr[perturbed-case_4_3x8x4-sgld]
-  -5700.07275390625
+  -5706.357421875
 # ---
 # name: test_accuracy_rrr[unperturbed-case_1_even_5x4x5-SGLD]
-  0.36638423800468445
+  0.36802372336387634
 # ---
 # name: test_accuracy_rrr[unperturbed-case_1_even_5x4x5-sgld]
-  0.36638423800468445
+  0.36802372336387634
 # ---
 # name: test_accuracy_rrr[unperturbed-case_1_odd_5x3x5-SGLD]
-  0.3891811668872833
+  0.3872425854206085
 # ---
 # name: test_accuracy_rrr[unperturbed-case_1_odd_5x3x5-sgld]
-  0.3891811668872833
+  0.3872425854206085
 # ---
 # name: test_accuracy_rrr[unperturbed-case_2_4x3x8-SGLD]
-  0.13740848004817963
+  0.13740846514701843
 # ---
 # name: test_accuracy_rrr[unperturbed-case_2_4x3x8-sgld]
-  0.13740848004817963
+  0.13740846514701843
 # ---
 # name: test_accuracy_rrr[unperturbed-case_3_8x3x4-SGLD]
-  0.4877088963985443
+  0.48806846141815186
 # ---
 # name: test_accuracy_rrr[unperturbed-case_3_8x3x4-sgld]
-  0.4877088963985443
+  0.48806846141815186
 # ---
 # name: test_accuracy_rrr[unperturbed-case_4_3x8x4-SGLD]
-  0.4049715995788574
+  0.40689289569854736
 # ---
 # name: test_accuracy_rrr[unperturbed-case_4_3x8x4-sgld]
-  0.4049715995788574
+  0.40689289569854736
 # ---

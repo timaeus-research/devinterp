@@ -155,9 +155,9 @@ class GaussianPrior(Prior):
         center = state.get(self.key)
 
         if center is None:
-            return ((scale * param) ** 2).sum()
+            return ((scale * param) ** 2).sum(dtype=torch.float32)
         else:
-            return ((scale * (param - center)) ** 2).sum()
+            return ((scale * (param - center)) ** 2).sum(dtype=torch.float32)
 
     def __repr__(self) -> str:
         return f"GaussianPrior(localization={self.localization}, center={self.center})"
