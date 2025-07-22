@@ -3,7 +3,7 @@ import warnings
 from typing import Union
 
 import torch
-
+from typing import Optional
 from devinterp.slt.callback import SamplerCallback
 from devinterp.utils import TPU_TYPE, USE_TPU_BACKEND
 
@@ -33,27 +33,32 @@ class LLCEstimator(SamplerCallback):
         self,
         num_chains: int,
         num_draws: int,
-        init_loss: torch.Tensor,
+        init_loss: Union[float, torch.Tensor],
         device: Union[torch.device, str] = "cpu",
         eval_field: str = "loss",
-        nbeta: float = None,
-        temperature: float = None,
+        nbeta: Optional[float] = None,
+        temperature: Optional[float] = None,
     ):
+        self.device = device
         self.num_chains = num_chains
         self.num_draws = num_draws
-        self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
-            device
-        )
-        self.init_loss = init_loss
+        self.losses: torch.Tensor = torch.zeros(
+            (num_chains, num_draws), dtype=torch.float32
+        ).to(device)
+        self.set_init_loss(init_loss)
 
         assert nbeta is not None, "Please provide a value for nbeta."
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
         self.temperature = temperature
 
-        self.device = device
         self.eval_field = eval_field
 
-    def update(self, chain: int, draw: int, loss: torch.tensor):
+    def set_init_loss(self, init_loss: Union[torch.Tensor, float]):
+        self.init_loss = torch.as_tensor(
+            init_loss, dtype=torch.float32, device=self.device
+        )
+
+    def update(self, chain: int, draw: int, loss: torch.Tensor):
         if torch.isnan(loss).any():
             raise RuntimeError(f"NaN detected in loss at chain {chain}, draw {draw}")
         self.losses[chain, draw] = loss.to(self.device)
@@ -100,15 +105,7 @@ class LLCEstimator(SamplerCallback):
             except ValueError:
                 pass
         avg_losses = self.losses.mean(axis=1)
-        # bypass automatic bfloat16 issues
-        if os.environ.get("XLA_USE_BF16", "0") == "1" and str(self.device).startswith(
-            "xla:"
-        ):
-            self.llc_per_chain = self.nbeta.to(device="cpu", dtype=torch.float32) * (
-                avg_losses.to(device="cpu", dtype=torch.float32)
-                - self.init_loss.to(device="cpu", dtype=torch.float32)
-            )
-        elif (
+        if (
             str(self.device).startswith("cuda")
             and os.environ.get("USE_SPMD", "0") == "1"
         ):
@@ -118,7 +115,7 @@ class LLCEstimator(SamplerCallback):
             )
         else:
             self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
-        self.llc_mean = self.llc_per_chain.mean()
+        self.llc_mean = self.llc_per_chain.mean(dtype=torch.float32)
         self.llc_std = self.llc_per_chain.std()
 
     def get_results(self):
@@ -126,14 +123,8 @@ class LLCEstimator(SamplerCallback):
         :returns: A dict :python:`{"llc/mean": llc_mean, "llc/std": llc_std, "llc-chain/{i}": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
         """
 
-        init_loss = (
-            self.init_loss.item()
-            if isinstance(self.init_loss, torch.Tensor)
-            else self.init_loss
-        )
-
         return {
-            "init_loss": init_loss,
+            "init_loss": self.init_loss.cpu().numpy().item(),
             "llc/mean": self.llc_mean.cpu().numpy().item(),
             "llc/std": self.llc_std.cpu().numpy().item(),
             **{
@@ -168,15 +159,16 @@ class OnlineLLCEstimator(SamplerCallback):
         self,
         num_chains: int,
         num_draws: int,
-        init_loss,
+        init_loss: Union[float, torch.Tensor],
         device="cpu",
         eval_field="loss",
-        nbeta: float = None,
-        temperature: float = None,  # Temperature is deprecated
+        nbeta: Optional[float] = None,
+        temperature: Optional[float] = None,  # Temperature is deprecated
     ):
+        self.device = device
         self.num_chains = num_chains
         self.num_draws = num_draws
-        self.init_loss = init_loss
+        self.set_init_loss(init_loss)
 
         self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
             device
@@ -189,10 +181,14 @@ class OnlineLLCEstimator(SamplerCallback):
         self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
         self.temperature = temperature
 
-        self.device = device
         self.eval_field = eval_field
 
-    def update(self, chain: int, draw: int, loss: torch.tensor):
+    def set_init_loss(self, init_loss: Union[torch.Tensor, float]):
+        self.init_loss = torch.as_tensor(
+            init_loss, dtype=torch.float32, device=self.device
+        )
+
+    def update(self, chain: int, draw: int, loss: torch.Tensor):
         if torch.isnan(loss).any():
             raise RuntimeError(f"NaN detected in loss at chain {chain}, draw {draw}")
         loss = loss.to(self.device)
@@ -201,7 +197,7 @@ class OnlineLLCEstimator(SamplerCallback):
 
     def finalize(self):
         # TODO
-        self.llc_means = self.llcs.mean(dim=0)
+        self.llc_means = self.llcs.mean(dim=0, dtype=torch.float32)
         self.llc_stds = self.llcs.std(dim=0)
 
     def get_results(self):
@@ -209,7 +205,7 @@ class OnlineLLCEstimator(SamplerCallback):
         :returns: A dict :python:`{"llc/means": llc_means, "llc/stds": llc_stds, "llc/trace": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
         """
         return {
-            "init_loss": self.init_loss,
+            "init_loss": self.init_loss.cpu().numpy(),
             "llc/means": self.llc_means.cpu().numpy(),
             "llc/stds": self.llc_stds.cpu().numpy(),
             "llc/trace": self.llcs.cpu().numpy(),

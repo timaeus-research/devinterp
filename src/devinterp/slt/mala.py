@@ -61,10 +61,12 @@ def mala_acceptance_probability(
     ):
         # Compute the log of the proposal probabilities (using the Gaussian proposal distribution)
         log_q_current_to_prev += -torch.sum(
-            (prev_point - current_point - (learning_rate * 0.5 * -current_grad)) ** 2
+            (prev_point - current_point - (learning_rate * 0.5 * -current_grad)) ** 2,
+            dtype=torch.float32,
         ) / (2 * learning_rate)
         log_q_prev_to_current += -torch.sum(
-            (current_point - prev_point - (learning_rate * 0.5 * -prev_grad)) ** 2
+            (current_point - prev_point - (learning_rate * 0.5 * -prev_grad)) ** 2,
+            dtype=torch.float32,
         ) / (2 * learning_rate)
 
     acceptance_log_prob = (

@@ -19,11 +19,11 @@ class Polynomial(nn.Module):
         )
 
     def forward(self, x):
-        return torch.sum(torch.pow(self.weights, self.powers))
+        return torch.sum(torch.pow(self.weights, self.powers), dtype=torch.float32)
 
 
 def linear_loss(y_preds, ys):
-    return torch.mean(y_preds)
+    return torch.mean(y_preds, dtype=torch.float32)
 
 
 MALA_CALC_TESTCASES = [

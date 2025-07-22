@@ -221,7 +221,9 @@ class SGLD(torch.optim.Optimizer):
                             )
                         # localization_loss = (p.data - initial_param)^2 * group["optimize_over"]^2 * group["localization"] / 2
                         #                                                           ^ boolean
-                        distance = (initial_param_distance.detach() ** 2).sum()
+                        distance = (initial_param_distance.detach() ** 2).sum(
+                            dtype=torch.float32
+                        )
                         self.localization_loss += distance * group["localization"] / 2
                         self.dws.append(dw.clone())
 
@@ -255,17 +257,19 @@ class SGLD(torch.optim.Optimizer):
                     if group["grad_norm"] is not False and p.grad is not None:
                         group["grad_norm"] += (
                             ((p.grad.data * group["nbeta"] * 0.5 * group["lr"]) ** 2)
-                            .sum()
+                            .sum(dtype=torch.float32)
                             .detach()
                         )
 
                     if group["noise_norm"] is not False:
-                        group["noise_norm"] += (noise**2).sum().detach()
+                        group["noise_norm"] += (
+                            (noise**2).sum(dtype=torch.float32).detach()
+                        )
 
                     if group["distance"] is not False and not self.save_mala_vars:
                         group["distance"] += (
                             ((initial_param_distance * group["localization"]) ** 2)
-                            .sum()
+                            .sum(dtype=torch.float32)
                             .detach()
                         )
 
@@ -280,7 +284,9 @@ class SGLD(torch.optim.Optimizer):
                         )
 
                     if group["weight_norm"] is not False:
-                        group["weight_norm"] += (p.data**2).sum().detach()
+                        group["weight_norm"] += (
+                            (p.data**2).sum(dtype=torch.float32).detach()
+                        )
 
                 for hp in ["noise_norm", "grad_norm", "distance", "weight_norm"]:
                     if group[hp] is not False:

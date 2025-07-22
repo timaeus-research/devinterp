@@ -35,7 +35,11 @@ def LinePlusDot():
             self.weights = nn.Parameter(torch.zeros(dim, dtype=torch.float32))
 
         def forward(self, x):
-            return x * (self.weights[0] - 1) * (self.weights.pow(2).sum().pow(2))
+            return (
+                x
+                * (self.weights[0] - 1)
+                * (self.weights.pow(2).sum(dtype=torch.float32).pow(2))
+            )
 
     return _LPD
 

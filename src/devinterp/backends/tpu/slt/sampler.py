@@ -186,6 +186,7 @@ def sample_single_chain(
                     enabled=dtype != torch.float32,
                 ):
                     _loss, _results = evaluate(model, prepare_input(data, device))
+                    _loss = _loss.to(torch.float32)
                     _mean_loss = _loss.mean() / gradient_accumulation_steps
 
                 if not no_grad:
@@ -363,7 +364,7 @@ def sample(
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
     for callback in callbacks:
         if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
-            setattr(callback, "init_loss", init_loss)
+            callback.set_init_loss(init_loss)
     if cores is None:
         cores = min(4, cpu_count())
 

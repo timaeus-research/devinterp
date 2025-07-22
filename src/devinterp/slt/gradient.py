@@ -169,7 +169,7 @@ class GradientDistribution(SamplerCallback):
         if chain is not None:
             max_count = grad_dist[chain].max()
         else:
-            max_count = grad_dist.sum(axis=0).max()
+            max_count = grad_dist.sum(axis=0, dtype=torch.float32).max()
 
         def get_color_alpha(count):
             if count == 0:
@@ -199,7 +199,7 @@ class GradientDistribution(SamplerCallback):
                 bin_min = self.min_grad + pos * self.bin_size
                 bin_max = bin_min + self.bin_size
                 if chain is None:
-                    count = grad_dist[:, draw, pos].sum()
+                    count = grad_dist[:, draw, pos].sum(dtype=torch.float32)
                 else:
                     count = grad_dist[chain, draw, pos]
                 if count != 0:

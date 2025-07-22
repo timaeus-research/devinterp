@@ -189,7 +189,7 @@ def sample(
     num_chains: int = 10,
     num_burnin_steps: int = 0,
     num_steps_bw_draws: int = 1,
-    init_loss: float = None,
+    init_loss: Optional[Union[float, torch.Tensor]] = None,
     gradient_accumulation_steps: int = 1,
     cores: Union[int, List[Union[str, torch.device]]] = 1,
     seed: Optional[Union[int, List[int]]] = None,
@@ -282,7 +282,7 @@ def sample(
         # alternative: init_loss = get_init_loss_one_batch(loader, model, evaluate, device)
     for callback in callbacks:
         if isinstance(callback, (OnlineLLCEstimator, LLCEstimator)):
-            setattr(callback, "init_loss", init_loss)
+            callback.set_init_loss(init_loss)
 
     # Temperature consistency warning
     if sampling_method_kwargs is not None and (
