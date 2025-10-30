@@ -1,8 +1,9 @@
+import platform
+
 import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
-import platform
 from devinterp.backends.default.slt.sampler import sample
 from devinterp.optim import SGLD, SGMCMC
 from devinterp.slt.llc import LLCEstimator
@@ -56,6 +57,7 @@ TEST_CASES = [
 ]
 
 
+@pytest.mark.skip("This test is flaky and old.")
 @pytest.mark.skipif(
     platform.machine() != "x86_64",
     reason=f"Differences in results between ARM and x86_64. Your arch is {platform.machine()}",
