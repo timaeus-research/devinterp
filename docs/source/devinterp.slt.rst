@@ -9,85 +9,85 @@ devinterp.slt.callback module
 
 .. automodule:: devinterp.slt.callback
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.slt.cov module
 ------------------------
 
 .. automodule:: devinterp.slt.cov
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.slt.gradient module
 -----------------------------
 
 .. automodule:: devinterp.slt.gradient
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.slt.llc module
 ------------------------
 
 .. automodule:: devinterp.slt.llc
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.slt.loss module
 -------------------------
 
 .. automodule:: devinterp.slt.loss
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.slt.mala module
 -------------------------
 
 .. automodule:: devinterp.slt.mala
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.slt.norms module
 --------------------------
 
 .. automodule:: devinterp.slt.norms
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.slt.sampler module
 ----------------------------
 
 .. automodule:: devinterp.slt.sampler
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.slt.trace module
 --------------------------
 
 .. automodule:: devinterp.slt.trace
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.slt.wbic module
 -------------------------
 
 .. automodule:: devinterp.slt.wbic
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Module contents
 ---------------
 
 .. automodule:: devinterp.slt
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

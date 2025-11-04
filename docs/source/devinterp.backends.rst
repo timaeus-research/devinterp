@@ -15,5 +15,5 @@ Module contents
 
 .. automodule:: devinterp.backends
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
