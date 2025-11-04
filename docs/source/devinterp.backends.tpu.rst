@@ -14,5 +14,5 @@ Module contents
 
 .. automodule:: devinterp.backends.tpu
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

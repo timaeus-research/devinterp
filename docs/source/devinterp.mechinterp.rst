@@ -9,21 +9,21 @@ devinterp.mechinterp.activations module
 
 .. automodule:: devinterp.mechinterp.activations
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.mechinterp.hooks module
 ---------------------------------
 
 .. automodule:: devinterp.mechinterp.hooks
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Module contents
 ---------------
 
 .. automodule:: devinterp.mechinterp
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

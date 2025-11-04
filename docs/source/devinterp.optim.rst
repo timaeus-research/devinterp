@@ -9,53 +9,53 @@ devinterp.optim.preconditioner module
 
 .. automodule:: devinterp.optim.preconditioner
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.optim.prior module
 ----------------------------
 
 .. automodule:: devinterp.optim.prior
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.optim.sgld module
 ---------------------------
 
 .. automodule:: devinterp.optim.sgld
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.optim.sgmcmc module
 -----------------------------
 
 .. automodule:: devinterp.optim.sgmcmc
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.optim.sgnht module
 ----------------------------
 
 .. automodule:: devinterp.optim.sgnht
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 devinterp.optim.utils module
 ----------------------------
 
 .. automodule:: devinterp.optim.utils
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Module contents
 ---------------
 
 .. automodule:: devinterp.optim
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
