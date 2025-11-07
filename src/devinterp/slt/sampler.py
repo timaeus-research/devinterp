@@ -5,19 +5,14 @@ from typing import Callable, Dict, List, Literal, Optional, Type, Union
 import torch
 from torch.utils.data import DataLoader
 
+from devinterp.backends.default.slt.sampler import sample
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
 from devinterp.utils import (
-    USE_TPU_BACKEND,
     EvaluateFn,
     default_nbeta,
     get_init_loss_multi_batch,
 )
-
-if USE_TPU_BACKEND:
-    from devinterp.backends.tpu.slt.sampler import sample
-else:
-    from devinterp.backends.default.slt.sampler import sample
 
 
 def estimate_learning_coeff_with_summary(
@@ -88,16 +83,7 @@ def estimate_learning_coeff_with_summary(
     :param seed: Seed for reproducibility. If a list of seeds is provided, each chain will be seeded with the corresponding seed. 
     Otherwise, this parameter will be used as an offset that will be added to the chain index to seed each chain.
     :type seed: int or list of int
-    :param device: Device to run the sampling on. Can be a torch.device or a string (e.g. "cuda:0"). Supports GPUs and TPUs. To use TPUs:
-
-    ``` python
-        import os
-        os.environ["USE_TPU_BACKEND"] = "1"
-        import torch_xla.core.xla_model as xm
-        DEVICE = xm.xla_device()
-        # If you are using a TPU, make sure to set the environment variable `USE_TPU_BACKEND` to `1` before importing `devinterp`.
-    ```   
- 
+    :param device: Device to run the sampling on. Can be a torch.device or a string (e.g. "cuda:0"). Supports GPUs.
     :type device: torch.device or str
     :param gpu_idxs: List of GPU indices to use. If None, the device will be used as is. Provide a list of indices \
     and set cores greater than the length of the list to use multiple GPUs.
@@ -262,16 +248,7 @@ def estimate_learning_coeff(
     :param seed: Seed for reproducibility. If a list of seeds is provided, each chain will be seeded with the corresponding seed. 
     Otherwise, this parameter will be used as an offset that will be added to the chain index to seed each chain.
     :type seed: int or list of int
-    :param device: Device to run the sampling on. Can be a torch.device or a string (e.g. "cuda:0"). Supports GPUs and TPUs. To use TPUs:
-
-    ``` python
-        import os
-        os.environ["USE_TPU_BACKEND"] = "1"
-        import torch_xla.core.xla_model as xm
-        DEVICE = xm.xla_device()
-        # If you are using a TPU, make sure to set the environment variable `USE_TPU_BACKEND` to `1` before importing `devinterp`.
-    ```   
- 
+    :param device: Device to run the sampling on. Can be a torch.device or a string (e.g. "cuda:0"). Supports GPUs.
     :type device: torch.device or str
     :param gpu_idxs: List of GPU indices to use. If None, the device will be used as is. Provide a list of indices \
     and set cores greater than the length of the list to use multiple GPUs.

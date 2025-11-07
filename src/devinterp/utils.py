@@ -11,10 +11,6 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 PJRT_DEVICE = os.environ.get("PJRT_DEVICE", None)
-USE_TPU_BACKEND = os.environ.get(
-    "USE_TPU_BACKEND", True if (PJRT_DEVICE == "TPU") else False
-)
-TPU_TYPE = os.environ.get("TPU_TYPE", None)
 
 
 class Outputs(NamedTuple):
@@ -260,14 +256,6 @@ def set_seed(seed: int, device: Optional[Union[str, torch.device]] = None):
         np.random.seed(seed)
     except ImportError:
         pass
-
-    try:
-        import torch_xla.core.xla_model as xm
-
-        if device is None:
-            xm.set_rng_state(seed)
-        elif "xla" in str(device):
-            xm.set_rng_state(seed, device=device)
 
     except (ImportError, RuntimeError):
         pass
