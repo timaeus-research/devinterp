@@ -1,14 +1,14 @@
+import os
 from pprint import pp
 
 import numpy as np
 import pytest
 import torch
-import os
 from datasets import load_dataset
 from devinterp.backends.default.slt.sampler import sample
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.llc import LLCEstimator
-from devinterp.utils import USE_TPU_BACKEND, prepare_input, set_seed
+from devinterp.utils import prepare_input, set_seed
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformer_lens.utils import lm_cross_entropy_loss, tokenize_and_concatenate
@@ -19,7 +19,6 @@ PJRT_DEVICE = os.environ.get("PJRT_DEVICE", "CPU")
 
 
 def _test_hf(model, dataset, device: str, batch_size=4, seed=42):
-    assert not USE_TPU_BACKEND, "TPU backend not supported for this test"
     assert device in ["cpu"] or device.startswith("cuda"), (
         "Invalid device. Should be cpu or cuda:n. Don't worry about this error if you're not on a GPU device."
     )

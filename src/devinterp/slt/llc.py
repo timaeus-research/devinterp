@@ -1,11 +1,9 @@
 import os
-import warnings
-from typing import Union
+from typing import Optional, Union
 
 import torch
-from typing import Optional
+
 from devinterp.slt.callback import SamplerCallback
-from devinterp.utils import TPU_TYPE, USE_TPU_BACKEND
 
 
 class LLCEstimator(SamplerCallback):
@@ -25,7 +23,6 @@ class LLCEstimator(SamplerCallback):
     :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
     :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Supports GPUs and TPUs.
-    To use TPUs, be sure to pass in torch_xla.core.xla_model.xla_device() as the device and set the USE_TPU_BACKEND environment flag to "1". Default is 'cpu'
     :type device: str | torch.device, optional
     """
 
@@ -76,25 +73,6 @@ class LLCEstimator(SamplerCallback):
             else:
                 pass
 
-        elif USE_TPU_BACKEND and str(self.device).startswith("xla:"):
-            import torch_xla.core.xla_model as xm
-
-            if TPU_TYPE == "v4":
-                self.losses = xm.all_reduce(xm.REDUCE_SUM, self.losses)
-            elif TPU_TYPE == "v2/v3":
-                self.losses = self.losses.cpu()
-                if torch.distributed.is_initialized():
-                    torch.distributed.all_reduce(self.losses)
-                else:
-                    warnings.warn(
-                        "torch.distributed has not been initialized. If running on TPU v2/v3, and you want to run chains in parallel, you need to initialize torch.distributed after calling xmp.spawn() as follows:"
-                        ">>> import torch_xla.runtime as xr"
-                        ">>> store = torch.distributed.TCPStore('127.0.0.1', 12345, 4, xr.global_ordinal() == 0)"
-                        ">>> torch.distributed.init_process_group(backend='gloo', store=store, rank=xr.global_ordinal()//2, world_size=xr.world_size()//2)"
-                    )
-
-            else:
-                raise NotImplementedError(f"TPU type {TPU_TYPE} not supported")
         elif str(
             self.device
         ).startswith(
@@ -150,8 +128,7 @@ class OnlineLLCEstimator(SamplerCallback):
     :type num_chains: int
     :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Supports GPUs and TPUs. \
-    To use TPUs, be sure to pass in torch_xla.core.xla_model.xla_device() as the device and set the USE_TPU_BACKEND environment flag to "1". Default is 'cpu'
+    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Supports GPUs. Default is 'cpu'
     :type device: str | torch.device, optional
     """
 
