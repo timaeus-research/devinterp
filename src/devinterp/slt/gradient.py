@@ -1,5 +1,5 @@
 import math
-from typing import List, Union
+from typing import Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -35,7 +35,7 @@ class GradientDistribution(SamplerCallback):
         num_chains: int,
         num_draws: int,
         min_bins: int = 20,
-        param_names: List[str] = None,
+        param_names: list[str] = None,
         device: Union[torch.device, str] = "cpu",
     ):
         self.num_chains = num_chains

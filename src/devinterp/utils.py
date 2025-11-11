@@ -2,7 +2,7 @@ import os
 import warnings
 from functools import partial
 from itertools import islice
-from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Tuple, Union
+from typing import Any, Callable, Mapping, NamedTuple, Optional, Union
 
 import numpy as np
 import torch
@@ -19,7 +19,7 @@ class Outputs(NamedTuple):
 
 
 EvalResults = Union[
-    Outputs, Dict[str, torch.Tensor], Tuple[torch.Tensor, ...], torch.Tensor
+    Outputs, dict[str, torch.Tensor], tuple[torch.Tensor, ...], torch.Tensor
 ]
 
 EvaluateFn = Callable[[nn.Module, torch.Tensor], EvalResults]
@@ -147,7 +147,7 @@ def prepare_input(
     return data
 
 
-def split_results(results: EvalResults) -> Tuple[torch.Tensor, Any]:
+def split_results(results: EvalResults) -> tuple[torch.Tensor, Any]:
     if isinstance(results, dict):
         loss = results.pop("loss")
     elif isinstance(results, tuple):

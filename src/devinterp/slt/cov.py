@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Union
 
 import numpy as np
 import torch
@@ -29,7 +29,7 @@ class CovarianceAccumulator(SamplerCallback):
     def __init__(
         self,
         num_weights: int,
-        accessors: List[WeightAccessor],
+        accessors: list[WeightAccessor],
         device: Union[torch.device, str] = "cpu",
         num_evals: int = 3,
     ):
@@ -91,7 +91,7 @@ class CovarianceAccumulator(SamplerCallback):
         self.accumulate(model)
 
 
-AttentionHeadWeightsAccessor = Callable[[nn.Module], Tuple[torch.Tensor, ...]]
+AttentionHeadWeightsAccessor = Callable[[nn.Module], tuple[torch.Tensor, ...]]
 
 
 class WithinHeadCovarianceAccumulator:
@@ -116,7 +116,7 @@ class WithinHeadCovarianceAccumulator:
         self,
         num_heads: int,
         num_weights_per_head: int,
-        accessors: List[AttentionHeadWeightsAccessor],
+        accessors: list[AttentionHeadWeightsAccessor],
         device: Union[torch.device, str] = "cpu",
         num_evals: int = 3,
     ):
@@ -246,7 +246,7 @@ class BetweenLayerCovarianceAccumulator:
     def __init__(
         self,
         model,
-        pairs: Dict[str, Tuple[str, str]],
+        pairs: dict[str, tuple[str, str]],
         device: Union[torch.device, str] = "cpu",
         num_evals: int = 3,
         **accessors: LayerWeightsAccessor,

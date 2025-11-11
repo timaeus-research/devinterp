@@ -1,6 +1,6 @@
 import warnings
 from collections.abc import Sequence
-from typing import Callable, Container, List, Optional, Union
+from typing import Callable, Container, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -22,8 +22,8 @@ except ImportError:
 
 # Sampling config validates input parameters while allowing us to use **kwargs later on
 class SweepConfig:
-    epsilon_range: List[float]
-    beta_range: List[float]
+    epsilon_range: list[float]
+    beta_range: list[float]
     llc_estimator: Callable
     llc_estimator_kwargs: dict
 
@@ -129,11 +129,11 @@ class EpsilonBetaAnalyzer:
         min_epsilon: Optional[float] = 1e-6,
         max_epsilon: Optional[float] = 1e-2,
         epsilon_samples: float = 8,
-        epsilon_range: Optional[List[float]] = None,
+        epsilon_range: Optional[list[float]] = None,
         min_beta: Optional[float] = None,
         max_beta: Optional[float] = None,
         beta_samples: float = 8,
-        beta_range: Optional[List[float]] = None,
+        beta_range: Optional[list[float]] = None,
         dataloader: Optional[torch.utils.data.DataLoader] = None,
     ) -> None:
         """

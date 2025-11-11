@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -9,11 +9,11 @@ from devinterp.slt.callback import SamplerCallback
 
 
 def mala_acceptance_probability(
-    prev_params: Union[Tensor, List[Tensor]],
-    prev_grads: Union[Tensor, List[Tensor]],
+    prev_params: Union[Tensor, list[Tensor]],
+    prev_grads: Union[Tensor, list[Tensor]],
     prev_loss: Tensor,
-    current_params: Union[Tensor, List[Tensor]],
-    current_grads: Union[Tensor, List[Tensor]],
+    current_params: Union[Tensor, list[Tensor]],
+    current_grads: Union[Tensor, list[Tensor]],
     current_loss: Tensor,
     learning_rate: float,
 ) -> float:

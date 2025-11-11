@@ -1,5 +1,5 @@
 import textwrap
-from typing import Iterator, List, Tuple
+from typing import Iterator
 
 from torch import nn
 from torch.nn.modules.module import Module
@@ -63,7 +63,7 @@ def _hook(module: nn.Module):
         return module
 
 
-def _hook_recursive(module: nn.Module, components: List[str]):
+def _hook_recursive(module: nn.Module, components: list[str]):
     # Base case
     if len(components) == 0:
         if isinstance(module, (Hooked, HookedList, HookedSequential)):
@@ -165,7 +165,7 @@ class Hooked(nn.Module):
         """Loads the state dictionary into the original module."""
         return self._module.load_state_dict(state_dict, strict)
 
-    def named_children(self) -> Iterator[Tuple[str, Module]]:
+    def named_children(self) -> Iterator[tuple[str, Module]]:
         """Returns an iterator over immediate children modules, yielding both the name of the module as well as the module itself."""
         for n, c_original in self._module.named_children():
             if hasattr(self, n):
