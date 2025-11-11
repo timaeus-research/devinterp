@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from numbers import Real
-from typing import Any, Dict, Iterable, Iterator, List, Literal, Optional, Union
+from typing import Any, Iterable, Iterator, Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -13,7 +13,7 @@ class Prior(ABC):
     @abstractmethod
     def initialize(
         self, params: Iterator[torch.Tensor]
-    ) -> Dict[torch.Tensor, Dict[str, Any]]:
+    ) -> dict[torch.Tensor, dict[str, Any]]:
         """Initialize prior for parameters
 
         Args:
@@ -28,7 +28,7 @@ class Prior(ABC):
     def grad(
         self,
         param: torch.Tensor,
-        state: Dict[str, Any],
+        state: dict[str, Any],
     ) -> torch.Tensor:
         """Compute gradient of the prior
 
@@ -78,7 +78,7 @@ class GaussianPrior(Prior):
 
     def initialize(
         self, params: Iterator[torch.Tensor]
-    ) -> Dict[torch.Tensor, Dict[str, Any]]:
+    ) -> dict[torch.Tensor, dict[str, Any]]:
         """Initialize centers for all parameters
 
         Args:
@@ -119,7 +119,7 @@ class GaussianPrior(Prior):
     def grad(
         self,
         param: torch.Tensor,
-        state: Dict[str, Any],
+        state: dict[str, Any],
     ) -> torch.Tensor:
         """Compute gradient of the prior. If state is provided, the prior center is
         looked up in the state dictionary using the instance key.
@@ -141,7 +141,7 @@ class GaussianPrior(Prior):
     def distance_sq(
         self,
         param: torch.Tensor,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         scale: Optional[Union[float, torch.Tensor]] = 1.0,
     ) -> torch.Tensor:
         """Compute squared distance from prior center. If state is provided, the
@@ -181,16 +181,16 @@ class UniformPrior(Prior):
 
     def initialize(
         self, params: Iterator[torch.Tensor]
-    ) -> Dict[torch.Tensor, Dict[str, Any]]:
+    ) -> dict[torch.Tensor, dict[str, Any]]:
         return {}
 
-    def grad(self, param: torch.Tensor, state: Dict[str, Any]) -> torch.Tensor:
+    def grad(self, param: torch.Tensor, state: dict[str, Any]) -> torch.Tensor:
         return torch.zeros_like(param)
 
     def distance_sq(
         self,
         param: torch.Tensor,
-        state: Dict[str, Any] = {},
+        state: dict[str, Any] = {},
         scale: Optional[Union[float, torch.Tensor]] = 1.0,
     ) -> torch.Tensor:
         return 0.0
@@ -201,7 +201,7 @@ class CompositePrior(Prior):
     The last prior in the list takes precedence for distance_sq and as a default for getattr.
     """
 
-    def __new__(cls, priors: List[Prior], **kwargs):
+    def __new__(cls, priors: list[Prior], **kwargs):
         """
         Args:
             priors: List of prior instances
@@ -220,7 +220,7 @@ class CompositePrior(Prior):
 
         return instance
 
-    def __init__(self, priors: List[Prior], **kwargs):
+    def __init__(self, priors: list[Prior], **kwargs):
         """
         Args:
             priors: List of prior instances
@@ -237,7 +237,7 @@ class CompositePrior(Prior):
 
     def initialize(
         self, params: Iterator[torch.Tensor]
-    ) -> Dict[torch.Tensor, Dict[str, Any]]:
+    ) -> dict[torch.Tensor, dict[str, Any]]:
         params = list(params)  # Convert iterator to list for reuse
         combined_state = defaultdict(dict)
 
@@ -249,13 +249,13 @@ class CompositePrior(Prior):
 
         return combined_state
 
-    def grad(self, param: torch.Tensor, state: Dict[str, Any]) -> torch.Tensor:
+    def grad(self, param: torch.Tensor, state: dict[str, Any]) -> torch.Tensor:
         return sum(prior.grad(param, state) for prior in self.priors)
 
     def distance_sq(
         self,
         param: torch.Tensor,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         scale: Optional[Union[float, torch.Tensor]] = 1.0,
     ) -> torch.Tensor:
         """Compute squared distance from prior center. The last prior in the list

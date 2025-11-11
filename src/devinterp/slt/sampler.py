@@ -1,5 +1,5 @@
 import os
-from typing import Callable, Dict, List, Literal, Optional, Type, Union
+from typing import Callable, Literal, Optional, Union
 
 import torch
 from torch.utils.data import DataLoader
@@ -17,11 +17,11 @@ from devinterp.utils import (
 def estimate_learning_coeff_with_summary(
     model: torch.nn.Module,
     loader: DataLoader,
-    callbacks: List[Callable] = [],
+    callbacks: list[Callable] = [],
     evaluate: Optional[EvaluateFn] = None,
-    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    sampling_method: type[torch.optim.Optimizer] = SGLD,
     sampling_method_kwargs: Optional[
-        Dict[str, Union[float, Literal["adaptive"]]]
+        dict[str, Union[float, Literal["adaptive"]]]
     ] = None,
     num_draws: int = 100,
     num_chains: int = 10,
@@ -29,12 +29,12 @@ def estimate_learning_coeff_with_summary(
     num_steps_bw_draws: int = 1,
     init_loss: Optional[Union[float, torch.Tensor]] = None,
     gradient_accumulation_steps: int = 1,
-    cores: Union[int, List[Union[str, torch.device]]] = 1,
-    seed: Optional[Union[int, List[int]]] = None,
+    cores: Union[int, list[Union[str, torch.device]]] = 1,
+    seed: Optional[Union[int, list[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
-    gpu_idxs: Optional[List[int]] = None,
+    gpu_idxs: Optional[list[int]] = None,
     verbose: bool = True,
-    optimize_over_per_model_param: Optional[Dict[str, torch.Tensor]] = None,
+    optimize_over_per_model_param: Optional[dict[str, torch.Tensor]] = None,
     online: bool = False,
     dtype: Optional[torch.dtype] = None,
 ) -> dict:
@@ -178,11 +178,11 @@ def estimate_learning_coeff_with_summary(
 def estimate_learning_coeff(
     model: torch.nn.Module,
     loader: DataLoader,
-    callbacks: List[Callable] = [],
+    callbacks: list[Callable] = [],
     evaluate: Optional[EvaluateFn] = None,
-    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    sampling_method: type[torch.optim.Optimizer] = SGLD,
     sampling_method_kwargs: Optional[
-        Dict[str, Union[float, Literal["adaptive"]]]
+        dict[str, Union[float, Literal["adaptive"]]]
     ] = None,
     num_draws: int = 100,
     num_chains: int = 10,
@@ -190,11 +190,11 @@ def estimate_learning_coeff(
     num_steps_bw_draws: int = 1,
     init_loss: Optional[Union[float, torch.Tensor]] = None,
     gradient_accumulation_steps: int = 1,
-    cores: Union[int, List[Union[str, torch.device]]] = 1,
-    seed: Optional[Union[int, List[int]]] = None,
+    cores: Union[int, list[Union[str, torch.device]]] = 1,
+    seed: Optional[Union[int, list[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
+    optimize_over_per_model_param: Optional[dict[str, list[bool]]] = None,
     dtype: Optional[torch.dtype] = (
         torch.bfloat16
         if os.environ.get("BF16")

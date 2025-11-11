@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import reduce
-from typing import List, NamedTuple, Optional, Union
+from typing import NamedTuple, Optional, Union
 
 import torch
 
@@ -72,7 +72,7 @@ class MaskPreconditioner(Preconditioner):
     Stores one mask per parameter in the parameter group.
     """
 
-    def __init__(self, masks: List[Union[torch.Tensor, float]]):
+    def __init__(self, masks: list[Union[torch.Tensor, float]]):
         """
         Args:
             masks: List of masks, one per parameter in the parameter group.
@@ -106,7 +106,7 @@ class MaskPreconditioner(Preconditioner):
 class CompositePreconditioner(Preconditioner):
     """Combines multiple preconditioners by multiplying their coefficients"""
 
-    def __new__(cls, preconditioners: List[Preconditioner]):
+    def __new__(cls, preconditioners: list[Preconditioner]):
         # Filter out identity preconditioners
         non_identity_preconditioners = [
             p for p in preconditioners if not isinstance(p, IdentityPreconditioner)
@@ -125,7 +125,7 @@ class CompositePreconditioner(Preconditioner):
 
         return instance
 
-    def __init__(self, preconditioners: List[Preconditioner]):
+    def __init__(self, preconditioners: list[Preconditioner]):
         self.preconditioners = preconditioners
 
     def get_coefficients(

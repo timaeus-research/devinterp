@@ -1,5 +1,5 @@
 import warnings
-from typing import Dict, Iterable, Iterator, List, Literal, Optional, Union
+from typing import Iterable, Iterator, Literal, Optional, Union
 
 import torch
 from devinterp.optim.preconditioner import (
@@ -144,10 +144,10 @@ class SGMCMC(Optimizer):
         preconditioner: Optional[
             Union[Preconditioner, Literal["identity", "rmsprop"]]
         ] = "identity",
-        preconditioner_kwargs: Optional[Dict] = None,
+        preconditioner_kwargs: Optional[dict] = None,
         bounding_box_size: Optional[float] = None,
         optimize_over: Optional[torch.Tensor] = None,
-        metrics: Optional[List[OptimizerMetric]] = None,
+        metrics: Optional[list[OptimizerMetric]] = None,
         weight_decay: float = 0.0,
     ):
         """
@@ -467,8 +467,8 @@ class SGMCMC(Optimizer):
         nbeta=1.0,
         bounding_box_size=None,
         optimize_over=None,
-        metrics: Optional[List[OptimizerMetric]] = None,
-        prior_kwargs: Optional[Dict] = None,
+        metrics: Optional[list[OptimizerMetric]] = None,
+        prior_kwargs: Optional[dict] = None,
     ):
         """Factory method to create an SGMCMC instance that implements Stochastic Gradient Langevin Dynamics (SGLD)
         with a localization term (Lau et al. 2023).
@@ -560,8 +560,8 @@ class SGMCMC(Optimizer):
         diffusion_factor=0.01,
         nbeta=1.0,
         bounding_box_size=None,
-        metrics: Optional[List[OptimizerMetric]] = None,
-        prior_kwargs: Optional[Dict] = None,
+        metrics: Optional[list[OptimizerMetric]] = None,
+        prior_kwargs: Optional[dict] = None,
     ):
         """Factory method to create an SGMCMC instance that matches SGNHT's interface.
 
@@ -611,8 +611,8 @@ class SGMCMC(Optimizer):
         add_grad_correction=False,
         bounding_box_size=None,
         optimize_over=None,
-        metrics: Optional[List[OptimizerMetric]] = None,
-        prior_kwargs: Optional[Dict] = None,
+        metrics: Optional[list[OptimizerMetric]] = None,
+        prior_kwargs: Optional[dict] = None,
     ):
         """Factory method to create an SGMCMC instance that wraps RMSprop's adaptive preconditioning with SGLD to perform Bayesian
         sampling of neural network weights.

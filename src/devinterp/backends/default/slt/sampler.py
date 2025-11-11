@@ -1,7 +1,7 @@
 import os
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Literal, Optional, Type, Union
+from typing import Literal, Optional, Union
 
 import cloudpickle
 import numpy as np
@@ -30,18 +30,18 @@ def sample_single_chain(
     ref_model: nn.Module,
     loader: DataLoader,
     evaluate: EvaluateFn,
-    sampling_method_kwargs: Dict,
+    sampling_method_kwargs: dict,
     num_draws=100,
     num_burnin_steps=0,
     num_steps_bw_draws=1,
     gradient_accumulation_steps=1,
-    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    sampling_method: type[torch.optim.Optimizer] = SGLD,
     chain: int = 0,
     seed: Optional[int] = None,
     verbose: bool = True,
     device: torch.device = torch.device("cpu"),
     optimize_over_per_model_param: Optional[dict] = None,
-    callbacks: List[SamplerCallback] = [],
+    callbacks: list[SamplerCallback] = [],
     dtype: torch.dtype = (
         torch.bfloat16
         if os.environ.get("BF16")
@@ -162,7 +162,7 @@ def _sample_single_chain(kwargs):
     return sample_single_chain(**kwargs, evaluate=evaluate, loader=loader)
 
 
-def get_args(chain_idx: int, seeds: List[int], device, callbacks, shared_kwargs):
+def get_args(chain_idx: int, seeds: list[int], device, callbacks, shared_kwargs):
     if isinstance(device, list):
         instance_device = device[chain_idx % len(device)]
     else:
@@ -179,11 +179,11 @@ def get_args(chain_idx: int, seeds: List[int], device, callbacks, shared_kwargs)
 def sample(
     model: torch.nn.Module,
     loader: DataLoader,
-    callbacks: List[SamplerCallback],
+    callbacks: list[SamplerCallback],
     evaluate: Optional[EvaluateFn] = None,
-    sampling_method: Type[torch.optim.Optimizer] = SGLD,
+    sampling_method: type[torch.optim.Optimizer] = SGLD,
     sampling_method_kwargs: Optional[
-        Dict[str, Union[float, Literal["adaptive"]]]
+        dict[str, Union[float, Literal["adaptive"]]]
     ] = None,
     num_draws: int = 100,
     num_chains: int = 10,
@@ -191,12 +191,12 @@ def sample(
     num_steps_bw_draws: int = 1,
     init_loss: Optional[Union[float, torch.Tensor]] = None,
     gradient_accumulation_steps: int = 1,
-    cores: Union[int, List[Union[str, torch.device]]] = 1,
-    seed: Optional[Union[int, List[int]]] = None,
+    cores: Union[int, list[Union[str, torch.device]]] = 1,
+    seed: Optional[Union[int, list[int]]] = None,
     device: Union[torch.device, str] = torch.device("cpu"),
     verbose: bool = True,
-    optimize_over_per_model_param: Optional[Dict[str, List[bool]]] = None,
-    gpu_idxs: Optional[List[int]] = None,
+    optimize_over_per_model_param: Optional[dict[str, list[bool]]] = None,
+    gpu_idxs: Optional[list[int]] = None,
     batch_size: bool = 1,
     dtype: torch.dtype = (
         torch.bfloat16

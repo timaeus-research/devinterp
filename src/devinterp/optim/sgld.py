@@ -1,6 +1,6 @@
 import warnings
 from collections import defaultdict
-from typing import Callable, List, Optional, Union
+from typing import Callable, Optional, Union
 
 import torch
 
@@ -93,7 +93,7 @@ class SGLD(torch.optim.Optimizer):
         weight_norm=False,
         distance=False,
         temperature: Optional[float] = None,
-        metrics: Optional[List[str]] = None,
+        metrics: Optional[list[str]] = None,
     ):
         warnings.warn(
             "SGLD has been deprecated. Please use SGMCMC.sgld instead.",

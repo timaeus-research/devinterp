@@ -1,5 +1,5 @@
 import warnings
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 import torch
@@ -55,7 +55,7 @@ class SGNHT(torch.optim.Optimizer):
         save_noise=False,
         save_mala_vars=False,
         nbeta=1.0,
-        metrics: Optional[List[str]] = None,
+        metrics: Optional[list[str]] = None,
     ):
         warnings.warn(
             "SGNHT has been deprecated. Please use SGMCMC.sgnht instead.",
