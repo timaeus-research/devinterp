@@ -2,6 +2,8 @@ import warnings
 from typing import Iterable, Iterator, Literal, Optional, Union
 
 import torch
+from torch.optim import Optimizer
+
 from devinterp.optim.preconditioner import (
     CompositePreconditioner,
     IdentityPreconditioner,
@@ -12,7 +14,6 @@ from devinterp.optim.preconditioner import (
 )
 from devinterp.optim.prior import CompositePrior, GaussianPrior, Prior
 from devinterp.optim.utils import OptimizerMetric
-from torch.optim import Optimizer
 
 SamplingMethodLiteral = Literal["sgld", "rmsprop_sgld", "sgnht"]
 
@@ -57,7 +58,7 @@ class SGMCMC(Optimizer):
         (default: None, equivalent to "identity")
     :param preconditioner_kwargs: Additional keyword arguments for preconditioner
     :param bounding_box_size: Size of bounding box around initial parameters
-    :param optimize_over: Boolean mask for restricting updatable parameters
+    :param mask: Boolean mask for restricting updatable parameters
     :param metrics: List of metrics to track during training
     :param weight_decay: Weight decay factor applied separately from other updates (like AdamW).
         For preconditioned weight decay (like Adam), use a GaussianPrior centered at zero instead.
@@ -67,12 +68,12 @@ class SGMCMC(Optimizer):
     :type noise_level: float
     :type nbeta: float
     :type prior: Optional[Union[Prior, Literal["initial"], Iterable[torch.Tensor], float]]
-    :type prior_kwargs: Optional[Dict]
+    :type prior_kwargs: Optional[dict]
     :type preconditioner: Optional[Union[Preconditioner, str]]
-    :type preconditioner_kwargs: Optional[Dict]
+    :type preconditioner_kwargs: Optional[dict]
     :type bounding_box_size: Optional[float]
-    :type optimize_over: Optional[torch.Tensor]
-    :type metrics: Optional[List[OptimizerMetric]]
+    :type mask: Optional[torch.Tensor]
+    :type metrics: Optional[list[OptimizerMetric]]
     :type weight_decay: float
 
     Valid metrics options:
@@ -146,7 +147,7 @@ class SGMCMC(Optimizer):
         ] = "identity",
         preconditioner_kwargs: Optional[dict] = None,
         bounding_box_size: Optional[float] = None,
-        optimize_over: Optional[torch.Tensor] = None,
+        mask: Optional[torch.Tensor] = None,
         metrics: Optional[list[OptimizerMetric]] = None,
         weight_decay: float = 0.0,
     ):
@@ -170,7 +171,7 @@ class SGMCMC(Optimizer):
             preconditioner=preconditioner,
             preconditioner_kwargs=preconditioner_kwargs or {},
             bounding_box_size=bounding_box_size,
-            optimize_over=optimize_over,
+            mask=mask,
             metrics=metrics or [],
         )
         super().__init__(params, defaults)
@@ -261,11 +262,11 @@ class SGMCMC(Optimizer):
         else:
             raise ValueError(f"Unsupported preconditioner type: {preconditioner}")
 
-        optimize_over = group.pop("optimize_over", None)
-        if optimize_over is not None:
-            # Convert optimize_over to masks (1.0 where True, 0.0 where False)
-            if isinstance(optimize_over, torch.Tensor):
-                optimize_over = [optimize_over]
+        mask = group.pop("mask", None)
+        if mask is not None:
+            # Convert mask to masks (1.0 where True, 0.0 where False)
+            if isinstance(mask, torch.Tensor):
+                mask = [mask]
 
             def _process_mask(m):
                 if not isinstance(m, torch.Tensor):
@@ -273,7 +274,7 @@ class SGMCMC(Optimizer):
 
                 return m.float()
 
-            masks = [_process_mask(mask) for mask in optimize_over]
+            masks = [_process_mask(_mask) for _mask in mask]
             mask_preconditioner = MaskPreconditioner(masks=masks)
 
             if group["preconditioner"] is not None:
@@ -466,7 +467,7 @@ class SGMCMC(Optimizer):
         localization=0.0,
         nbeta=1.0,
         bounding_box_size=None,
-        optimize_over=None,
+        mask=None,
         metrics: Optional[list[OptimizerMetric]] = None,
         prior_kwargs: Optional[dict] = None,
     ):
@@ -509,7 +510,7 @@ class SGMCMC(Optimizer):
             (default: 0.0)
         :param nbeta: Inverse temperature (default: 1.0)
         :param bounding_box_size: Size of bounding box around initial parameters (default: None)
-        :param optimize_over: Boolean mask for restricting updatable parameters (default: None)
+        :param mask: Boolean mask for restricting updatable parameters (default: None)
         :param metrics: List of metrics to track during training (default: None)
         :param prior_kwargs: Additional keyword arguments for prior initialization.
         :return: SGMCMC optimizer instance
@@ -546,7 +547,7 @@ class SGMCMC(Optimizer):
             nbeta=nbeta,
             prior=prior,
             bounding_box_size=bounding_box_size,
-            optimize_over=optimize_over,
+            mask=mask,
             metrics=metrics,
         )
 
@@ -610,7 +611,7 @@ class SGMCMC(Optimizer):
         eps=0.1,
         add_grad_correction=False,
         bounding_box_size=None,
-        optimize_over=None,
+        mask=None,
         metrics: Optional[list[OptimizerMetric]] = None,
         prior_kwargs: Optional[dict] = None,
     ):
@@ -655,7 +656,7 @@ class SGMCMC(Optimizer):
         :param eps: RMSprop stability constant (default: 0.1)
         :param add_grad_correction: Whether to add gradient correction term (default: False)
         :param bounding_box_size: Size of bounding box around initial parameters (default: None)
-        :param optimize_over: Boolean mask for restricting updatable parameters (default: None)
+        :param mask: Boolean mask for restricting updatable parameters (default: None)
         :param metrics: List of metrics to track during training (default: None)
         :param prior_kwargs: Additional keyword arguments for prior initialization.
         :return: SGMCMC optimizer instance
@@ -703,7 +704,7 @@ class SGMCMC(Optimizer):
             preconditioner="rmsprop",
             preconditioner_kwargs=preconditioner_kwargs,
             bounding_box_size=bounding_box_size,
-            optimize_over=optimize_over,
+            mask=mask,
             metrics=metrics,
         )
 

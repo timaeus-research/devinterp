@@ -93,7 +93,7 @@ def sample_single_chain(
             param_groups.append(
                 {
                     "params": parameter,
-                    "optimize_over": optimize_over_per_model_param[name].to(device),
+                    "mask": optimize_over_per_model_param[name].to(device),
                 }
             )
         optimizer = sampling_method(
