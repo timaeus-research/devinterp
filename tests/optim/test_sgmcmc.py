@@ -188,14 +188,14 @@ def test_SGMCMC_vs_SGLD(
 @pytest.mark.parametrize("localization", [0.0, 0.1])
 @pytest.mark.parametrize("bounding_box_size", [None, 0.1])
 @pytest.mark.parametrize("weight_decay", [0.0])
-@pytest.mark.parametrize("optimize_over", ["scalar", "tensor"])
+@pytest.mark.parametrize("mask", ["scalar", "tensor"])
 def test_optimize_over(
     lr,
     nbeta,
     localization,
     bounding_box_size,
     weight_decay,
-    optimize_over,
+    mask,
     snapshot,
 ):
     # Create identical models
@@ -225,11 +225,11 @@ def test_optimize_over(
 
     torch.manual_seed(42)
 
-    if optimize_over == "tensor":
+    if mask == "tensor":
         optimize_over_params = [
             torch.randint(0, 2, p.shape).bool() for p in model1.parameters()
         ]
-    elif optimize_over == "scalar":
+    elif mask == "scalar":
         optimize_over_params = [
             torch.randint(0, 2, (1,)).bool() for p in model1.parameters()
         ]
@@ -237,7 +237,7 @@ def test_optimize_over(
     # Setup optimizers with equivalent parameters
     optimizer_sgld = SGLD(
         [
-            {"params": p, "optimize_over": opt}
+            {"params": p, "mask": opt}
             for p, opt in zip(model1.parameters(), optimize_over_params)
         ],
         **kwargs,
@@ -251,7 +251,7 @@ def test_optimize_over(
 
     optimizer_sgmcmc = SGMCMC(
         [
-            {"params": (p,), "optimize_over": (opt,)}
+            {"params": (p,), "mask": (opt,)}
             for p, opt in zip(model2.parameters(), optimize_over_params)
         ],
         **kwargs,
@@ -267,19 +267,19 @@ def test_optimize_over(
 
     compare_parameters(model1, model2)
 
-    if optimize_over == "tensor":
-        for p1, p2, mask in zip(
+    if mask == "tensor":
+        for p1, p2, _mask in zip(
             original_params, model2.parameters(), optimize_over_params
         ):
-            assert torch.allclose(p1[~mask], p2[~mask], atol=1e-5), (
-                f"Masked parameters differ: {p1} vs {p2} for mask {mask}"
+            assert torch.allclose(p1[~_mask], p2[~_mask], atol=1e-5), (
+                f"Masked parameters differ: {p1} vs {p2} for mask {_mask}"
             )
 
-    elif optimize_over == "scalar":
-        for p1, p2, mask in zip(
+    elif mask == "scalar":
+        for p1, p2, _mask in zip(
             original_params, model2.parameters(), optimize_over_params
         ):
-            if not mask:
+            if not _mask:
                 assert torch.allclose(p1, p2, atol=1e-5), (
                     f"Masked parameters differ: {p1} vs {p2}"
                 )
@@ -294,7 +294,7 @@ def test_optimize_over(
     }
 
     assert state == snapshot(
-        name=f"test_optimize_over_{lr}_{nbeta}_{localization}_{bounding_box_size}_{weight_decay}_{optimize_over}"
+        name=f"test_optimize_over_{lr}_{nbeta}_{localization}_{bounding_box_size}_{weight_decay}_{mask}"
     )
 
 

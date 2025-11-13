@@ -59,9 +59,9 @@ class SGLD(torch.optim.Optimizer):
     :type save_noise: bool, optional
     :param save_mala_vars: Whether to store variables for calculating Metropolis-Adjusted Langevin Algorithm (MALA) metrics.
     :type save_mala_vars: bool, optional
-    :param optimize_over: A boolean tensor of the same shape as the parameters. Used to implement weight restrictions.
+    :param mask: A boolean tensor of the same shape as the parameters. Used to implement weight restrictions.
     Think of it as a boolean mask that restricts the set of parameters that can be updated. Default is None (no restrictions).
-    :type optimize_over: torch.Tensor, optional
+    :type mask: torch.Tensor, optional
     :param noise_norm: Boolean flag to track the norm of the noise. Default is False
     :type noise_norm: bool, optional
     :param grad_norm: Boolean flag to track the norm of the gradient. Default is False
@@ -87,7 +87,7 @@ class SGLD(torch.optim.Optimizer):
         bounding_box_size=None,
         save_noise=False,
         save_mala_vars=False,
-        optimize_over=None,
+        mask=None,
         noise_norm=False,
         grad_norm=False,
         weight_norm=False,
@@ -146,7 +146,7 @@ class SGLD(torch.optim.Optimizer):
             localization=localization,
             nbeta=nbeta,
             bounding_box_size=bounding_box_size,
-            optimize_over=optimize_over,
+            mask=mask,
             noise_norm=noise_norm,
             grad_norm=grad_norm,
             weight_norm=weight_norm,
@@ -215,11 +215,11 @@ class SGLD(torch.optim.Optimizer):
                         dw.add_(initial_param_distance, alpha=group["localization"])
 
                     if self.save_mala_vars:
-                        if group["optimize_over"] is not None:
+                        if group["mask"] is not None:
                             initial_param_distance = (
-                                initial_param_distance * group["optimize_over"]
+                                initial_param_distance * group["mask"]
                             )
-                        # localization_loss = (p.data - initial_param)^2 * group["optimize_over"]^2 * group["localization"] / 2
+                        # localization_loss = (p.data - initial_param)^2 * group["mask"]^2 * group["localization"] / 2
                         #                                                           ^ boolean
                         distance = (initial_param_distance.detach() ** 2).sum(
                             dtype=torch.float32
@@ -242,10 +242,10 @@ class SGLD(torch.optim.Optimizer):
                         # Noise saved here is the unscaled noise.
                         self.noise[group_idx].append(noise)
 
-                    if group["optimize_over"] is not None:
+                    if group["mask"] is not None:
                         # Restrict the noise and gradient to the subset of parameters we're optimizing over.
-                        dw = dw * group["optimize_over"]
-                        noise = noise * group["optimize_over"]
+                        dw = dw * group["mask"]
+                        noise = noise * group["mask"]
 
                     # Update parameters
                     p.data.add_(dw, alpha=-0.5 * group["lr"])
