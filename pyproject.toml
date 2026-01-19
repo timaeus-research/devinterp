@@ -22,7 +22,6 @@ classifiers = [
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-docs = ["sphinx", "sphinx-math-dollar", "sphinx-rtd-theme", "sphinx-autobuild", "myst_parser"]
 vis = ["plotly>=5.20.0"]
 
 [dependency-groups]
@@ -36,6 +35,13 @@ dev = [
     "syrupy"
 ]
 
+docs = [
+    "sphinx",
+    "sphinx-math-dollar",
+    "sphinx-rtd-theme",
+    "sphinx-autobuild",
+    "myst_parser",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/timaeus-research/devinterp"
