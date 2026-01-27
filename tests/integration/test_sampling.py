@@ -38,7 +38,7 @@ class torchvisionWrapper(torch.utils.data.Dataset):
 
 @pytest.fixture(scope="module")
 def data():
-    mnist_dataset = load_dataset("mnist")
+    mnist_dataset = load_dataset("ylecun/mnist")
 
     def preprocess(examples):
         # Convert images to tensors and normalize
