@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Sequence
 from numbers import Real
-from typing import Any, Iterable, Iterator, Literal, Optional, Union
+from typing import Any, Iterable, Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -10,9 +11,11 @@ import torch
 class Prior(ABC):
     """Abstract base class for parameter priors"""
 
+    key: str
+
     @abstractmethod
     def initialize(
-        self, params: Iterator[torch.Tensor]
+        self, params: Sequence[torch.Tensor]
     ) -> dict[torch.Tensor, dict[str, Any]]:
         """Initialize prior for parameters
 
@@ -51,8 +54,6 @@ class GaussianPrior(Prior):
         center: Optional[
             Union[Literal["initial"], Iterable[torch.Tensor], Real]
         ] = "initial",
-        key: str = "prior_center",
-        **kwargs,  # Accept additional kwargs for consistency
     ):
         """
         Args:
@@ -62,11 +63,11 @@ class GaussianPrior(Prior):
                 - 'initial': centered at initial parameter values (localization)
                 - iterable of tensors: centered at provided parameter values
                   (must match model parameter shapes)
-            key: Key to use in state dictionary
-            **kwargs: Additional keyword arguments (ignored by GaussianPrior)
         """
         self.localization = localization
-        self.key = key
+        self.key = (
+            "prior_center"  # Mutable - will be modified if passed to a CompositePrior
+        )
 
         if isinstance(center, (str, type(None))):
             self.center = center
@@ -77,7 +78,7 @@ class GaussianPrior(Prior):
             self.center = list(center)
 
     def initialize(
-        self, params: Iterator[torch.Tensor]
+        self, params: Sequence[torch.Tensor]
     ) -> dict[torch.Tensor, dict[str, Any]]:
         """Initialize centers for all parameters
 
@@ -87,17 +88,16 @@ class GaussianPrior(Prior):
         Returns:
             State dictionary containing prior centers
         """
-        params_list = list(params)
         state = defaultdict(dict)
 
         if isinstance(self.center, list):
             # Validate and use provided centers
-            if len(self.center) != len(params_list):
+            if len(self.center) != len(params):
                 raise ValueError(
                     f"Number of centers ({len(self.center)}) does not match "
-                    f"number of parameters ({len(params_list)})"
+                    f"number of parameters ({len(params)})"
                 )
-            for c, p in zip(self.center, params_list):
+            for c, p in zip(self.center, params):
                 if c.shape != p.shape:
                     raise ValueError(
                         f"Center shape {c.shape} does not match "
@@ -107,11 +107,11 @@ class GaussianPrior(Prior):
 
         elif self.center == "initial":
             # Use initial parameter values as centers
-            for p in params_list:
+            for p in params:
                 state[p][self.key] = p.detach().clone()
 
         else:  # None case - zero-centered
-            for p in params_list:
+            for p in params:
                 state[p][self.key] = None
 
         return state
@@ -138,27 +138,6 @@ class GaussianPrior(Prior):
         else:
             return self.localization * (param - center)
 
-    def distance_sq(
-        self,
-        param: torch.Tensor,
-        state: dict[str, Any],
-        scale: Optional[Union[float, torch.Tensor]] = 1.0,
-    ) -> torch.Tensor:
-        """Compute squared distance from prior center. If state is provided, the
-        prior center is looked up in the state dictionary using the instance key.
-
-        Args:
-            param: Parameter tensor
-            state: State dictionary
-            scale: Scale factor
-        """
-        center = state.get(self.key)
-
-        if center is None:
-            return ((scale * param) ** 2).sum(dtype=torch.float32)
-        else:
-            return ((scale * (param - center)) ** 2).sum(dtype=torch.float32)
-
     def __repr__(self) -> str:
         return f"GaussianPrior(localization={self.localization}, center={self.center})"
 
@@ -166,12 +145,14 @@ class GaussianPrior(Prior):
 class UniformPrior(Prior):
     """Uniform prior."""
 
-    def __init__(self, box_size: float = np.inf, **kwargs):
+    def __init__(self, box_size: float = np.inf):
         """
         Args:
             box_size: Size of the box constraint
-            **kwargs: Additional keyword arguments (ignored by UniformPrior)
         """
+        # Required by the Prior ABC but unused: initialize() returns {} and
+        # grad() returns zeros, so the key is never looked up in any state dict.
+        self.key = "uniform_prior_center"
         self.box_size = box_size
 
         if box_size != np.inf:
@@ -180,65 +161,31 @@ class UniformPrior(Prior):
             )
 
     def initialize(
-        self, params: Iterator[torch.Tensor]
+        self, params: Sequence[torch.Tensor]
     ) -> dict[torch.Tensor, dict[str, Any]]:
         return {}
 
     def grad(self, param: torch.Tensor, state: dict[str, Any]) -> torch.Tensor:
         return torch.zeros_like(param)
 
-    def distance_sq(
-        self,
-        param: torch.Tensor,
-        state: dict[str, Any] = {},
-        scale: Optional[Union[float, torch.Tensor]] = 1.0,
-    ) -> torch.Tensor:
-        return 0.0
-
 
 class CompositePrior(Prior):
     """Combines multiple priors, summing their contributions.
-    The last prior in the list takes precedence for distance_sq and as a default for getattr.
+
+    Always wraps even a single non-uniform prior (no short-circuit).
+    Callers that need to decompose sub-priors (e.g. SGMCMC._update_metrics)
+    can iterate ``self.priors`` uniformly.
     """
 
-    def __new__(cls, priors: list[Prior], **kwargs):
-        """
-        Args:
-            priors: List of prior instances
-            **kwargs: Additional keyword arguments (passed to child priors)
-        """
-        non_uniform_priors = [p for p in priors if not isinstance(p, UniformPrior)]
-
-        if not non_uniform_priors:
-            return UniformPrior(**kwargs)
-
-        if len(non_uniform_priors) == 1:
-            instance = non_uniform_priors[0]
-        else:
-            instance = super().__new__(cls)
-            instance.priors = non_uniform_priors
-
-        return instance
-
-    def __init__(self, priors: list[Prior], **kwargs):
-        """
-        Args:
-            priors: List of prior instances
-            **kwargs: Additional keyword arguments (passed to child priors)
-        """
-        # Skip initialization if this is actually a uniform or single prior
-        if not hasattr(self, "priors"):
-            return
-
-        self.priors = priors
-
-        for i, prior in enumerate(priors):
+    def __init__(self, priors: list[Prior]):
+        self.key = "composite_prior"
+        self.priors = [p for p in priors if not isinstance(p, UniformPrior)]
+        for i, prior in enumerate(self.priors):
             prior.key = f"{prior.key}_{i}"
 
     def initialize(
-        self, params: Iterator[torch.Tensor]
+        self, params: Sequence[torch.Tensor]
     ) -> dict[torch.Tensor, dict[str, Any]]:
-        params = list(params)  # Convert iterator to list for reuse
         combined_state = defaultdict(dict)
 
         for prior in self.priors:
@@ -250,21 +197,10 @@ class CompositePrior(Prior):
         return combined_state
 
     def grad(self, param: torch.Tensor, state: dict[str, Any]) -> torch.Tensor:
-        return sum(prior.grad(param, state) for prior in self.priors)
-
-    def distance_sq(
-        self,
-        param: torch.Tensor,
-        state: dict[str, Any],
-        scale: Optional[Union[float, torch.Tensor]] = 1.0,
-    ) -> torch.Tensor:
-        """Compute squared distance from prior center. The last prior in the list
-        takes precedence (i.e. is used for distance_sq).
-        """
-        return self.priors[-1].distance_sq(param, state, scale)
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self.priors[-1], name)
+        result = torch.zeros_like(param)
+        for prior in self.priors:
+            result += prior.grad(param, state)
+        return result
 
     def __repr__(self) -> str:
         return f"CompositePrior({self.priors})"
