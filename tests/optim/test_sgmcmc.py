@@ -50,34 +50,10 @@ def run_optimization_steps(model, optimizer, data, target, criterion, steps=2, s
         optimizer.step()
 
 
-def compare_parameters(model1, model2, atol=1e-5):
+def compare_parameters(model1, model2, *, atol: float):
     """Helper function to compare model parameters"""
     for p1, p2 in zip(model1.parameters(), model2.parameters()):
-        assert torch.allclose(p1, p2, atol=atol), f"Parameters differ: {p1} vs {p2}"
-
-
-def compare_metrics(optimizer_sgld, optimizer_sgmcmc, metrics):
-    """Helper function to compare optimizer metrics"""
-    for i, (g1, g2) in enumerate(
-        zip(optimizer_sgld.param_groups, optimizer_sgmcmc.param_groups)
-    ):
-        for metric in metrics:
-            if metric == "noise":
-                for a, b in zip(optimizer_sgld.noise[i], g2["metrics"]["noise"]):
-                    assert a.shape == b.shape, "Noise tensors differ"
-                    assert torch.allclose(a, b), "Noise tensors differ"
-            elif metric == "dws":
-                pi = 0
-                for j, a in enumerate(g2["metrics"]["dws"]):
-                    b = optimizer_sgld.dws[pi]
-                    pi += 1
-                    assert a.shape == b.shape, "DWS tensors differ in shape"
-                    assert torch.allclose(a, b, atol=1e-4), "DWS metrics differ"
-            else:
-                assert torch.allclose(
-                    g2["metrics"][metric],
-                    getattr(optimizer_sgld, metric),
-                ), f"Metric {metric} differs"
+        torch.testing.assert_close(p1, p2, atol=atol, rtol=0)
 
 
 def _serialize(obj, precision=2):
@@ -110,11 +86,20 @@ def serialize_model_state(model, precision=2):
 
 def serialize_metrics(optimizer, precision=2):
     """Helper to convert optimizer metrics to serializable format with rounding"""
-    metrics = {}
-    for group in optimizer.param_groups:
-        if "metrics" in group:
-            metrics.update(_serialize(group["metrics"], precision))
-    return metrics
+    if not optimizer.save_metrics:
+        return {}
+    metrics = optimizer.get_metrics()
+    return _serialize(
+        {
+            "scaled_grad": metrics.scaled_grad,
+            "localization": metrics.localization,
+            "weight_decay": metrics.weight_decay,
+            "prior": metrics.prior,
+            "noise": metrics.noise,
+            "numel": metrics.numel,
+        },
+        precision,
+    )
 
 
 @pytest.mark.parametrize("lr", [1e-1, 1e-2, 1e-3, 1e-4])
@@ -125,6 +110,7 @@ def serialize_metrics(optimizer, precision=2):
 def test_SGMCMC_vs_SGLD(
     lr, nbeta, localization, bounding_box_size, weight_decay, snapshot
 ):
+    """Test that SGMCMC.sgld and deprecated SGLD produce identical parameter updates."""
     model1, model2 = create_paired_models()
     data, target, criterion = create_task()
 
@@ -135,41 +121,44 @@ def test_SGMCMC_vs_SGLD(
         localization=localization,
         bounding_box_size=bounding_box_size,
         weight_decay=weight_decay,
+        save_metrics=True,
     )
-
-    metrics = [
-        "noise_norm",
-        "grad_norm",
-        "weight_norm",
-        "noise",
-        "dws",
-        "localization_loss",
-        "distance",
-    ]
 
     optimizer_sgld = SGLD(
         model1.parameters(),
         **kwargs,
-        save_noise=True,
-        save_mala_vars=True,
-        noise_norm=True,
-        grad_norm=True,
-        weight_norm=True,
-        distance=True,
     )
 
     optimizer_sgmcmc = SGMCMC.sgld(
         model2.parameters(),
         **kwargs,
-        metrics=metrics,
     )
 
     run_optimization_steps(model1, optimizer_sgld, data, target, criterion)
     run_optimization_steps(model2, optimizer_sgmcmc, data, target, criterion)
-    if localization == 0.0:
-        metrics.remove("distance")  # undefined if no localization is given
-    compare_parameters(model1, model2)
-    compare_metrics(optimizer_sgld, optimizer_sgmcmc, metrics)
+
+    # SGLD and SGMCMC apply weight_decay/localization in a slightly different
+    # order, so float32 rounding can differ by up to ~6e-8 over multiple steps.
+    compare_parameters(model1, model2, atol=1e-7)
+
+    # Metrics use float32 accumulators with the same operation-order caveat.
+    metrics_sgld = optimizer_sgld.get_metrics()
+    metrics_sgmcmc = optimizer_sgmcmc.get_metrics()
+
+    _m_atol = 1e-7
+    torch.testing.assert_close(
+        metrics_sgld.scaled_grad, metrics_sgmcmc.scaled_grad, atol=_m_atol, rtol=0
+    )
+    torch.testing.assert_close(
+        metrics_sgld.localization, metrics_sgmcmc.localization, atol=_m_atol, rtol=0
+    )
+    torch.testing.assert_close(
+        metrics_sgld.weight_decay, metrics_sgmcmc.weight_decay, atol=_m_atol, rtol=0
+    )
+    torch.testing.assert_close(
+        metrics_sgld.noise, metrics_sgmcmc.noise, atol=_m_atol, rtol=0
+    )
+    assert metrics_sgld.numel == metrics_sgmcmc.numel
 
     state = {
         "model1": serialize_model_state(model1),
@@ -188,16 +177,15 @@ def test_SGMCMC_vs_SGLD(
 @pytest.mark.parametrize("localization", [0.0, 0.1])
 @pytest.mark.parametrize("bounding_box_size", [None, 0.1])
 @pytest.mark.parametrize("weight_decay", [0.0])
-@pytest.mark.parametrize("mask", ["scalar", "tensor"])
 def test_optimize_over(
     lr,
     nbeta,
     localization,
     bounding_box_size,
     weight_decay,
-    mask,
     snapshot,
 ):
+    """Test that SGMCMC correctly handles masked parameter optimization."""
     # Create identical models
     model1, model2 = create_paired_models()
 
@@ -211,28 +199,15 @@ def test_optimize_over(
         localization=localization,
         bounding_box_size=bounding_box_size,
         weight_decay=weight_decay,
+        save_metrics=True,
     )
-
-    metrics = [
-        "noise_norm",
-        "grad_norm",
-        "weight_norm",
-        "noise",
-        "dws",
-        "localization_loss",
-        "distance",
-    ]
 
     torch.manual_seed(42)
 
-    if mask == "tensor":
-        optimize_over_params = [
-            torch.randint(0, 2, p.shape).bool() for p in model1.parameters()
-        ]
-    elif mask == "scalar":
-        optimize_over_params = [
-            torch.randint(0, 2, (1,)).bool() for p in model1.parameters()
-        ]
+    # Create tensor masks matching parameter shapes
+    optimize_over_params = [
+        torch.randint(0, 2, p.shape).bool() for p in model1.parameters()
+    ]
 
     # Setup optimizers with equivalent parameters
     optimizer_sgld = SGLD(
@@ -241,21 +216,14 @@ def test_optimize_over(
             for p, opt in zip(model1.parameters(), optimize_over_params)
         ],
         **kwargs,
-        save_noise=True,
-        save_mala_vars=True,
-        noise_norm=True,
-        grad_norm=True,
-        weight_norm=True,
-        distance=True,
     )
 
-    optimizer_sgmcmc = SGMCMC(
+    optimizer_sgmcmc = SGMCMC.sgld(
         [
             {"params": (p,), "mask": (opt,)}
             for p, opt in zip(model2.parameters(), optimize_over_params)
         ],
         **kwargs,
-        metrics=metrics,
     )
 
     # Create test data
@@ -265,28 +233,12 @@ def test_optimize_over(
     run_optimization_steps(model1, optimizer_sgld, data, target, criterion)
     run_optimization_steps(model2, optimizer_sgmcmc, data, target, criterion)
 
-    compare_parameters(model1, model2)
+    compare_parameters(model1, model2, atol=0)
 
-    if mask == "tensor":
-        for p1, p2, _mask in zip(
-            original_params, model2.parameters(), optimize_over_params
-        ):
-            assert torch.allclose(p1[~_mask], p2[~_mask], atol=1e-5), (
-                f"Masked parameters differ: {p1} vs {p2} for mask {_mask}"
-            )
-
-    elif mask == "scalar":
-        for p1, p2, _mask in zip(
-            original_params, model2.parameters(), optimize_over_params
-        ):
-            if not _mask:
-                assert torch.allclose(p1, p2, atol=1e-5), (
-                    f"Masked parameters differ: {p1} vs {p2}"
-                )
-
-    # Compare parameters
-    for p1, p2 in zip(model1.parameters(), model2.parameters()):
-        assert torch.allclose(p1, p2, atol=1e-5), f"Parameters differ: {p1} vs {p2}"
+    for p1, p2, _mask in zip(
+        original_params, model2.parameters(), optimize_over_params
+    ):
+        torch.testing.assert_close(p1[~_mask], p2[~_mask], atol=0, rtol=0)
 
     state = {
         "model1": serialize_model_state(model1),
@@ -294,7 +246,7 @@ def test_optimize_over(
     }
 
     assert state == snapshot(
-        name=f"test_optimize_over_{lr}_{nbeta}_{localization}_{bounding_box_size}_{weight_decay}_{mask}"
+        name=f"test_optimize_over_{lr}_{nbeta}_{localization}_{bounding_box_size}_{weight_decay}"
     )
 
 
@@ -316,7 +268,7 @@ def test_SGMCMC_deterministic(lr, snapshot):
     run_optimization_steps(model1, optimizer_sgd, data, target, criterion, steps=1)
     run_optimization_steps(model2, optimizer_sgmcmc, data, target, criterion, steps=1)
 
-    compare_parameters(model1, model2, atol=1e-6)
+    compare_parameters(model1, model2, atol=0)
 
     state = {
         "model1": serialize_model_state(model1),
@@ -358,7 +310,7 @@ def test_SGMCMC_vs_SGNHT(lr, diffusion_factor, bounding_box_size, snapshot):
         model2, optimizer_sgmcmc, data, target, criterion, steps=STEPS, seed=42
     )
 
-    compare_parameters(model1, model2, atol=1e-6)
+    compare_parameters(model1, model2, atol=0)
 
     state = {
         "model1": serialize_model_state(model1),
@@ -490,29 +442,17 @@ def test_SGMCMC_vs_SGLD_param_groups(lr_ratio, noise_ratio, snapshot):
         },
     ]
 
-    metrics = [
-        "noise_norm",
-        "grad_norm",
-        "weight_norm",
-        "distance",
-    ]  # , "noise"]  # , "dws"]
-
     # Setup optimizers with equivalent parameters
     optimizer_sgld = SGLD(
         param_groups1,
         nbeta=1.0,
-        save_noise=True,
-        save_mala_vars=True,
-        noise_norm=True,
-        grad_norm=True,
-        weight_norm=True,
-        distance=True,
+        save_metrics=True,
     )
 
     optimizer_sgmcmc = SGMCMC(
         param_groups2,
         nbeta=1.0,
-        metrics=metrics,
+        save_metrics=True,
     )
 
     # Check hyperparameters in groups
@@ -524,9 +464,6 @@ def test_SGMCMC_vs_SGLD_param_groups(lr_ratio, noise_ratio, snapshot):
         assert g1["nbeta"] == g2["nbeta"], (
             f"nbeta differ: {g1['nbeta']} vs {g2['nbeta']}"
         )
-        assert g1["localization"] == g2["localization"], (
-            f"Localizations differ: {g1['localization']} vs {g2['localization']}"
-        )
 
     data, target, criterion = create_task()
 
@@ -537,32 +474,24 @@ def test_SGMCMC_vs_SGLD_param_groups(lr_ratio, noise_ratio, snapshot):
         model2, optimizer_sgmcmc, data, target, criterion, steps=STEPS, seed=42
     )
 
-    compare_parameters(model1, model2, atol=1e-4)
+    compare_parameters(model1, model2, atol=0)
 
-    # Compare metrics (Need this custom comparison because of different storage)
-    for i, (g1, g2) in enumerate(
-        zip(optimizer_sgld.param_groups, optimizer_sgmcmc.param_groups)
-    ):
-        for metric in metrics:
-            if metric == "noise":
-                # Compare noise tensors for each parameter group
-                for a, b in zip(
-                    optimizer_sgld.noise[i],
-                    g2["metrics"]["noise"],
-                ):
-                    assert a.shape == b.shape, "Noise tensors differ"
-                    assert torch.allclose(a, b), "Noise tensors differ"
-            elif metric == "dws":
-                pi = 0
-                for j, a in enumerate(g2["metrics"]["dws"]):
-                    b = optimizer_sgld.dws[pi]
-                    pi += 1
-                    assert a.shape == b.shape, "DWS tensors differ in shape"
-                    assert torch.allclose(a, b, atol=1e-4), "DWS metrics differ"
-            else:
-                assert torch.allclose(g2["metrics"][metric], g1[metric], atol=1e-2), (
-                    f"Metric {metric} differs"
-                )
+    metrics_sgld = optimizer_sgld.get_metrics()
+    metrics_sgmcmc = optimizer_sgmcmc.get_metrics()
+
+    _m_atol = 1e-7
+    torch.testing.assert_close(
+        metrics_sgld.scaled_grad, metrics_sgmcmc.scaled_grad, atol=_m_atol, rtol=0
+    )
+    torch.testing.assert_close(
+        metrics_sgld.localization, metrics_sgmcmc.localization, atol=_m_atol, rtol=0
+    )
+    torch.testing.assert_close(
+        metrics_sgld.weight_decay, metrics_sgmcmc.weight_decay, atol=_m_atol, rtol=0
+    )
+    torch.testing.assert_close(
+        metrics_sgld.noise, metrics_sgmcmc.noise, atol=_m_atol, rtol=0
+    )
 
     state = {
         "optimizer_sgld": serialize_metrics(optimizer_sgld),
@@ -592,7 +521,7 @@ def test_SGMCMC_rmsprop_sgld(lr, alpha, eps, add_grad_correction, snapshot):
         eps=eps,
         add_grad_correction=add_grad_correction,
         nbeta=1.0,
-        metrics=["grad_norm", "noise_norm", "weight_norm"],
+        save_metrics=True,
     )
 
     # Verify RMSprop preconditioner settings
@@ -620,10 +549,10 @@ def test_SGMCMC_rmsprop_sgld(lr, alpha, eps, add_grad_correction, snapshot):
             assert not torch.isnan(state["square_avg"]).any()
             assert not torch.isinf(state["square_avg"]).any()
 
-        # Verify metrics are being tracked
-        assert optimizer.metrics["grad_norm"] >= 0
-        assert optimizer.metrics["noise_norm"] >= 0
-        assert optimizer.metrics["weight_norm"] >= 0
+        # Verify metrics are being tracked via the new interface
+        metrics = optimizer.get_metrics()
+        assert metrics.scaled_grad >= 0
+        assert metrics.noise >= 0
 
     state = {
         "optimizer": serialize_metrics(optimizer),
@@ -634,7 +563,7 @@ def test_SGMCMC_rmsprop_sgld(lr, alpha, eps, add_grad_correction, snapshot):
 
 @pytest.mark.parametrize("lr", [1e-1, 1e-2, 1e-3, 1e-4])
 def test_SGMCMC_rmsprop_equals_sgld(lr, snapshot):
-    """Test that RMSprop-preconditioned SGLD equals regular SGLD when alpha=0 and eps=1"""
+    """Test that RMSprop-preconditioned SGLD equals regular SGLD when alpha=1 and eps=1"""
     model1, model2 = create_paired_models()
     data, target, criterion = create_task()
 
@@ -645,15 +574,13 @@ def test_SGMCMC_rmsprop_equals_sgld(lr, snapshot):
         nbeta=1.0,
         localization=0.1,
         weight_decay=0.0,
+        save_metrics=True,
     )
 
-    metrics = ["grad_norm", "noise_norm", "weight_norm", "noise"]
-
-    # Regular SGLD
-    optimizer_sgld = SGLD(
+    # Regular SGLD via SGMCMC
+    optimizer_sgld = SGMCMC.sgld(
         model1.parameters(),
         **kwargs,
-        metrics=metrics,
     )
 
     # RMSprop SGLD with identity-like settings
@@ -663,7 +590,6 @@ def test_SGMCMC_rmsprop_equals_sgld(lr, snapshot):
         eps=1.0,  # Makes preconditioner act like identity
         add_grad_correction=False,
         **kwargs,
-        metrics=metrics,
     )
 
     # Verify optimizers behave identically
@@ -674,8 +600,23 @@ def test_SGMCMC_rmsprop_equals_sgld(lr, snapshot):
         model2, optimizer_rmsprop, data, target, criterion, steps=STEPS, seed=42
     )
 
-    compare_parameters(model1, model2, atol=1e-6)
-    compare_metrics(optimizer_sgld, optimizer_rmsprop, metrics)
+    compare_parameters(model1, model2, atol=0)
+
+    _m_atol = 1e-7
+    metrics_sgld = optimizer_sgld.get_metrics()
+    metrics_rmsprop = optimizer_rmsprop.get_metrics()
+    torch.testing.assert_close(
+        metrics_sgld.scaled_grad, metrics_rmsprop.scaled_grad, atol=_m_atol, rtol=0
+    )
+    torch.testing.assert_close(
+        metrics_sgld.localization, metrics_rmsprop.localization, atol=_m_atol, rtol=0
+    )
+    torch.testing.assert_close(
+        metrics_sgld.weight_decay, metrics_rmsprop.weight_decay, atol=_m_atol, rtol=0
+    )
+    torch.testing.assert_close(
+        metrics_sgld.noise, metrics_rmsprop.noise, atol=_m_atol, rtol=0
+    )
 
     state = {
         "model1": serialize_model_state(model1),

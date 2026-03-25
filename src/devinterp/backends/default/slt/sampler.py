@@ -14,8 +14,6 @@ from tqdm import tqdm
 from devinterp.optim.sgld import SGLD
 from devinterp.slt.callback import SamplerCallback, validate_callbacks
 from devinterp.slt.llc import LLCEstimator, OnlineLLCEstimator
-from devinterp.slt.mala import MalaAcceptanceRate
-from devinterp.slt.norms import NoiseNorm
 from devinterp.utils import (
     EvaluateFn,
     cycle,
@@ -74,14 +72,6 @@ def sample_single_chain(
 
     assert "nbeta" in sampling_method_kwargs, "Set nbeta in sampling_method_kwargs"
 
-    optimizer_metrics = sampling_method_kwargs.get("metrics", [])
-    if any(isinstance(callback, MalaAcceptanceRate) for callback in callbacks):
-        optimizer_metrics.extend(["dws", "localization_loss"])
-
-    if any(isinstance(callback, NoiseNorm) for callback in callbacks):
-        optimizer_metrics.extend(["noise"])
-
-    sampling_method_kwargs["metrics"] = optimizer_metrics
     sampling_method_kwargs.setdefault(
         "nbeta",
         default_nbeta(loader, gradient_accumulation_steps=gradient_accumulation_steps),

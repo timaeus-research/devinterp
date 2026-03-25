@@ -4,6 +4,7 @@ from typing import Iterable, Iterator, Literal, Optional, Union
 import torch
 from torch.optim import Optimizer
 
+from devinterp.optim.metrics import Metrics
 from devinterp.optim.preconditioner import (
     CompositePreconditioner,
     IdentityPreconditioner,
@@ -13,7 +14,6 @@ from devinterp.optim.preconditioner import (
     RMSpropPreconditioner,
 )
 from devinterp.optim.prior import CompositePrior, GaussianPrior, Prior
-from devinterp.optim.utils import OptimizerMetric
 
 SamplingMethodLiteral = Literal["sgld", "rmsprop_sgld", "sgnht"]
 
@@ -45,12 +45,13 @@ class SGMCMC(Optimizer):
     :param noise_level: Standard deviation σ of the noise (default: 1.0)
     :param nbeta: Inverse temperature nβ (default: 1.0)
     :param prior: Prior distribution specification. Can be:
+        In SGMCMC, weight_decay and localization should be implemented
+        as a prior. See the `rmsprop_sgld()` method for an example.
         - GaussianPrior instance
         - string specifying center type
         - iterable of tensor centers
         - float specifying precision
         (default: None)
-    :param prior_kwargs: Additional keyword arguments for prior initialization
     :param preconditioner: Preconditioner specification. Can be:
         - "identity" for no preconditioning
         - "rmsprop" for RMSprop-style preconditioning
@@ -59,31 +60,17 @@ class SGMCMC(Optimizer):
     :param preconditioner_kwargs: Additional keyword arguments for preconditioner
     :param bounding_box_size: Size of bounding box around initial parameters
     :param mask: Boolean mask for restricting updatable parameters
-    :param metrics: List of metrics to track during training
-    :param weight_decay: Weight decay factor applied separately from other updates (like AdamW).
-        For preconditioned weight decay (like Adam), use a GaussianPrior centered at zero instead.
-        (default: 0.0)
+    :param save_metrics: Whether to track metrics during training (default: False)
     :type params: Iterable
     :type lr: float
     :type noise_level: float
     :type nbeta: float
     :type prior: Optional[Union[Prior, Literal["initial"], Iterable[torch.Tensor], float]]
-    :type prior_kwargs: Optional[dict]
     :type preconditioner: Optional[Union[Preconditioner, str]]
     :type preconditioner_kwargs: Optional[dict]
     :type bounding_box_size: Optional[float]
     :type mask: Optional[torch.Tensor]
-    :type metrics: Optional[list[OptimizerMetric]]
-    :type weight_decay: float
-
-    Valid metrics options:
-        * noise_norm
-        * grad_norm
-        * weight_norm
-        * distance
-        * noise
-        * dws
-        * localization_loss
+    :type save_metrics: bool
 
     Example::
 
@@ -123,7 +110,7 @@ class SGMCMC(Optimizer):
         * Use the factory methods (sgld, rmsprop_sgld, sgnht) for easier initialization
         * nbeta should typically be set using devinterp.utils.default_nbeta() rather than manually
         * The prior helps explore the local posterior by pulling toward initialization
-        * Tracked metrics can be accessed as attributes, e.g. optimizer.grad_norm
+        * Use save_metrics=True and call get_metrics() to access tracked metrics
 
     References:
         * Welling & Teh (2011) - Original SGLD paper
@@ -141,21 +128,16 @@ class SGMCMC(Optimizer):
         prior: Optional[
             Union[Prior, Literal["initial"], Iterable[torch.Tensor], float]
         ] = None,
-        localization: Optional[float] = None,
         preconditioner: Optional[
             Union[Preconditioner, Literal["identity", "rmsprop"]]
         ] = "identity",
         preconditioner_kwargs: Optional[dict] = None,
         bounding_box_size: Optional[float] = None,
         mask: Optional[torch.Tensor] = None,
-        metrics: Optional[list[OptimizerMetric]] = None,
-        weight_decay: float = 0.0,
+        save_metrics: bool = False,
     ):
-        """
-        The localization parameter controls how strongly parameters are pulled back toward their
-        initialization point (or other specified center). If provided directly, it will override
-        prior_kwargs["localization"].
-        """
+        self.save_metrics = save_metrics
+
         # Handle single parameter case
         if isinstance(params, (torch.Tensor, dict)):
             params = [params]
@@ -165,14 +147,11 @@ class SGMCMC(Optimizer):
             lr=lr,
             noise_level=noise_level,
             nbeta=nbeta,
-            weight_decay=weight_decay,
             prior=prior,
-            localization=localization,
             preconditioner=preconditioner,
             preconditioner_kwargs=preconditioner_kwargs or {},
             bounding_box_size=bounding_box_size,
             mask=mask,
-            metrics=metrics or [],
         )
         super().__init__(params, defaults)
 
@@ -185,48 +164,18 @@ class SGMCMC(Optimizer):
 
         Prior initialization supports several formats:
         1. Prior object: Use any existing Prior instance directly
+          - localization and weight_decay should be implemented via a Prior. To see how
+            to do this, look at e.g. `SGMCMC.sgld()`.
         2. String ("initial"): Creates GaussianPrior centered at parameter initialization
         3. Tensor centers: Creates GaussianPrior centered at provided tensor values
         4. Number (float/int): Creates GaussianPrior with specified localization strength
 
-        The localization parameter controls how strongly parameters are pulled toward their center:
-        - If prior is None but localization > 0, defaults to "initial" center
-        - Default localization is 0.0 (no pull)
-        - Additional prior parameters can be passed via prior_kwargs
-
         Args:
             group: Parameter group dictionary containing optimizer settings
         """
-
-        # Validate metrics
-        valid_metrics = {
-            "noise_norm",
-            "grad_norm",
-            "weight_norm",
-            "distance",
-            "noise",
-            "dws",
-            "localization_loss",
-        }
-        if not set(group["metrics"]).issubset(valid_metrics):
-            raise ValueError(
-                f"Invalid metrics {group['metrics']}. Choose from: {valid_metrics}"
-            )
-
-        # Initialize metrics directly in the group
-        group["metrics"] = {
-            metric: (
-                []
-                if metric in {"noise", "dws"}
-                else torch.zeros((), device=self.device)
-            )
-            for metric in group["metrics"]
-        }
-
         # Initialize prior
         prior = group["prior"]
-        prior_kwargs = group.pop("prior_kwargs", {})
-        localization = group.get("localization", prior_kwargs.get("localization", 0.0))
+        localization = group.get("localization", 0.0)
 
         if prior is not None or localization:
             prior = prior if prior is not None else "initial"
@@ -235,17 +184,11 @@ class SGMCMC(Optimizer):
             if isinstance(prior, Prior):
                 group["prior"] = prior
             elif isinstance(prior, str):
-                group["prior"] = GaussianPrior(
-                    localization=localization, center=prior, **prior_kwargs
-                )
+                group["prior"] = GaussianPrior(localization=localization, center=prior)
             elif isinstance(prior, Iterable) and not isinstance(prior, str):
-                group["prior"] = GaussianPrior(
-                    localization=localization, center=prior, **prior_kwargs
-                )
+                group["prior"] = GaussianPrior(localization=localization, center=prior)
             elif isinstance(prior, (int, float)):
-                group["prior"] = GaussianPrior(
-                    localization=float(prior), **prior_kwargs
-                )
+                group["prior"] = GaussianPrior(localization=float(prior))
             else:
                 raise ValueError(f"Unsupported prior type: {type(prior)}")
 
@@ -268,13 +211,20 @@ class SGMCMC(Optimizer):
             if isinstance(mask, torch.Tensor):
                 mask = [mask]
 
-            def _process_mask(m):
+            def _process_mask(m, p):
                 if not isinstance(m, torch.Tensor):
                     m = torch.tensor(m).to(self.device)
 
+                # Validate mask shape matches parameter shape
+                if m.shape != p.shape:
+                    raise ValueError(
+                        f"Mask shape {m.shape} does not match parameter shape {p.shape}. "
+                    )
+
                 return m.float()
 
-            masks = [_process_mask(_mask) for _mask in mask]
+            params = list(group["params"])
+            masks = [_process_mask(_mask, p) for _mask, p in zip(mask, params)]
             mask_preconditioner = MaskPreconditioner(masks=masks)
 
             if group["preconditioner"] is not None:
@@ -288,9 +238,10 @@ class SGMCMC(Optimizer):
 
         # Initialize prior state if needed
         if group["prior"] is not None:
-            pstates = group["prior"].initialize(iter(group["params"]))
+            pstates = group["prior"].initialize(list(group["params"]))
 
         # Initialize states for each parameter in the group
+        store_initial = group["bounding_box_size"] is not None or self.save_metrics
         for i, p in enumerate(group["params"]):
             pstate = pstates.get(p, {})
 
@@ -298,34 +249,114 @@ class SGMCMC(Optimizer):
                 **self.state[p],
                 **pstate,
                 "param_idx": i,
-                "initial_param": (
-                    p.data.clone().detach()
-                    if group["bounding_box_size"] is not None
-                    else None
-                ),
+                "initial_param": (p.data.clone().detach() if store_initial else None),
             }
 
-    def reset_metrics(self):
-        """Reset all tracked metrics at the start of each step."""
-        for group in self.param_groups:
-            for metric, value in group["metrics"].items():
-                if isinstance(value, torch.Tensor):
-                    value.zero_()
-                else:  # List metrics (noise, dws)
-                    value.clear()
+        # Initialize per-group metrics
+        if self.save_metrics:
+            device = next(iter(group["params"])).device
+            group["metrics"] = Metrics().to(device)
 
-    def zero_grad(self, *args, **kwargs):
-        """Zero out gradients"""
-        self.reset_metrics()
-        super().zero_grad(*args, **kwargs)
+    def _update_metrics(
+        self, group, p, loc_grad, wd_grad, noise, preconditioning, d_p, distance
+    ):
+        """Calculate and accumulate metrics for this parameter update.
+
+        Tracks post-preconditioned values (actual update magnitudes), the
+        unscaled gradient (without preconditioner), the raw distance from
+        initial params, and dot products between the three main components.
+
+        Args:
+            loc_grad: Pre-computed localization prior gradient (before p.data update),
+                or None if no prior is active.
+            wd_grad: Pre-computed weight_decay prior gradient (before p.data update),
+                or None if no prior is active.
+            d_p: The actual deterministic update vector (used only for debug assertion).
+            distance: Pre-computed displacement from initial params (before p.data
+                update), matching the time-point of the other component vectors.
+        """
+        _lr = group["lr"]
+        _precond = preconditioning.overall_coef
+        _half_lr = 0.5 * _lr
+
+        _grad_pre = preconditioning.grad_coef * p.grad.mul(group["nbeta"])
+        _loc_pre = loc_grad if loc_grad is not None else torch.zeros_like(p)
+        _wd_pre = wd_grad if wd_grad is not None else torch.zeros_like(p)
+
+        _scaled_grad = _half_lr * (_precond * _grad_pre)
+        _unscaled_grad = _half_lr * p.grad.mul(group["nbeta"])
+
+        _prior_scale = _half_lr * preconditioning.prior_coef * _precond
+        _loc = _prior_scale * _loc_pre
+        _wd = _prior_scale * _wd_pre
+
+        # noise already includes overall_coef from step()
+        _noise = (group["lr"] ** 0.5) * preconditioning.noise_coef * noise
+
+        _combined_prior = (
+            _half_lr * preconditioning.prior_coef * _precond * (_loc_pre + _wd_pre)
+        )
+
+        if __debug__:
+            # Both assertions use a scale-aware tolerance because any
+            # decomposition of d_p distributes half_lr (and possibly
+            # prior_coef) over separate terms, breaking IEEE 754
+            # associativity.  The error from c*(a+b) vs c*a + c*b
+            # scales with the component magnitudes, so we bound it
+            # by a few ULP of the reference scale.
+            _dtype_eps = torch.finfo(d_p.dtype).eps
+
+            # (1) grad + prior must reconstruct the full step update
+            _decomp_scale = float((_scaled_grad.abs() + _combined_prior.abs()).max())
+            _decomp_atol = max(_decomp_scale * _dtype_eps * 16, 1e-12)
+            torch.testing.assert_close(
+                (_scaled_grad + _combined_prior).float(),
+                (_half_lr * d_p).float(),
+                atol=_decomp_atol,
+                rtol=0,
+                msg=lambda s: f"Metrics components don't match gradient update:\n{s}",
+            )
+
+            # (2) loc + wd must match the combined prior (distribution
+            #     of prior_coef over sub-priors for per-component norms)
+            _dist_scale = float((_loc.abs() + _wd.abs()).max())
+            _dist_atol = max(_dist_scale * _dtype_eps * 16, 1e-12)
+            torch.testing.assert_close(
+                (_loc + _wd).float(),
+                _combined_prior.float(),
+                atol=_dist_atol,
+                rtol=0,
+                msg=lambda s: f"Prior distribution error exceeds bound:\n{s}",
+            )
+
+        group["metrics"].add_sum_squared_(
+            scaled_grad=_scaled_grad,
+            unscaled_grad=_unscaled_grad,
+            localization=_loc,
+            weight_decay=_wd,
+            noise=_noise,
+            distance=distance,
+        )
+        group["metrics"].add_dot_products_(
+            scaled_grad=_scaled_grad,
+            prior=_loc + _wd,
+            noise=_noise,
+        )
+        if isinstance(_precond, torch.Tensor):
+            group["metrics"].numel += int(_precond.count_nonzero())
+        else:
+            group["metrics"].numel += p.numel()
 
     @torch.no_grad()
-    def step(self, closure=None):
+    def step(
+        self, closure=None, noise_generator: Optional[torch.Generator] = None
+    ) -> None:
         """Perform a single optimization step.
 
         Args:
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss.
+            noise_generator (torch.Generator, optional): Generator for reproducible noise.
 
         Returns:
             Optional[float]: The loss value if closure is provided, else None.
@@ -336,6 +367,10 @@ class SGMCMC(Optimizer):
                 loss = closure()
 
         for group_idx, group in enumerate(self.param_groups):
+            # Metrics lifecycle: zero → accumulate per-param → sqrt (see Metrics docstring)
+            if self.save_metrics:
+                group["metrics"].zero_()
+
             prior = group["prior"]
             preconditioner = group["preconditioner"]
             params = group["params"]
@@ -352,26 +387,40 @@ class SGMCMC(Optimizer):
                 # Gradient computation
                 d_p = preconditioning.grad_coef * p.grad.mul(group["nbeta"])
 
-                # Prior contribution
+                # Prior contribution — decompose into sub-priors when
+                # tracking metrics so we can record localization and
+                # weight_decay norms separately. Must happen before p.data
+                # is modified below.
+                loc_grad = None
+                wd_grad = None
                 if prior is not None:
-                    prior_grad = prior.grad(p.data, state)
+                    if self.save_metrics:
+                        loc_grad = torch.zeros_like(p)
+                        wd_grad = torch.zeros_like(p)
+                        sub_priors = (
+                            prior.priors
+                            if isinstance(prior, CompositePrior)
+                            else [prior]
+                        )
+                        for sub_prior in sub_priors:
+                            sub_grad = sub_prior.grad(p.data, state)
+                            if (
+                                isinstance(sub_prior, GaussianPrior)
+                                and sub_prior.center is None
+                            ):
+                                wd_grad += sub_grad
+                            else:
+                                loc_grad += sub_grad
+                        prior_grad = loc_grad + wd_grad
+                    else:
+                        prior_grad = prior.grad(p.data, state)
                     d_p.add_(preconditioning.prior_coef * prior_grad)
-                    if (
-                        "distance" in self.tracked_metrics
-                        or "localization_loss" in self.tracked_metrics
-                    ):
-                        group["metrics"]["distance"] += prior.distance_sq(p.data, state)
-
-                # if (
-                #     isinstance(preconditioning.overall_coef, torch.Tensor)
-                #     and not preconditioning.overall_coef.any()
-                # ) or (
-                #     not isinstance(preconditioning.overall_coef, torch.Tensor)
-                #     and not preconditioning.overall_coef
-                # ):
-                #     continue
 
                 d_p = preconditioning.overall_coef * d_p
+
+                if self.save_metrics:
+                    _distance = p.data - state["initial_param"]
+
                 p.data.add_(d_p, alpha=-0.5 * group["lr"])
 
                 # Noise addition
@@ -380,6 +429,7 @@ class SGMCMC(Optimizer):
                     std=group["noise_level"],
                     size=d_p.size(),
                     device=d_p.device,
+                    generator=noise_generator,
                 )
                 noise = preconditioning.overall_coef * noise
 
@@ -388,9 +438,6 @@ class SGMCMC(Optimizer):
                     preconditioning.noise_coef * noise,
                     alpha=group["lr"] ** 0.5,
                 )
-                # Apply weight decay separately from other updates
-                if group["weight_decay"] != 0:
-                    d_p.add_(group["weight_decay"] * p.data)
 
                 # Bounding box enforcement
                 if group["bounding_box_size"] is not None:
@@ -401,53 +448,21 @@ class SGMCMC(Optimizer):
                         max=initial_param + group["bounding_box_size"],
                     )
 
-                # Track metrics
-                metrics = group["metrics"]
-                if "dws" in metrics:
-                    metrics["dws"].append(d_p.clone())
+                if self.save_metrics:
+                    self._update_metrics(
+                        group,
+                        p,
+                        loc_grad,
+                        wd_grad,
+                        noise,
+                        preconditioning,
+                        d_p,
+                        _distance,
+                    )
 
-                if "grad_norm" in metrics and p.grad is not None:
-                    metrics["grad_norm"] += (
-                        (p.grad.data * group["nbeta"] * 0.5 * group["lr"]) ** 2
-                    ).sum(dtype=torch.float32)
-
-                if "weight_norm" in metrics:
-                    metrics["weight_norm"] += (p.data**2).sum(dtype=torch.float32)
-
-                if "noise" in metrics:
-                    metrics["noise"].append(noise)
-
-                if "noise_norm" in metrics:
-                    metrics["noise_norm"] += (noise**2).sum(dtype=torch.float32)
-
-        # Finalize scalar metrics
-        for group in self.param_groups:
-            metrics = group["metrics"]
-
-            for metric in {
-                "grad_norm",
-                "weight_norm",
-                "noise_norm",
-                "distance",
-            } & metrics.keys():
-                metrics[metric] = torch.sqrt(metrics[metric])
-
-            if "localization_loss" in metrics and group["prior"] is not None:
-                localization = 0.0
-                if (
-                    isinstance(group["prior"], GaussianPrior)
-                    and group["prior"].center is not None
-                ):
-                    localization = group["prior"].localization
-                elif (
-                    isinstance(group["prior"], CompositePrior)
-                    and isinstance(group["prior"].priors[-1], GaussianPrior)
-                    and group["prior"].priors[-1].center is not None
-                ):
-                    localization = group["prior"].priors[-1].localization
-                metrics["localization_loss"] = (
-                    metrics["distance"] ** 2 * localization / 2
-                )
+            if self.save_metrics:
+                # All params accumulated; convert sum-of-squares to L2 norms
+                group["metrics"].sqrt_norms_()
 
         return loss
 
@@ -456,6 +471,17 @@ class SGMCMC(Optimizer):
         for group in self.param_groups:
             for p in group["params"]:
                 yield p
+
+    def iter_group_metrics(self) -> Iterator[Metrics]:
+        """Yield metrics for each param group."""
+        if not self.save_metrics:
+            raise RuntimeError("Metrics not enabled. Set save_metrics=True.")
+        for group in self.param_groups:
+            yield group["metrics"]
+
+    def get_metrics(self) -> Metrics:
+        """Aggregate metrics across all param groups into a single CPU Metrics."""
+        return Metrics.aggregate(self.iter_group_metrics())
 
     @classmethod
     def sgld(
@@ -468,8 +494,7 @@ class SGMCMC(Optimizer):
         nbeta=1.0,
         bounding_box_size=None,
         mask=None,
-        metrics: Optional[list[OptimizerMetric]] = None,
-        prior_kwargs: Optional[dict] = None,
+        save_metrics: bool = False,
     ):
         """Factory method to create an SGMCMC instance that implements Stochastic Gradient Langevin Dynamics (SGLD)
         with a localization term (Lau et al. 2023).
@@ -511,8 +536,7 @@ class SGMCMC(Optimizer):
         :param nbeta: Inverse temperature (default: 1.0)
         :param bounding_box_size: Size of bounding box around initial parameters (default: None)
         :param mask: Boolean mask for restricting updatable parameters (default: None)
-        :param metrics: List of metrics to track during training (default: None)
-        :param prior_kwargs: Additional keyword arguments for prior initialization.
+        :param save_metrics: Whether to track metrics during training (default: False)
         :return: SGMCMC optimizer instance
         """
         if noise_level != 1.0:
@@ -523,20 +547,11 @@ class SGMCMC(Optimizer):
             warnings.warn(
                 "nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.default_nbeta(dataloader) instead"
             )
-        if prior_kwargs is None:
-            prior_kwargs = {}
-        # Updated prior initialization to handle both weight decay and localization
         priors = []
         if weight_decay > 0:
-            priors.append(
-                GaussianPrior(localization=weight_decay, center=None, **prior_kwargs)
-            )
+            priors.append(GaussianPrior(localization=weight_decay, center=None))
         if localization > 0:
-            priors.append(
-                GaussianPrior(
-                    localization=localization, center="initial", **prior_kwargs
-                )
-            )
+            priors.append(GaussianPrior(localization=localization, center="initial"))
 
         prior = CompositePrior(priors)
 
@@ -548,7 +563,7 @@ class SGMCMC(Optimizer):
             prior=prior,
             bounding_box_size=bounding_box_size,
             mask=mask,
-            metrics=metrics,
+            save_metrics=save_metrics,
         )
 
         return instance
@@ -561,8 +576,7 @@ class SGMCMC(Optimizer):
         diffusion_factor=0.01,
         nbeta=1.0,
         bounding_box_size=None,
-        metrics: Optional[list[OptimizerMetric]] = None,
-        prior_kwargs: Optional[dict] = None,
+        save_metrics: bool = False,
     ):
         """Factory method to create an SGMCMC instance that matches SGNHT's interface.
 
@@ -573,16 +587,13 @@ class SGMCMC(Optimizer):
         :param diffusion_factor: Diffusion factor (default: 0.01)
         :param nbeta: Inverse temperature (default: 1.0)
         :param bounding_box_size: Size of bounding box around initial parameters (default: None)
-        :param metrics: List of metrics to track during training (default: None)
-        :param prior_kwargs: Additional keyword arguments for prior initialization.
+        :param save_metrics: Whether to track metrics (default: False)
         :return: SGMCMC optimizer instance
         """
         if nbeta == 1.0:
             warnings.warn(
                 "nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.default_nbeta(dataloader) instead"
             )
-        if prior_kwargs is None:
-            prior_kwargs = {}
         # Create NHT preconditioner
         preconditioner = NHTPreconditioning(diffusion_factor=diffusion_factor)
 
@@ -593,7 +604,7 @@ class SGMCMC(Optimizer):
             nbeta=nbeta,
             preconditioner=preconditioner,
             bounding_box_size=bounding_box_size,
-            metrics=metrics,  # Pass metrics here
+            save_metrics=save_metrics,
         )
 
         return instance
@@ -612,8 +623,7 @@ class SGMCMC(Optimizer):
         add_grad_correction=False,
         bounding_box_size=None,
         mask=None,
-        metrics: Optional[list[OptimizerMetric]] = None,
-        prior_kwargs: Optional[dict] = None,
+        save_metrics: bool = False,
     ):
         """Factory method to create an SGMCMC instance that wraps RMSprop's adaptive preconditioning with SGLD to perform Bayesian
         sampling of neural network weights.
@@ -657,8 +667,7 @@ class SGMCMC(Optimizer):
         :param add_grad_correction: Whether to add gradient correction term (default: False)
         :param bounding_box_size: Size of bounding box around initial parameters (default: None)
         :param mask: Boolean mask for restricting updatable parameters (default: None)
-        :param metrics: List of metrics to track during training (default: None)
-        :param prior_kwargs: Additional keyword arguments for prior initialization.
+        :param save_metrics: Whether to track metrics during training (default: False)
         :return: SGMCMC optimizer instance
         """
         if noise_level != 1.0:
@@ -669,22 +678,12 @@ class SGMCMC(Optimizer):
             warnings.warn(
                 "nbeta set to 1, LLC estimates will be off unless you know what you're doing. Use utils.default_nbeta(dataloader) instead"
             )
-        if prior_kwargs is None:
-            prior_kwargs = {}
 
-        # Updated prior initialization to handle both weight decay and localization
         priors = []
-        prior = None
         if weight_decay > 0:
-            priors.append(
-                GaussianPrior(localization=weight_decay, center=None, **prior_kwargs)
-            )
+            priors.append(GaussianPrior(localization=weight_decay, center=None))
         if localization > 0:
-            priors.append(
-                GaussianPrior(
-                    localization=localization, center="initial", **prior_kwargs
-                )
-            )
+            priors.append(GaussianPrior(localization=localization, center="initial"))
 
         prior = CompositePrior(priors)
 
@@ -705,7 +704,7 @@ class SGMCMC(Optimizer):
             preconditioner_kwargs=preconditioner_kwargs,
             bounding_box_size=bounding_box_size,
             mask=mask,
-            metrics=metrics,
+            save_metrics=save_metrics,
         )
 
         return instance
@@ -726,36 +725,3 @@ class SGMCMC(Optimizer):
     @property
     def device(self):
         return next(self.get_params()).device
-
-    @property
-    def metrics(self):
-        if len(self.param_groups) > 1:
-            warnings.warn(
-                "metrics is only available for single-parameter groups. Returning first group's metrics."
-            )
-
-        return self.param_groups[0]["metrics"]
-
-    @property
-    def tracked_metrics(self):
-        if len(self.param_groups) > 1:
-            warnings.warn(
-                "tracked_metrics is only available for single-parameter groups. Returning first group's tracked metrics."
-            )
-
-        return set(self.param_groups[0]["metrics"].keys())
-
-    def __getattr__(self, name):
-        """Return metrics if there's only one param group"""
-
-        # For other attributes, check if they exist in param_groups
-        if len(self.param_groups) != 1:
-            warnings.warn(
-                "metrics is only available for single-parameter groups. Returning first group's metrics."
-            )
-        if name in self.param_groups[0]:
-            return self.param_groups[0][name]
-        elif name in self.param_groups[0]["metrics"]:
-            return self.param_groups[0]["metrics"][name]
-        else:
-            raise AttributeError(f"'SGMCMC' object has no attribute '{name}'")

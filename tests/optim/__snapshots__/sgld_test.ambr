@@ -1,32 +1,4 @@
 # serializer version: 1
-# name: test_SGLD_metrics_tracking[SGLD][test_SGLD_metrics_tracking]
-  dict({
-    'distance': array(0., dtype=float32),
-    'grad_norm': array(0.05733979, dtype=float32),
-    'noise_norm': array(0.5136473, dtype=float32),
-    'weight_norm': array(1.3351691, dtype=float32),
-  })
-# ---
-# name: test_SGLD_metrics_tracking[sgld][test_SGLD_metrics_tracking]
-  dict({
-    'distance': array(0., dtype=float32),
-    'grad_norm': array(0.05733979, dtype=float32),
-    'noise_norm': array(0.5136473, dtype=float32),
-    'weight_norm': array(1.3351691, dtype=float32),
-  })
-# ---
-# name: test_SGLD_selective_metrics[SGLD][test_SGLD_selective_metrics]
-  dict({
-    'grad_norm': array(0.05733979, dtype=float32),
-    'weight_norm': array(1.3351691, dtype=float32),
-  })
-# ---
-# name: test_SGLD_selective_metrics[sgld][test_SGLD_selective_metrics]
-  dict({
-    'grad_norm': array(0.05733979, dtype=float32),
-    'weight_norm': array(1.3351691, dtype=float32),
-  })
-# ---
 # name: test_SGLD_vs_SGD[SGLD-0.0001][test_SGLD_vs_SGD_0.0001]
   dict({
     'model1': dict({
