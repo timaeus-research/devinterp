@@ -1,5 +1,5 @@
 import warnings
-from typing import Iterable, Iterator, Literal, Optional, Union
+from typing import Iterable, Iterator, Literal, NamedTuple, Optional, Union
 
 import torch
 from torch.optim import Optimizer
@@ -11,11 +11,27 @@ from devinterp.optim.preconditioner import (
     MaskPreconditioner,
     NHTPreconditioning,
     Preconditioner,
+    PreconditionerCoefs,
     RMSpropPreconditioner,
 )
 from devinterp.optim.prior import CompositePrior, GaussianPrior, Prior
+from devinterp.optim.sketch import CountSketch, SketchBuffer
 
 SamplingMethodLiteral = Literal["sgld", "rmsprop_sgld", "sgnht"]
+
+
+class _ComponentVectors(NamedTuple):
+    """Post-preconditioned component vectors from a single parameter update."""
+
+    # Structurally identical to the copy in sgld.py. Kept separate because
+    # SGLD is deprecated — sharing a private type would couple the old
+    # module to this one and complicate its eventual removal.
+
+    scaled_grad: torch.Tensor
+    unscaled_grad: torch.Tensor
+    localization: torch.Tensor
+    weight_decay: torch.Tensor
+    noise: torch.Tensor
 
 
 class SGMCMC(Optimizer):
@@ -122,6 +138,7 @@ class SGMCMC(Optimizer):
     def __init__(
         self,
         params,
+        *,
         lr: float = 0.01,
         noise_level: float = 1.0,
         nbeta: float = 1.0,
@@ -135,9 +152,9 @@ class SGMCMC(Optimizer):
         bounding_box_size: Optional[float] = None,
         mask: Optional[torch.Tensor] = None,
         save_metrics: bool = False,
+        sketch_dim: Optional[int] = None,
+        sketch_seed: int = 0,
     ):
-        self.save_metrics = save_metrics
-
         # Handle single parameter case
         if isinstance(params, (torch.Tensor, dict)):
             params = [params]
@@ -154,6 +171,28 @@ class SGMCMC(Optimizer):
             mask=mask,
         )
         super().__init__(params, defaults)
+
+        self.save_metrics = save_metrics
+
+        if sketch_dim is not None:
+            self._total_numel = sum(
+                p.numel() for group in self.param_groups for p in group["params"]
+            )
+            device = next(iter(self.param_groups[0]["params"])).device
+            self._sketch = CountSketch.create(
+                self._total_numel, sketch_dim, sketch_seed
+            ).to(device)
+            # Single buffer shared across all param groups. Sketch accumulation
+            # is purely additive (linear), so per-group buffers are unnecessary.
+            # N.B. With FSDP each rank only sees a parameter shard; this buffer
+            # would hold only the local contribution and would need an all-reduce
+            # across ranks before consumption. See the FSDP guard in sampler.py.
+            self._sketch_buf = SketchBuffer.create(sketch_dim, device)
+            self.save_sketches = True
+        else:
+            self._sketch = None
+            self._sketch_buf = None
+            self.save_sketches = False
 
         # Initialize each parameter group
         for group in self.param_groups:
@@ -257,23 +296,25 @@ class SGMCMC(Optimizer):
             device = next(iter(group["params"])).device
             group["metrics"] = Metrics().to(device)
 
-    def _update_metrics(
-        self, group, p, loc_grad, wd_grad, noise, preconditioning, d_p, distance
-    ):
-        """Calculate and accumulate metrics for this parameter update.
+    def _decompose_update(
+        self,
+        group: dict,
+        p: torch.Tensor,
+        loc_grad: Optional[torch.Tensor],
+        wd_grad: Optional[torch.Tensor],
+        noise: torch.Tensor,
+        preconditioning: PreconditionerCoefs,
+        d_p: torch.Tensor,
+    ) -> _ComponentVectors:
+        """Decompose a parameter update into its post-preconditioned component vectors.
 
-        Tracks post-preconditioned values (actual update magnitudes), the
-        unscaled gradient (without preconditioner), the raw distance from
-        initial params, and dot products between the three main components.
+        Shared by both metrics accumulation and sketch scattering. Debug
+        assertions verify the decomposition matches the actual update.
 
         Args:
-            loc_grad: Pre-computed localization prior gradient (before p.data update),
-                or None if no prior is active.
-            wd_grad: Pre-computed weight_decay prior gradient (before p.data update),
-                or None if no prior is active.
-            d_p: The actual deterministic update vector (used only for debug assertion).
-            distance: Pre-computed displacement from initial params (before p.data
-                update), matching the time-point of the other component vectors.
+            loc_grad: Pre-computed localization prior gradient, or None.
+            wd_grad: Pre-computed weight_decay prior gradient, or None.
+            d_p: The actual deterministic update vector (for debug assertion).
         """
         _lr = group["lr"]
         _precond = preconditioning.overall_coef
@@ -293,34 +334,31 @@ class SGMCMC(Optimizer):
         # noise already includes overall_coef from step()
         _noise = (group["lr"] ** 0.5) * preconditioning.noise_coef * noise
 
-        _combined_prior = (
-            _half_lr * preconditioning.prior_coef * _precond * (_loc_pre + _wd_pre)
-        )
-
         if __debug__:
-            # Both assertions use a scale-aware tolerance because any
-            # decomposition of d_p distributes half_lr (and possibly
-            # prior_coef) over separate terms, breaking IEEE 754
-            # associativity.  The error from c*(a+b) vs c*a + c*b
-            # scales with the component magnitudes, so we bound it
-            # by a few ULP of the reference scale.
-            _dtype_eps = torch.finfo(d_p.dtype).eps
+            _combined_prior = (
+                _half_lr * preconditioning.prior_coef * _precond * (_loc_pre + _wd_pre)
+            )
 
-            # (1) grad + prior must reconstruct the full step update
+            # (1) grad + prior must reconstruct the full step update.
+            # step() computes d_p at _grad_pre's precision before
+            # overall_coef promotion, so rounding error is at that scale.
+            _step_eps = torch.finfo(_grad_pre.dtype).eps
             _decomp_scale = float((_scaled_grad.abs() + _combined_prior.abs()).max())
-            _decomp_atol = max(_decomp_scale * _dtype_eps * 16, 1e-12)
+            _decomp_atol = max(_decomp_scale * _step_eps * 16, 1e-12)
             torch.testing.assert_close(
                 (_scaled_grad + _combined_prior).float(),
                 (_half_lr * d_p).float(),
                 atol=_decomp_atol,
                 rtol=0,
-                msg=lambda s: f"Metrics components don't match gradient update:\n{s}",
+                msg=lambda s: f"Decomposition components don't match gradient update:\n{s}",
             )
 
-            # (2) loc + wd must match the combined prior (distribution
-            #     of prior_coef over sub-priors for per-component norms)
+            # (2) loc + wd must match the combined prior.
+            # _loc_pre + _wd_pre sums at input precision regardless
+            # of preconditioner promotion, so use p.grad.dtype.
+            _input_eps = torch.finfo(p.grad.dtype).eps
             _dist_scale = float((_loc.abs() + _wd.abs()).max())
-            _dist_atol = max(_dist_scale * _dtype_eps * 16, 1e-12)
+            _dist_atol = max(_dist_scale * _input_eps * 16, 1e-12)
             torch.testing.assert_close(
                 (_loc + _wd).float(),
                 _combined_prior.float(),
@@ -329,23 +367,64 @@ class SGMCMC(Optimizer):
                 msg=lambda s: f"Prior distribution error exceeds bound:\n{s}",
             )
 
-        group["metrics"].add_sum_squared_(
+        return _ComponentVectors(
             scaled_grad=_scaled_grad,
             unscaled_grad=_unscaled_grad,
             localization=_loc,
             weight_decay=_wd,
             noise=_noise,
+        )
+
+    def _accumulate_metrics(
+        self,
+        group: dict,
+        components: _ComponentVectors,
+        distance: torch.Tensor,
+        preconditioning: PreconditionerCoefs,
+        p: torch.Tensor,
+    ) -> None:
+        """Accumulate decomposed component vectors into per-group metrics."""
+        group["metrics"].add_sum_squared_(
+            scaled_grad=components.scaled_grad,
+            unscaled_grad=components.unscaled_grad,
+            localization=components.localization,
+            weight_decay=components.weight_decay,
+            noise=components.noise,
             distance=distance,
         )
         group["metrics"].add_dot_products_(
-            scaled_grad=_scaled_grad,
-            prior=_loc + _wd,
-            noise=_noise,
+            scaled_grad=components.scaled_grad,
+            prior=components.localization + components.weight_decay,
+            noise=components.noise,
         )
+        _precond = preconditioning.overall_coef
         if isinstance(_precond, torch.Tensor):
             group["metrics"].numel += int(_precond.count_nonzero())
         else:
             group["metrics"].numel += p.numel()
+
+    def _scatter_sketches(self, components: _ComponentVectors, offset: int) -> None:
+        """Scatter decomposed component vectors into the sketch buffer."""
+        buf = self._sketch_buf
+        sketch = self._sketch
+        assert buf is not None and sketch is not None
+        sketch.scatter_into_(buf.scaled_grad, components.scaled_grad, offset)
+        sketch.scatter_into_(buf.unscaled_grad, components.unscaled_grad, offset)
+        sketch.scatter_into_(buf.localization, components.localization, offset)
+        sketch.scatter_into_(buf.weight_decay, components.weight_decay, offset)
+        sketch.scatter_into_(buf.noise, components.noise, offset)
+
+    def get_sketches(self) -> SketchBuffer:
+        """Return a CPU snapshot of the current sketch buffer."""
+        if not self.save_sketches:
+            raise RuntimeError("Sketches not enabled.")
+        assert self._sketch_buf is not None
+        return SketchBuffer(
+            **{
+                q: getattr(self._sketch_buf, q).detach().cpu().clone()
+                for q in SketchBuffer.QUANTITIES
+            }
+        )
 
     @torch.no_grad()
     def step(
@@ -366,6 +445,13 @@ class SGMCMC(Optimizer):
             with torch.enable_grad():
                 loss = closure()
 
+        _need_decomposition = self.save_metrics or self.save_sketches
+        param_offset = 0
+
+        if self.save_sketches:
+            assert self._sketch_buf is not None
+            self._sketch_buf.zero_()
+
         for group_idx, group in enumerate(self.param_groups):
             # Metrics lifecycle: zero → accumulate per-param → sqrt (see Metrics docstring)
             if self.save_metrics:
@@ -377,6 +463,10 @@ class SGMCMC(Optimizer):
 
             for i, p in enumerate(params):
                 if p.grad is None:
+                    if self.save_sketches:
+                        # Advance past this param's region in the sketch's
+                        # hash/sign index space so subsequent params stay aligned.
+                        param_offset += p.numel()
                     continue
 
                 state = self.state[p]
@@ -388,13 +478,13 @@ class SGMCMC(Optimizer):
                 d_p = preconditioning.grad_coef * p.grad.mul(group["nbeta"])
 
                 # Prior contribution — decompose into sub-priors when
-                # tracking metrics so we can record localization and
-                # weight_decay norms separately. Must happen before p.data
+                # tracking metrics or sketches so we can record localization
+                # and weight_decay separately. Must happen before p.data
                 # is modified below.
                 loc_grad = None
                 wd_grad = None
                 if prior is not None:
-                    if self.save_metrics:
+                    if _need_decomposition:
                         loc_grad = torch.zeros_like(p)
                         wd_grad = torch.zeros_like(p)
                         sub_priors = (
@@ -448,17 +538,19 @@ class SGMCMC(Optimizer):
                         max=initial_param + group["bounding_box_size"],
                     )
 
-                if self.save_metrics:
-                    self._update_metrics(
-                        group,
-                        p,
-                        loc_grad,
-                        wd_grad,
-                        noise,
-                        preconditioning,
-                        d_p,
-                        _distance,
+                if _need_decomposition:
+                    components = self._decompose_update(
+                        group, p, loc_grad, wd_grad, noise, preconditioning, d_p
                     )
+                    if self.save_metrics:
+                        self._accumulate_metrics(
+                            group, components, _distance, preconditioning, p
+                        )
+                    if self.save_sketches:
+                        self._scatter_sketches(components, param_offset)
+
+                if self.save_sketches:
+                    param_offset += p.numel()
 
             if self.save_metrics:
                 # All params accumulated; convert sum-of-squares to L2 norms
@@ -495,6 +587,8 @@ class SGMCMC(Optimizer):
         bounding_box_size=None,
         mask=None,
         save_metrics: bool = False,
+        sketch_dim: Optional[int] = None,
+        sketch_seed: int = 0,
     ):
         """Factory method to create an SGMCMC instance that implements Stochastic Gradient Langevin Dynamics (SGLD)
         with a localization term (Lau et al. 2023).
@@ -564,6 +658,8 @@ class SGMCMC(Optimizer):
             bounding_box_size=bounding_box_size,
             mask=mask,
             save_metrics=save_metrics,
+            sketch_dim=sketch_dim,
+            sketch_seed=sketch_seed,
         )
 
         return instance
@@ -577,6 +673,8 @@ class SGMCMC(Optimizer):
         nbeta=1.0,
         bounding_box_size=None,
         save_metrics: bool = False,
+        sketch_dim: Optional[int] = None,
+        sketch_seed: int = 0,
     ):
         """Factory method to create an SGMCMC instance that matches SGNHT's interface.
 
@@ -605,6 +703,8 @@ class SGMCMC(Optimizer):
             preconditioner=preconditioner,
             bounding_box_size=bounding_box_size,
             save_metrics=save_metrics,
+            sketch_dim=sketch_dim,
+            sketch_seed=sketch_seed,
         )
 
         return instance
@@ -624,6 +724,8 @@ class SGMCMC(Optimizer):
         bounding_box_size=None,
         mask=None,
         save_metrics: bool = False,
+        sketch_dim: Optional[int] = None,
+        sketch_seed: int = 0,
     ):
         """Factory method to create an SGMCMC instance that wraps RMSprop's adaptive preconditioning with SGLD to perform Bayesian
         sampling of neural network weights.
@@ -705,6 +807,8 @@ class SGMCMC(Optimizer):
             bounding_box_size=bounding_box_size,
             mask=mask,
             save_metrics=save_metrics,
+            sketch_dim=sketch_dim,
+            sketch_seed=sketch_seed,
         )
 
         return instance

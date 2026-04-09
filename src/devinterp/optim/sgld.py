@@ -1,9 +1,25 @@
 import warnings
-from typing import Callable, Iterable, Iterator, Optional, Union
+from typing import Callable, Iterable, Iterator, NamedTuple, Optional, Union
 
 import torch
 
 from .metrics import Metrics
+from .sketch import CountSketch, SketchBuffer
+
+
+class _ComponentVectors(NamedTuple):
+    """Post-masked component vectors from a single SGLD parameter update."""
+
+    # Duplicated from SGMCMC deliberately: SGLD is deprecated and will be
+    # removed, so coupling it to the replacement via a shared type would make
+    # that cleanup harder. Also the semantics differ slightly in the way masks
+    # are applied.
+
+    scaled_grad: torch.Tensor
+    unscaled_grad: torch.Tensor
+    localization: torch.Tensor
+    weight_decay: torch.Tensor
+    noise: torch.Tensor
 
 
 class SGLD(torch.optim.Optimizer):
@@ -66,6 +82,7 @@ class SGLD(torch.optim.Optimizer):
     def __init__(
         self,
         params: Iterable[torch.nn.Parameter],
+        *,
         lr: float = 0.01,
         noise_level: float = 1.0,
         weight_decay: float = 0.0,
@@ -73,6 +90,8 @@ class SGLD(torch.optim.Optimizer):
         nbeta: Union[Callable[[], float], float] = 1.0,
         bounding_box_size: Optional[float] = None,
         save_metrics: bool = False,
+        sketch_dim: Optional[int] = None,
+        sketch_seed: int = 0,
     ):
         warnings.warn(
             "SGLD has been deprecated. Please use SGMCMC.sgld instead.",
@@ -80,6 +99,7 @@ class SGLD(torch.optim.Optimizer):
         )
 
         self.save_metrics = save_metrics
+        self.save_sketches = sketch_dim is not None
 
         if noise_level != 1.0:
             warnings.warn(
@@ -120,6 +140,7 @@ class SGLD(torch.optim.Optimizer):
                 group["localization"] != 0
                 or group["bounding_box_size"] != 0
                 or self.save_metrics
+                or self.save_sketches
             )
             if store_initial:
                 for p in group["params"]:
@@ -131,11 +152,32 @@ class SGLD(torch.optim.Optimizer):
                 device = next(iter(group["params"])).device
                 group["metrics"] = Metrics().to(device)
 
+        if self.save_sketches:
+            assert sketch_dim is not None
+            total_numel = sum(
+                p.numel() for group in self.param_groups for p in group["params"]
+            )
+            device = next(iter(self.param_groups[0]["params"])).device
+            self._sketch = CountSketch.create(total_numel, sketch_dim, sketch_seed).to(
+                device
+            )
+            self._sketch_buf = SketchBuffer.create(sketch_dim, device)
+        else:
+            self._sketch = None
+            self._sketch_buf = None
+
     def step(self, noise_generator: Optional[torch.Generator] = None) -> None:
         """
         Perform a single SGLD optimization step.
         """
         with torch.no_grad():
+            _need_decomposition = self.save_metrics or self.save_sketches
+            param_offset = 0
+
+            if self.save_sketches:
+                assert self._sketch_buf is not None
+                self._sketch_buf.zero_()
+
             for group_idx, group in enumerate(self.param_groups):
                 # Metrics lifecycle: zero → accumulate per-param → sqrt (see Metrics docstring)
                 if self.save_metrics:
@@ -177,16 +219,25 @@ class SGLD(torch.optim.Optimizer):
                         dw = dw * group["mask"]
                         noise = noise * group["mask"]
 
-                    if self.save_metrics:
-                        self._update_metrics(
+                    if _need_decomposition:
+                        components = self._decompose_update(
                             group, p, dw, initial_param_distance, noise
                         )
+                        if self.save_metrics:
+                            self._accumulate_metrics(
+                                group, p, components, initial_param_distance
+                            )
+                        if self.save_sketches:
+                            self._scatter_sketches(components, param_offset)
 
                     # Update parameters
                     p.data.add_(dw, alpha=-0.5 * group["lr"])
                     p.data.add_(
                         noise, alpha=group["lr"] ** 0.5
                     )  # Scale noise by sqrt(lr)
+
+                    if self.save_sketches:
+                        param_offset += p.numel()
 
                     # Rebound if exceeded bounding box size
                     if group["bounding_box_size"]:
@@ -202,19 +253,19 @@ class SGLD(torch.optim.Optimizer):
                     # All params accumulated; convert sum-of-squares to L2 norms
                     group["metrics"].sqrt_norms_()
 
-    def _update_metrics(
+    def _decompose_update(
         self,
         group: dict,
         p: torch.Tensor,
         dw: torch.Tensor,
         initial_param_distance: torch.Tensor,
         noise: torch.Tensor,
-    ) -> None:
-        """Calculate and accumulate metrics for this parameter update.
+    ) -> _ComponentVectors:
+        """Decompose an SGLD parameter update into post-masked component vectors.
 
-        Reconstructs the SGLD update components from the in-place dw and
-        validates they sum to the actual update. SGLD has no preconditioner,
-        so unscaled_grad == scaled_grad.
+        Shared by both metrics accumulation and sketch scattering. SGLD has no
+        preconditioner, so unscaled_grad == scaled_grad. Debug assertions verify
+        the decomposition matches the actual update.
         """
         _lr = group["lr"]
         _mask = group.get("mask")
@@ -224,44 +275,98 @@ class SGLD(torch.optim.Optimizer):
         #   step() builds dw as: (p.grad * nbeta) + (p.data * wd) + (dist * loc)
         raw_grad = p.grad.data if p.grad is not None else torch.zeros_like(p.data)
         _scaled_grad = _half_lr * raw_grad.mul(group["nbeta"])
-        _noise = noise * (_lr**0.5)
+        _noise_vec = noise * (_lr**0.5)
         _loc = _half_lr * initial_param_distance.mul(group["localization"])
         _wd = _half_lr * p.data.mul(group["weight_decay"])
 
         if _mask is not None:
-            _scaled_grad *= _mask
-            _loc *= _mask
-            _wd *= _mask
-            _noise *= _mask
+            _scaled_grad = _scaled_grad * _mask
+            _loc = _loc * _mask
+            _wd = _wd * _mask
+            _noise_vec = _noise_vec * _mask
+
+        # Sanity-check: reconstructed components must sum to the actual update.
+        # step() builds dw via in-place add_ (which may use FMA on GPU),
+        # then we multiply by half_lr once. Here we multiply half_lr into
+        # each component separately and sum — distributing the scalar
+        # breaks IEEE 754 associativity. The rounding gap scales with the
+        # component magnitudes and the dtype's epsilon (significant for
+        # bfloat16 models where eps ≈ 0.004). Using the sum of absolute
+        # values as the scale handles catastrophic cancellation, where
+        # large components nearly cancel leaving a small residual whose
+        # relative error would otherwise look enormous.
+        if __debug__:
+            _step_eps = torch.finfo(dw.dtype).eps
+            _decomp_scale = float((_scaled_grad.abs() + _loc.abs() + _wd.abs()).max())
+            _decomp_atol = max(_decomp_scale * _step_eps * 16, 1e-12)
+            torch.testing.assert_close(
+                (_scaled_grad + _loc + _wd).float(),
+                (_half_lr * dw).float(),
+                atol=_decomp_atol,
+                rtol=0,
+                msg=lambda s: f"Decomposition components don't match gradient update:\n{s}",
+            )
+
+        return _ComponentVectors(
+            scaled_grad=_scaled_grad,
+            unscaled_grad=_scaled_grad,
+            localization=_loc,
+            weight_decay=_wd,
+            noise=_noise_vec,
+        )
+
+    def _accumulate_metrics(
+        self,
+        group: dict,
+        p: torch.Tensor,
+        components: _ComponentVectors,
+        initial_param_distance: torch.Tensor,
+    ) -> None:
+        """Accumulate decomposed component vectors into per-group metrics."""
+        _mask = group.get("mask")
+        if _mask is not None:
             initial_param_distance = initial_param_distance * _mask
             numel = p[_mask.bool()].numel()
         else:
             numel = p.numel()
 
-        # Sanity-check: reconstructed components must sum to the actual update.
-        if __debug__:
-            torch.testing.assert_close(
-                _scaled_grad + _loc + _wd,
-                0.5 * _lr * dw,
-                atol=1e-6,
-                rtol=0,
-                msg=lambda s: f"Metrics components don't match gradient update:\n{s}",
-            )
-
         group["metrics"].add_sum_squared_(
-            scaled_grad=_scaled_grad,
-            unscaled_grad=_scaled_grad,
-            localization=_loc,
-            weight_decay=_wd,
-            noise=_noise,
+            scaled_grad=components.scaled_grad,
+            unscaled_grad=components.unscaled_grad,
+            localization=components.localization,
+            weight_decay=components.weight_decay,
+            noise=components.noise,
             distance=initial_param_distance,
         )
         group["metrics"].add_dot_products_(
-            scaled_grad=_scaled_grad,
-            prior=_loc + _wd,
-            noise=_noise,
+            scaled_grad=components.scaled_grad,
+            prior=components.localization + components.weight_decay,
+            noise=components.noise,
         )
         group["metrics"].numel += numel
+
+    def _scatter_sketches(self, components: _ComponentVectors, offset: int) -> None:
+        """Scatter decomposed component vectors into the sketch buffer."""
+        buf = self._sketch_buf
+        sketch = self._sketch
+        assert buf is not None and sketch is not None
+        sketch.scatter_into_(buf.scaled_grad, components.scaled_grad, offset)
+        sketch.scatter_into_(buf.unscaled_grad, components.unscaled_grad, offset)
+        sketch.scatter_into_(buf.localization, components.localization, offset)
+        sketch.scatter_into_(buf.weight_decay, components.weight_decay, offset)
+        sketch.scatter_into_(buf.noise, components.noise, offset)
+
+    def get_sketches(self) -> SketchBuffer:
+        """Return a CPU snapshot of the current sketch buffer."""
+        if not self.save_sketches:
+            raise RuntimeError("Sketches not enabled.")
+        assert self._sketch_buf is not None
+        return SketchBuffer(
+            **{
+                q: getattr(self._sketch_buf, q).detach().cpu().clone()
+                for q in SketchBuffer.QUANTITIES
+            }
+        )
 
     def iter_group_metrics(self) -> Iterator[Metrics]:
         """Yield metrics for each param group."""
