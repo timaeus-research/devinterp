@@ -15,35 +15,40 @@ class SGNHT(torch.optim.Optimizer):
 
     The equations for the update are as follows:
 
-    $$\Delta w_t = \epsilon\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right) - \xi_t w_t \right) + \sqrt{2A} N(0, \epsilon)$$
-    $$\Delta\xi_{t} = \epsilon \left( \frac{1}{n} \|w_t\|^2 - 1 \right)$$
+    .. math::
 
-    where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate,
-    $(\beta n)$ is the inverse temperature (we're in the tempered Bayes paradigm),
-    $n$ is the number of samples, $m$ is the batch size,
-    $\xi_t$ is the thermostat variable at time $t$, $A$ is the diffusion factor,
-    and $N(0, A)$ represents Gaussian noise with mean 0 and variance $A$.
+        \Delta w_t = \epsilon\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right) - \xi_t w_t \right) + \sqrt{2A} N(0, \epsilon)
+
+    .. math::
+
+        \Delta\xi_{t} = \epsilon \left( \frac{1}{n} \|w_t\|^2 - 1 \right)
+
+    where :math:`w_t` is the weight at time :math:`t`, :math:`\epsilon` is the learning rate,
+    :math:`(\beta n)` is the inverse temperature (we're in the tempered Bayes paradigm),
+    :math:`n` is the number of samples, :math:`m` is the batch size,
+    :math:`\xi_t` is the thermostat variable at time :math:`t`, :math:`A` is the diffusion factor,
+    and :math:`N(0, A)` represents Gaussian noise with mean 0 and variance :math:`A`.
 
     Note:
-        - :python:`diffusion_factor` is unique to this class, and functions as a way to allow for random parameter changes while keeping them from blowing up by guiding parameters back to a slowly-changing thermostat value using a friction term.
-        - This class does not have an explicit localization term like :func:`~devinterp.optim.sgld.SGLD` does. If you want to constrain your sampling, use :python:`bounding_box_size`
-        - Although this class is a subclass of :python:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.
+        - ``diffusion_factor`` is unique to this class, and functions as a way to allow for random parameter changes while keeping them from blowing up by guiding parameters back to a slowly-changing thermostat value using a friction term.
+        - This class does not have an explicit localization term like :func:`~devinterp.optim.sgld.SGLD` does. If you want to constrain your sampling, use ``bounding_box_size``.
+        - Although this class is a subclass of ``torch.optim.Optimizer``, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.
 
 
-    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :python:`model.parameters()` or something more fancy, just like other :python:`torch.optim.Optimizer` classes.
+    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either ``model.parameters()`` or something more fancy, just like other ``torch.optim.Optimizer`` classes.
     :type params: Iterable
-    :param lr: Learning rate $\epsilon$. Default is 0.01
+    :param lr: Learning rate :math:`\epsilon`. Default is 0.01
     :type lr: float, optional
-    :param diffusion_factor: The diffusion factor $A$ of the thermostat. Default is 0.01
+    :param diffusion_factor: The diffusion factor :math:`A` of the thermostat. Default is 0.01
     :type diffusion_factor: float, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory. Default is None
     :type bounding_box_size: float, optional
     :param nbeta: Effective Inverse Temperature, float (default: 1., set to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: int, optional
 
-    :raises Warning: if :python:`nbeta` is set to 1
-    :raises Warning: if :python:`NoiseNorm` callback is used
-    :raises Warning: if :python:`MALA` callback is used
+    :raises Warning: if ``nbeta`` is set to 1
+    :raises Warning: if ``NoiseNorm`` callback is used
+    :raises Warning: if ``MALA`` callback is used
     """
 
     def __init__(

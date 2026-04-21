@@ -1,100 +1,213 @@
-.. devinterp documentation master file, created by
-   sphinx-quickstart on Fri Jan 19 13:45:44 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
-Welcome to devinterp's documentation!
+Welcome to DevInterp's documentation!
 =====================================
 
-
-DevInterp is a python library for conducting research on developmental interpretability, which is a novel AI safety research agenda rooted in Singular Learning Theory (SLT). DevInterp proposes tools for detecting, locating, and ultimately *controlling* the development of structure over training.
+DevInterp is a Python library for conducting research on developmental interpretability,
+a novel AI safety research agenda rooted in Singular Learning Theory (SLT). DevInterp
+proposes tools for detecting, locating, and ultimately *controlling* the development of
+structure over training.
 
 Read more about `developmental interpretability here <https://www.lesswrong.com/posts/TjaeCWvLZtEDAS5Ex/towards-developmental-interpretability>`_!
 
-For an overview of papers that either used or inspired this package, `click here <https://devinterp.com/publications>`_.
+For questions, `join the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_!
 
-For questions, it's easiest to `join the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_!
-
-.. warning:: This library is still in early development. Don't expect things to work on a first attempt. We are actively working on improving the library and adding new features.
+.. warning:: This library is under active development. The API may change between releases.
 
 Installation
-=====================================
+============
 
-To install :code:`devinterp`, simply run :bash:`pip install devinterp`.
+.. code-block:: bash
 
-**Requirements**: Python 3.8 or higher.
+   pip install devinterp
 
-Minimal Example
-=====================================
+**Requirements**: Python 3.8 or higher. PyTorch is a dependency.
+
+
+Quick Start
+===========
+
+Compute the Local Learning Coefficient
+---------------------------------------
 
 .. code-block:: python
 
-   from devinterp.slt import sample, LLCEstimator
-   from devinterp.optim import SGLD
+   from devinterp.slt.llc import llc
 
-   # Assuming you have a PyTorch Module and DataLoader
-   llc_estimator = LLCEstimator(..., nbeta=optimal_nbeta(trainloader))
-   sample(model, trainloader, ..., callbacks = [llc_estimator])
-   
-   llc_mean = llc_estimator.get_results()["llc/mean"]
+   result = llc(
+       model=model,
+       dataset=dataset,              # HuggingFace Dataset with "input_ids"
+       observables={"train": dataset},
+       lr=0.001,
+       n_beta=30,
+       num_chains=4,
+       num_draws=200,
+   )
+   print(result["llc_mean"])         # scalar LLC
+   print(result["loss_trace"])       # (num_chains, num_draws) loss trace
 
-Examples
-=====================================
 
-To see DevInterp in action, check out our example notebooks:
+Sample with Observables
+-----------------------
 
-.. |colab1| image:: https://colab.research.google.com/assets/colab-badge.svg 
-   :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/introduction.ipynb
-.. |colab2| image:: https://colab.research.google.com/assets/colab-badge.svg 
-   :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/normal_crossing.ipynb
-.. |colab3| image:: https://colab.research.google.com/assets/colab-badge.svg 
-   :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/tms.ipynb
-.. |colab4| image:: https://colab.research.google.com/assets/colab-badge.svg 
-   :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/mnist.ipynb
-.. |colab5| image:: https://colab.research.google.com/assets/colab-badge.svg 
-   :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb
-.. |colab6| image:: https://colab.research.google.com/assets/colab-badge.svg 
-   :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb
+.. code-block:: python
 
-- `Introduction <https://www.github.com/timaeus-research/devinterp/blob/main/examples/introduction.ipynb>`_ |colab1|
-- `Normal Crossing degeneracy quantification <https://www.github.com/timaeus-research/devinterp/blob/main/examples/normal_crossing.ipynb>`_ |colab2|
-- `Toy Models of Superposition phase transition detection <https://www.github.com/timaeus-research/devinterp/blob/main/examples/tms.ipynb>`_ |colab3|
-- `MNIST eSGD vs SGD comparison <https://www.github.com/timaeus-research/devinterp/blob/main/examples/mnist.ipynb>`_ |colab4|
+   from devinterp.slt.sampling import sample
 
-For more advanced usage, see `the Diagnostics notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb>`_ |colab5| and for a quick guide on picking hyperparameters, see `the calibration notebook. <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab6|
+   tree = sample(
+       model=model,
+       dataset=train_data,
+       observables={
+           "train": train_data,
+           "code": (code_data, 5),   # (dataset, batches_per_draw)
+       },
+       lr=0.001,
+       n_beta=30,
+       num_chains=4,
+       num_draws=200,
+   )
+   # tree is an xr.DataTree backed by Zarr with full per-token loss traces
+
+
+Concepts
+========
+
+Posterior Sampling with SGLD
+----------------------------
+
+The core workflow:
+
+1. Start at a checkpoint :math:`\hat{w}^*`
+2. Take SGLD steps (SGD + noise) using one dataset for gradients
+3. Evaluate losses on multiple datasets (observables) at each draw
+4. Store the full per-token loss chains as Zarr datasets
+5. Compute observables (LLC, susceptibilities, BIF) from these chains
+
+The SGLD noise allows exploring low-loss directions while staying near the original
+checkpoint. This samples from the local posterior distribution around the checkpoint.
+
+Local Learning Coefficient (LLC)
+--------------------------------
+
+The **LLC** measures model complexity by counting "effective parameters" in a region of
+weight space:
+
+.. math::
+
+   \hat{\lambda}(\hat{w}^*) = n\beta \cdot (\bar{L}_n - L_n(\hat{w}^*))
+
+Unlike parameter count or Hessian rank, LLC accounts for **singularities** -- regions where
+multiple parameter configurations produce identical outputs. This makes it suitable for
+neural networks.
+
+**Why LLC matters:**
+
+- **Detect phase transitions** during training (sudden capability changes)
+- **Predict generalization** via the Free Energy formula
+- **Compare checkpoints** across training
+
+Susceptibilities
+----------------
+
+**Susceptibilities** measure how a model component responds to distribution shifts. For
+example, how does an attention head's behavior change when shifting from general text toward
+code or math?
+
+This is computed by sampling with different **weight restrictions** (parameter subsets) and
+measuring the covariance between sampling loss and observable loss.
+
+See `Structural Inference: Interpreting Small Language Models with Susceptibilities
+<https://arxiv.org/abs/2504.18274>`_ (Baker et al., 2025) for details.
+
+Bayesian Influence Functions (BIF)
+----------------------------------
+
+**BIF** computes pairwise correlations between observable loss traces across sequences from
+SGLD sampling results. This reveals which sequences influence each other's loss under
+posterior sampling, providing a measure of functional similarity.
+
+
+Architecture
+============
+
+Each analysis has two entry points:
+
+- **High-level** (``llc()``, ``bif()``, ``susceptibilities()``): runs sampling and
+  post-processing in one call
+- **Low-level** (``compute_llc()``, ``compute_bif()``, ``compute_susceptibilities()``):
+  takes a pre-computed ``xr.DataTree`` from ``sample()``, useful when you want to run
+  sampling once and compute multiple analyses
+
+The sampling pipeline stores full per-token losses to Zarr via ``sample()``, and
+post-processing functions operate on the resulting ``xr.DataTree``.
+
+
+Model Requirements
+==================
+
+The current API assumes **autoregressive language models** with fixed-length tokenized
+sequences:
+
+- Model must accept ``input_ids`` and return logits (HuggingFace models, TransformerLens
+  ``HookedTransformer``, or any model returning a tensor or object with ``.logits``)
+- Dataset must be a HuggingFace ``Dataset`` with an ``"input_ids"`` column of
+  uniform-length sequences
+- Loss is next-token cross-entropy
+
+For non-standard models, ``sample_single_chain()`` in ``devinterp.slt.sampler`` accepts a
+custom ``evaluate`` callable.
 
 
 Known Issues
-=====================================
+============
 
-- LLC Estimation is currently more of an art than a science. It will take some time and pain to get it work reliably.
+- LLC estimation is sensitive to hyperparameters. Always vary ``lr``, ``n_beta``, and
+  ``num_draws`` to check robustness.
+- Hyperparameters do change what we observe. Observables should theoretically be independent
+  of hyperparameters, but in practice estimates are sensitive.
 
-If you run into issues not mentioned here, please first `check the GitHub issues <https://github.com/timaeus-research/devinterp/issues>`_, then `ask in the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_, and only then make a new github issue.
+Further Reading
+===============
+
+- `You're Measuring Model Complexity Wrong <https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong>`_ - Introduction to LLC and phase transitions
+- `Structural Inference with Susceptibilities <https://arxiv.org/abs/2504.18274>`_ - Susceptibility framework for interpretability (Baker et al., 2025)
+- Lau et al. (2023) - Local learning coefficient estimator
+- Watanabe (2009) - Algebraic Geometry and Statistical Learning Theory
+
 
 Credits & Citations
-=====================================
+===================
 
-This package was created by `Timaeus <https://timaeus.co>`_. The main contributors to this package are Stan van Wingerden, Jesse Hoogland, and George Wang. Zach Furman, Matthew Farrugia-Roberts, William Zhou, Rohan Hitchcock and Edmund Lau also made valuable contributions or provided useful advice.
+.. TODO: Update credits and citation for v2 release. The current citation
+   reflects the original devinterp authors. The v2 sampling/susceptibilities/BIF
+   pipeline was ported from aether and needs proper attribution.
 
-If this package was useful in your work, please cite it as:
+This package was created by `Timaeus <https://timaeus.co>`_.
 
-.. code-block:: 
+.. code-block:: bibtex
 
-   @misc{devinterp2024,
-      title = {DevInterp},
-      author = {Stan van Wingerden, Jesse Hoogland, and George Wang},
-      year = {2024},
-      howpublished = {\url{https://github.com/timaeus-research/devinterp}},
+   @misc{devinterpcode,
+     title = {DevInterp},
+     author = {van Wingerden, Stan and Hoogland, Jesse and Wang, George and Zhou, William},
+     year = {2024},
+     howpublished = {\url{https://github.com/timaeus-research/devinterp}},
    }
 
-Table of Contents
-=====================================
+
+Guides
+======
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
 
-   self
-   SLT Observables <source/devinterp.slt>
+   sampling
+   output_formats
+
+
+API Reference
+=============
+
+.. toctree::
+   :maxdepth: 2
+
+   SLT Analysis <source/devinterp.slt>
    Sampling Methods <source/devinterp.optim>
-   Utils & Visualisation Methods <source/devinterp.utils>
-   
+   Utilities <source/devinterp.utils>

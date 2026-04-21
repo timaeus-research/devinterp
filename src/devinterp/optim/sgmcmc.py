@@ -244,7 +244,7 @@ class SGMCMC(Optimizer):
         else:
             raise ValueError(f"Unsupported preconditioner type: {preconditioner}")
 
-        mask = group.pop("mask", None)
+        mask = group.get("mask", None)
         if mask is not None:
             # Convert mask to masks (1.0 where True, 0.0 where False)
             if isinstance(mask, torch.Tensor):
@@ -618,6 +618,7 @@ class SGMCMC(Optimizer):
 
 
         This allows SGMCMC to be used as a drop-in replacement for SGLD.
+
         :param params: Iterable of parameters to optimize
         :param lr: Learning rate (default: 0.01)
         :param noise_level: Standard deviation of noise (default: 1.0)
