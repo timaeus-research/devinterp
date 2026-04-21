@@ -35,13 +35,15 @@ class SGLD(torch.optim.Optimizer):
 
     The equation for the update is as follows:
 
-    $$\Delta w_t = \frac{\epsilon}{2}\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right)+\gamma\left(w_0-w_t\right) - \lambda w_t\right) + N(0, \epsilon\sigma^2)$$
+    .. math::
 
-    where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate,
-    $(\beta n)$ is the inverse temperature (we're in the tempered Bayes paradigm),
-    $n$ is the number of training samples, $m$ is the batch size, $\gamma$ is
-    the localization strength, $\lambda$ is the weight decay strength,
-    and $\sigma$ is the noise term.
+        \Delta w_t = \frac{\epsilon}{2}\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right)+\gamma\left(w_0-w_t\right) - \lambda w_t\right) + N(0, \epsilon\sigma^2)
+
+    where :math:`w_t` is the weight at time :math:`t`, :math:`\epsilon` is the learning rate,
+    :math:`(\beta n)` is the inverse temperature (we're in the tempered Bayes paradigm),
+    :math:`n` is the number of training samples, :math:`m` is the batch size, :math:`\gamma` is
+    the localization strength, :math:`\lambda` is the weight decay strength,
+    and :math:`\sigma` is the noise term.
 
     Example:
         >>> optimizer = SGLD(model.parameters(), lr=0.1, nbeta=utils.default_nbeta(dataloader))
@@ -54,19 +56,19 @@ class SGLD(torch.optim.Optimizer):
         :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb
 
     Note:
-        - :python:`localization` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
-        - :python:`noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.
-        - Although this class is a subclass of :python:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.
+        - ``localization`` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
+        - ``noise_level`` is not intended to be changed, except when testing! Doing so will raise a warning.
+        - Although this class is a subclass of ``torch.optim.Optimizer``, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.
         - Hyperparameter optimization is more of an art than a science. Check out `the calibration notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab6| for how to go about it in a simple case.
-    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :python:`model.parameters()` or something more fancy, just like other :python:`torch.optim.Optimizer` classes.
+    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either ``model.parameters()`` or something more fancy, just like other ``torch.optim.Optimizer`` classes.
     :type params: Iterable
-    :param lr: Learning rate $\epsilon$. Default is 0.01
+    :param lr: Learning rate :math:`\epsilon`. Default is 0.01
     :type lr: float, optional
-    :param noise_level: Amount of Gaussian noise $\sigma$ introduced into gradient updates. Don't change this unless you know very well what you're doing! Default is 1
+    :param noise_level: Amount of Gaussian noise :math:`\sigma` introduced into gradient updates. Don't change this unless you know very well what you're doing! Default is 1
     :type noise_level: float, optional
-    :param weight_decay: L2 regularization term $\lambda$, applied as weight decay. Default is 0
+    :param weight_decay: L2 regularization term :math:`\lambda`, applied as weight decay. Default is 0
     :type weight_decay: float, optional
-    :param localization: Strength of the force $\gamma$ pulling weights back to their initial values. Default is 0
+    :param localization: Strength of the force :math:`\gamma` pulling weights back to their initial values. Default is 0
     :type localization: float, optional
     :param nbeta: Inverse reparameterized temperature (otherwise known as n*beta or ~beta), float (default: 1., set to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
     :type nbeta: float or Callable, optional
@@ -75,8 +77,8 @@ class SGLD(torch.optim.Optimizer):
     :param save_metrics: Whether to track metrics (scaled_grad, localization, weight_decay, noise norms) during optimization. Use :meth:`get_metrics` to retrieve. Default is False
     :type save_metrics: bool, optional
 
-    :raises Warning: if :python:`noise_level` is set to anything other than 1
-    :raises Warning: if :python:`nbeta` is set to 1
+    :raises Warning: if ``noise_level`` is set to anything other than 1
+    :raises Warning: if ``nbeta`` is set to 1
     """
 
     def __init__(

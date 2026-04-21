@@ -1,193 +1,107 @@
-import os
-from typing import Optional, Union
+"""Local Learning Coefficient (LLC) computation from sampling results.
+
+Computes LLC from the stored per-draw losses, without needing callbacks.
+
+    LLC = n_beta * (mean_sampling_loss - init_loss)
+
+Two entry points:
+- llc(): high-level, takes model + dataset, runs sampling + LLC
+- compute_llc(): low-level, takes pre-computed sampling DataTree
+"""
+
+from __future__ import annotations
 
 import torch
+import xarray as xr
+from datasets import Dataset
 
-from devinterp.slt.callback import SamplerCallback
-
-
-class LLCEstimator(SamplerCallback):
-    r"""
-    Callback for estimating the Local Learning Coefficient (LLC) in a rolling fashion during a sampling process.
-    It calculates the LLC based on the average loss across draws for each chain:
-
-    $$LLC = \textrm{n \beta} * (\textrm{avg_loss} - \textrm{init_loss})$$
-
-    For use with :func:`devinterp.slt.sampler.sample`.
+from devinterp.slt.lm_loss import LossFn
+from devinterp.slt.sampler import ParamMasks
+from devinterp.slt.sampling import ObservableSpec, sample
 
 
-    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
-    :type num_draws: int
-    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
-    :type num_chains: int
-    :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
-    :type nbeta: int
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Supports GPUs and TPUs.
-    :type device: str | torch.device, optional
+def llc(
+    model: torch.nn.Module,
+    dataset: Dataset,
+    observables: dict[str, ObservableSpec],
+    *,
+    lr: float,
+    n_beta: float,
+    param_masks: ParamMasks | None = None,
+    loss_fn: LossFn | None = None,
+    **kwargs,
+) -> xr.Dataset:
+    """Sample and compute LLC in one call.
+
+    Args:
+        model: PyTorch model.
+        dataset: HuggingFace Dataset with "input_ids" column.
+        observables: Dict mapping names to datasets (or (dataset, batches_per_draw) tuples).
+        lr: SGLD learning rate.
+        n_beta: SGLD inverse temperature.
+        param_masks: Which parameters to optimize. None for full model.
+        loss_fn: Optional custom per-token loss `(model, input_ids) -> (batch, seq-1)`.
+            Defaults to cross-entropy on the model's logits.
+        **kwargs: Additional arguments passed to sample() (num_chains, num_draws,
+            batch_size, output_path, etc.)
+
+    Returns:
+        xr.Dataset with llc_mean, llc_std, llc_per_chain, loss_trace, init_loss.
     """
+    samples = sample(
+        model=model,
+        dataset=dataset,
+        observables=observables,
+        param_masks=param_masks,
+        lr=lr,
+        n_beta=n_beta,
+        loss_fn=loss_fn,
+        **kwargs,
+    )
+    return compute_llc(samples)
 
-    def __init__(
-        self,
-        num_chains: int,
-        num_draws: int,
-        init_loss: Union[float, torch.Tensor],
-        device: Union[torch.device, str] = "cpu",
-        eval_field: str = "loss",
-        nbeta: Optional[float] = None,
-        temperature: Optional[float] = None,
-    ):
-        self.device = device
-        self.num_chains = num_chains
-        self.num_draws = num_draws
-        self.losses: torch.Tensor = torch.zeros(
-            (num_chains, num_draws), dtype=torch.float32
-        ).to(device)
-        self.set_init_loss(init_loss)
 
-        assert nbeta is not None, "Please provide a value for nbeta."
-        self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
-        self.temperature = temperature
+def compute_llc(samples: xr.DataTree) -> xr.Dataset:
+    """Compute LLC from a sampling DataTree.
 
-        self.eval_field = eval_field
+    Matches aether's `calculate` action with `function: llc`: averages
+    `sampling_loss_micro` over every step (including burn-in) and every
+    micro-batch, then subtracts mean `init_loss` and scales by `n_beta`.
 
-    def set_init_loss(self, init_loss: Union[torch.Tensor, float]):
-        self.init_loss = torch.as_tensor(
-            init_loss, dtype=torch.float32, device=self.device
-        )
+    Args:
+        samples: DataTree output from sample(), containing sampling_loss_micro,
+            init_loss, and n_beta.
 
-    def update(self, chain: int, draw: int, loss: torch.Tensor):
-        if torch.isnan(loss).any():
-            raise RuntimeError(f"NaN detected in loss at chain {chain}, draw {draw}")
-        self.losses[chain, draw] = loss.to(self.device)
+    Returns:
+        xr.Dataset with:
+            llc_mean: scalar, mean LLC across chains
+            llc_std: scalar, std LLC across chains
+            llc_per_chain: (chain,) LLC per chain
+            llc_scalar: scalar LLC matching aether's calculate action
+            loss_trace: (chain, step) mean loss per chain per step
+            init_loss: scalar, mean init loss
+    """
+    ds = samples.dataset
+    n_beta = float(ds.metadata["config"]["sampler"]["n_beta"])
+    init_loss_mean = float(ds.init_loss.values.mean())
 
-    def finalize(self):
-        if os.environ.get("USE_SPMD", "0") == "1" and not str(self.device).startswith(
-            "cpu:"
-        ):
-            if str(self.device).startswith("cuda") and torch.cuda.device_count() > 1:
-                if torch.distributed.is_initialized():
-                    torch.distributed.barrier()
-                    torch.distributed.all_reduce(
-                        self.losses, op=torch.distributed.ReduceOp.AVG
-                    )
-            else:
-                pass
+    # Per-chain per-step mean loss (average over batch_sampling and token_pos)
+    loss_trace = ds.sampling_loss_micro.mean(dim=["batch_sampling", "token_pos"])
 
-        elif str(
-            self.device
-        ).startswith(
-            "cuda"
-        ):  # if we've ran on multi-GPU, we should do a reduce as well. see above for how this would work
-            try:
-                torch.distributed.all_reduce(self.losses)
-            except ValueError:
-                pass
-        avg_losses = self.losses.mean(axis=1)
-        if (
-            str(self.device).startswith("cuda")
-            and os.environ.get("USE_SPMD", "0") == "1"
-        ):
-            self.llc_per_chain = self.nbeta.to(device="cpu", dtype=torch.float32) * (
-                avg_losses.to(device="cpu", dtype=torch.float32)
-                - self.init_loss.to(device="cpu", dtype=torch.float32)
-            )
-        else:
-            self.llc_per_chain = self.nbeta * (avg_losses - self.init_loss)
-        self.llc_mean = self.llc_per_chain.mean(dtype=torch.float32)
-        self.llc_std = self.llc_per_chain.std()
+    # LLC per chain = n_beta * (mean_loss_per_chain - init_loss)
+    llc_per_chain = n_beta * (loss_trace.mean(dim="step") - init_loss_mean)  # (chain,)
 
-    def get_results(self):
-        """
-        :returns: A dict :python:`{"llc/mean": llc_mean, "llc/std": llc_std, "llc-chain/{i}": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
-        """
+    # Scalar LLC matching aether's calculate action reduction order
+    # (all dims reduced at once for bitwise parity)
+    llc_scalar = n_beta * (float(ds.sampling_loss_micro.mean()) - init_loss_mean)
 
-        return {
-            "init_loss": self.init_loss.cpu().numpy().item(),
-            "llc/mean": self.llc_mean.cpu().numpy().item(),
-            "llc/std": self.llc_std.cpu().numpy().item(),
-            **{
-                f"llc-chain/{i}": self.llc_per_chain[i].cpu().numpy().item()
-                for i in range(self.num_chains)
-            },
-            "loss/trace": self.losses.cpu().numpy(),
+    return xr.Dataset(
+        {
+            "llc_mean": llc_per_chain.mean(),
+            "llc_std": llc_per_chain.std(),
+            "llc_per_chain": llc_per_chain,
+            "llc_scalar": llc_scalar,
+            "loss_trace": loss_trace,
+            "init_loss": init_loss_mean,
         }
-
-    def __call__(self, chain: int, draw: int, **kwargs):
-        self.update(chain, draw, kwargs[self.eval_field])
-
-
-class OnlineLLCEstimator(SamplerCallback):
-    """
-    Callback for estimating the Local Learning Coefficient (LLC) in an online fashion during a sampling process.
-    It calculates LLCs using the same formula as :func:`devinterp.slt.llc.LLCEstimator`, but continuously and including means and std across draws (as opposed to just across chains).
-    For use with :func:`devinterp.slt.sampler.sample`.
-
-    :param num_draws: Number of samples to draw (should be identical to :python:`num_draws` passed to :python:`devinterp.slt.sampler.sample`)
-    :type num_draws: int
-    :param num_chains: Number of chains to run (should be identical to :python:`num_chains` passed to :python:`devinterp.slt.sampler.sample`)
-    :type num_chains: int
-    :param nbeta: Effective Inverse Temperature, float (default: 1., set by sample() to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
-    :type nbeta: int
-    :param device: Device to perform computations on, e.g., 'cpu' or 'cuda'. Supports GPUs. Default is 'cpu'
-    :type device: str | torch.device, optional
-    """
-
-    def __init__(
-        self,
-        num_chains: int,
-        num_draws: int,
-        init_loss: Union[float, torch.Tensor],
-        device="cpu",
-        eval_field="loss",
-        nbeta: Optional[float] = None,
-        temperature: Optional[float] = None,  # Temperature is deprecated
-    ):
-        self.device = device
-        self.num_chains = num_chains
-        self.num_draws = num_draws
-        self.set_init_loss(init_loss)
-
-        self.losses = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(
-            device
-        )
-        self.llcs = torch.zeros((num_chains, num_draws), dtype=torch.float32).to(device)
-
-        self.losses = torch.zeros((num_chains, num_draws)).to(device)
-        self.llcs = torch.zeros((num_chains, num_draws)).to(device)
-        assert nbeta is not None, "Please provide a value for nbeta."
-        self.nbeta = torch.tensor(nbeta, dtype=torch.float32).to(device)
-        self.temperature = temperature
-
-        self.eval_field = eval_field
-
-    def set_init_loss(self, init_loss: Union[torch.Tensor, float]):
-        self.init_loss = torch.as_tensor(
-            init_loss, dtype=torch.float32, device=self.device
-        )
-
-    def update(self, chain: int, draw: int, loss: torch.Tensor):
-        if torch.isnan(loss).any():
-            raise RuntimeError(f"NaN detected in loss at chain {chain}, draw {draw}")
-        loss = loss.to(self.device)
-        self.losses[chain, draw] = loss
-        self.llcs[chain, draw] = self.nbeta * (loss - self.init_loss)
-
-    def finalize(self):
-        # TODO
-        self.llc_means = self.llcs.mean(dim=0, dtype=torch.float32)
-        self.llc_stds = self.llcs.std(dim=0)
-
-    def get_results(self):
-        """
-        :returns: A dict :python:`{"llc/means": llc_means, "llc/stds": llc_stds, "llc/trace": llc_trace_per_chain, "loss/trace": loss_trace_per_chain}`. (Only after running :python:`devinterp.slt.sampler.sample(..., [llc_estimator_instance], ...)`).
-        """
-        return {
-            "init_loss": self.init_loss.cpu().numpy(),
-            "llc/means": self.llc_means.cpu().numpy(),
-            "llc/stds": self.llc_stds.cpu().numpy(),
-            "llc/trace": self.llcs.cpu().numpy(),
-            "loss/trace": self.losses.cpu().numpy(),
-        }
-
-    def __call__(self, chain: int, draw: int, **kwargs):
-        self.update(chain, draw, kwargs[self.eval_field])
+    )

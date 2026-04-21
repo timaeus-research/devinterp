@@ -5,3 +5,7 @@ pandas>=1.5.3
 torch>=2.0.1
 tqdm>=4.65.0
 cloudpickle>=3.0.0
+xarray>=2024.1.0
+zarr>=3.0.0
+datasets>=2.14.0
+pydantic>=2.0.0

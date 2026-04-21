@@ -1,88 +1,79 @@
 devinterp.slt package
 =====================
 
-Submodules
-----------
+Sampling and SLT analysis tools.
 
-devinterp.slt.callback module
------------------------------
+Sampling
+--------
 
-.. automodule:: devinterp.slt.callback
+.. automodule:: devinterp.slt.sampling
    :members:
    :show-inheritance:
-   :undoc-members:
 
-devinterp.slt.cov module
-------------------------
-
-.. automodule:: devinterp.slt.cov
-   :members:
+.. automodule:: devinterp.slt.sampler
+   :members: sample_single_chain, calculate_num_steps, ParamMasks, EpochMode, ChainHealthError
    :show-inheritance:
-   :undoc-members:
 
-devinterp.slt.gradient module
------------------------------
+Configuration
+-------------
 
-.. automodule:: devinterp.slt.gradient
+.. automodule:: devinterp.slt.config
    :members:
+   :no-inherited-members:
    :show-inheritance:
-   :undoc-members:
 
-devinterp.slt.llc module
-------------------------
+Local Learning Coefficient
+--------------------------
 
 .. automodule:: devinterp.slt.llc
    :members:
    :show-inheritance:
-   :undoc-members:
 
-devinterp.slt.loss module
--------------------------
-
-.. automodule:: devinterp.slt.loss
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
-devinterp.slt.mala module
--------------------------
-
-.. automodule:: devinterp.slt.mala
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
-devinterp.slt.norms module
---------------------------
-
-.. automodule:: devinterp.slt.norms
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
-devinterp.slt.sampler module
+Bayesian Influence Functions
 ----------------------------
 
-.. automodule:: devinterp.slt.sampler
+.. automodule:: devinterp.slt.bif
    :members:
    :show-inheritance:
-   :undoc-members:
 
-devinterp.slt.trace module
---------------------------
+Susceptibilities
+----------------
 
-.. automodule:: devinterp.slt.trace
+.. automodule:: devinterp.slt.susceptibilities
    :members:
    :show-inheritance:
-   :undoc-members:
 
-devinterp.slt.wbic module
--------------------------
+Observables
+-----------
 
-.. automodule:: devinterp.slt.wbic
+.. automodule:: devinterp.slt.observables
    :members:
    :show-inheritance:
-   :undoc-members:
+
+Loss Computation
+----------------
+
+.. automodule:: devinterp.slt.lm_loss
+   :members:
+   :show-inheritance:
+
+Covariance Utilities
+--------------------
+
+.. automodule:: devinterp.slt.covariance
+   :members:
+   :show-inheritance:
+
+Zarr Writing
+------------
+
+.. automodule:: devinterp.slt.writing
+   :members:
+   :show-inheritance:
+
+.. automodule:: devinterp.slt.zarr_schema
+   :members:
+   :show-inheritance:
 
 Module contents
 ---------------
@@ -90,4 +81,3 @@ Module contents
 .. automodule:: devinterp.slt
    :members:
    :show-inheritance:
-   :undoc-members:
