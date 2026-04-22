@@ -1,19 +1,27 @@
 """Sphinx configuration for devinterp documentation."""
 
 import os
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.abspath("../src"))
+
+# -- Project information -----------------------------------------------------
 
 project = "devinterp"
 copyright = "2024-2026, Timaeus"
 author = "Timaeus"
 
+# -- General configuration ---------------------------------------------------
+
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.autosectionlabel",
+    "sphinx.ext.githubpages",
+    "sphinx_math_dollar",
     "myst_parser",
 ]
 
@@ -25,33 +33,58 @@ source_suffix = {
     ".md": "markdown",
 }
 
-# -- Theme -------------------------------------------------------------------
+autosectionlabel_prefix_document = True
 
-html_theme = "furo"
-html_title = "DevInterp"
-
-html_theme_options = {
-    "light_css_variables": {
-        "color-brand-primary": "#2962FF",
-        "color-brand-content": "#2962FF",
-    },
-    "dark_css_variables": {
-        "color-brand-primary": "#82B1FF",
-        "color-brand-content": "#82B1FF",
+mathjax3_config = {
+    "tex": {
+        "inlineMath": [["\\(", "\\)"]],
+        "displayMath": [["\\[", "\\]"]],
     },
 }
+
+rst_prolog = """
+.. role:: python(code)
+    :language: python
+    :class: highlight
+
+.. role:: bash(code)
+    :language: bash
+    :class: highlight
+"""
+
+# -- Options for HTML output -------------------------------------------------
+
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
+html_css_files = ["custom.css"]
 
 # -- Autodoc -----------------------------------------------------------------
 
 autodoc_default_options = {
     "members": True,
+    "undoc-members": True,
+    "private-members": True,
+    "special-members": True,
+    "inherited-members": True,
     "show-inheritance": True,
 }
 
-autodoc_member_order = "bysource"
+autosummary_generate = True
 
-# Don't show inherited Pydantic/torch methods
-autodoc_inherited_members = False
 
-html_static_path = ["_static"]
-html_css_files = ["custom.css"]
+def run_apidoc(_):
+    current_dir = os.path.abspath(os.path.dirname(__file__))
+    module_dir = os.path.join(current_dir, "..", "src", "devinterp")
+    output_dir = os.path.join(current_dir, "source")
+    subprocess.call(["sphinx-apidoc", "-o", output_dir, module_dir, "--force"])
+
+
+def skip(app, what, name, obj, would_skip, options):
+    if name.startswith("_") or not getattr(obj, "__doc__", None):
+        return True
+    return would_skip
+
+
+def setup(app):
+    app.connect("autodoc-skip-member", skip)
+    app.connect("builder-inited", run_apidoc)

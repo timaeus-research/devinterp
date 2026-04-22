@@ -36,7 +36,9 @@ dev = [
 
 docs = [
     "sphinx",
-    "furo",
+    "sphinx-rtd-theme",
+    "sphinx-math-dollar",
+    "sphinx-autobuild",
     "myst_parser",
 ]
 
