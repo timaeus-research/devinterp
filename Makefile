@@ -4,7 +4,6 @@
 UV := $(shell command -v uv 2>/dev/null || echo ~/.local/bin/uv)
 VENV_NAME := ../../.venv
 PYTHON := $(VENV_NAME)/bin/python
-PIP := $(VENV_NAME)/bin/pip
 
 docs-prep:
 	cd docs && $(UV) run python generate_docs.py && cd ..

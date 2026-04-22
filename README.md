@@ -1,6 +1,6 @@
 # DevInterp
 
-[![PyPI version](https://badge.fury.io/py/devinterp.svg)](https://badge.fury.io/py/devinterp) ![Python version](https://img.shields.io/pypi/pyversions/devinterp) ![Contributors](https://img.shields.io/github/contributors/timaeus-research/devinterp) [![Docs](https://img.shields.io/badge/Read_the_Docs!-white?style=flat&logo=Read-the-Docs&logoColor=black&link=https%3A%2F%2Ftimaeus-research.github.io%2Fdevinterp%2F)](https://devinterp.timaeus.co/)
+[![PyPI version](https://badge.fury.io/py/devinterp.svg)](https://badge.fury.io/py/devinterp) ![Python version](https://img.shields.io/pypi/pyversions/devinterp) ![Contributors](https://img.shields.io/github/contributors/timaeus-research/devinterp) [![Docs](https://img.shields.io/badge/Read_the_Docs!-white?style=flat&logo=Read-the-Docs&logoColor=black)](https://devinterp.timaeus.co/)
 
 
 ## A Python Library for Developmental Interpretability Research
@@ -13,14 +13,17 @@ DevInterp is a python library for conducting research on developmental interpret
 
 - **SGLD Sampling** with per-token loss storage to xarray/Zarr
 - **Local Learning Coefficient (LLC)** estimation from sampling results
-- **Susceptibilities** measuring model response to distribution shifts across weight-restricted components
-- **Bayesian Influence Functions (BIF)** computing pairwise correlations between observable loss traces
-- **Observable framework** for evaluating multiple probe datasets during sampling
+- **Susceptibilities** measuring first-order posterior response to data perturbations, localized on model components
+- **Bayesian Influence Functions (BIF)** as posterior covariances between per-sample losses
 - **Weight restrictions** for sampling over parameter subsets (e.g., individual attention heads)
 
 ## Installation
 
-To install `devinterp`, simply run `pip install devinterp`. (Note: This has PyTorch as a dependency.)
+`devinterp` is distributed through PyPI. Install with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add devinterp
+```
 
 ## Example
 
@@ -45,7 +48,7 @@ result = llc(
 
 print(result["llc_mean"])         # scalar LLC
 print(result["llc_per_chain"])    # (num_chains,) per-chain LLC
-print(result["loss_trace"])       # (num_chains, num_draws) loss trace
+print(result["loss_trace"])       # (num_chains, num_steps) per-step loss, num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
 ```
 
 ### Sample with Observables
@@ -90,7 +93,7 @@ result = susceptibilities(
 # result is a DataTree with /susceptibilities and /context subtrees
 ```
 
-`create_param_masks` supports 95+ HuggingFace model types and TransformerLens.
+`create_param_masks` supports 85+ HuggingFace model types and TransformerLens.
 Restriction patterns: `"full"`, `"l0"`, `"l0h1"`, `"l0g0"` (GQA group), `"l0 attn"`, `"l0 mlp"`, `"embed"`, `"unembed"`.
 
 ### Compute BIF
@@ -116,7 +119,7 @@ result = bif(
 Each analysis has two entry points:
 
 - **High-level** (`llc()`, `bif()`, `susceptibilities()`): runs sampling and post-processing in one call
-- **Low-level** (`compute_llc()`, `compute_bif()`, `compute_susceptibilities()`): takes a pre-computed `xr.DataTree` from `sample()`, useful when you want to run sampling once and compute multiple analyses
+- **Low-level** (`compute_llc()`, `compute_bif()`): takes a pre-computed `xr.DataTree` from `sample()`, useful when you want to run sampling once and compute multiple analyses. `compute_susceptibilities()` takes a `dict[str, xr.DataTree]` (one tree per weight restriction), since susceptibilities require a separate sampling run for each restriction.
 
 The sampling pipeline stores full per-token losses to Zarr via `sample()`, and post-processing functions operate on the resulting `xr.DataTree`.
 
@@ -167,36 +170,33 @@ llc_value = float(result["llc_mean"])
 - Results are `xr.Dataset` / `xr.DataTree`, not dicts with string keys
 - New capabilities: `susceptibilities()`, `bif()`, observables, weight restrictions, per-token loss storage
 
-## Known Issues
+## Hyperparameter selection
 
-- LLC estimation is sensitive to hyperparameters. Always vary `lr`, `n_beta`, and `num_draws` to check robustness.
-- Hyperparameters do change what we observe, and we don't have ground truth. Observables should theoretically be independent of hyperparameters, but in practice estimates are sensitive.
+All sampling is sensitive to hyperparameters. See our [Sampling Hyperparameter Guide](https://timaeus.co/research/2026-04-21-sampling-guide).
 
-If you run into issues, please first check the GitHub issues, then ask in [the DevInterp Discord](https://discord.gg/UwjWKCZZYR).
 
 ## Further Reading
 
-- [You're Measuring Model Complexity Wrong](https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong) - Introduction to LLC and phase transitions
-- [Structural Inference with Susceptibilities](https://arxiv.org/abs/2504.18274) - Susceptibility framework for interpretability (Baker et al., 2025)
-- [Announcing Timaeus](https://www.lesswrong.com/posts/TjaeCWvLZtEDAS5Ex/announcing-timaeus) - Timaeus research program
-- Lau et al. (2023) - Local learning coefficient estimator
-- Watanabe (2009) - Algebraic Geometry and Statistical Learning Theory
+- [You're Measuring Model Complexity Wrong](https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong) - Introduction to LLC and phase transitions (2024)
+- [Structural Inference with Susceptibilities](https://arxiv.org/abs/2504.18274) (2025)
+- [Towards Spectroscopy: Susceptibility Clusters in Language Models](https://arxiv.org/abs/2601.12703) (2026)
+- [The Local Learning Coefficient: A Singularity-Aware Complexity Measure](https://arxiv.org/pdf/2308.12108) (2023)
+- [Algebraic Geometry and Statistical Learning Theory](https://www.cambridge.org/core/books/algebraic-geometry-and-statistical-learning-theory/9C8FD1BDC817E2FC79117C7F41544A3A#fndtn-information) Watanabe (2009)
 
 ## Credits & Citations
 
-<!-- TODO: Update credits and citation for v2 release. The current citation
-     reflects the original devinterp authors. The v2 sampling/susceptibilities/BIF
-     pipeline was ported from aether and needs proper attribution. -->
-
-This package was created by [Timaeus](https://timaeus.co).
+This package was created by [Timaeus](https://timaeus.co). Most of the sampling, LLC, susceptibility, and BIF implementations were developed internally; this package is a port of that joint work.
 
 If this package was useful in your work, please cite it as:
 
 ```BibTeX
-@misc{devinterpcode,
-  title = {DevInterp},
-  author = {van Wingerden, Stan and Hoogland, Jesse and Wang, George and Zhou, William},
-  year = {2024},
+@misc{devinterpcodeV2,
+  title  = {DevInterp},
+  author = {Snell, William and Wind, Johan Sokrates and Snikkers, Billy
+            and Fraser, Sandy and Newgas, Adam and Hoogland, Jesse
+            and Wang, George and Gordon, Andrew and Zhou, William
+            and van Wingerden, Stan},
+  year   = {2026},
   howpublished = {\url{https://github.com/timaeus-research/devinterp}},
 }
 ```

@@ -15,11 +15,13 @@ For questions, `join the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_!
 Installation
 ============
 
+``devinterp`` is distributed through PyPI. From within a `uv <https://docs.astral.sh/uv/>`_ project:
+
 .. code-block:: bash
 
-   pip install devinterp
+   uv add devinterp
 
-**Requirements**: Python 3.8 or higher. PyTorch is a dependency.
+**Requirements**: Python 3.10 or higher. 
 
 
 Quick Start
