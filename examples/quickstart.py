@@ -1,6 +1,6 @@
 """Quickstart: LLC, susceptibilities, and BIF on Qwen2.5-0.5B.
 
-Requires: pip install devinterp transformers datasets
+Requires: devinterp transformers datasets
 GPU recommended.
 """
 

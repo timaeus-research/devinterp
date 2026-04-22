@@ -15,11 +15,13 @@ For questions, `join the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_!
 Installation
 ============
 
+``devinterp`` is distributed through PyPI. Install with `uv <https://docs.astral.sh/uv/>`_:
+
 .. code-block:: bash
 
-   pip install devinterp
+   uv add devinterp
 
-**Requirements**: Python 3.8 or higher. PyTorch is a dependency.
+**Requirements**: Python 3.10 or higher.
 
 
 Quick Start
@@ -42,7 +44,9 @@ Compute the Local Learning Coefficient
        num_draws=200,
    )
    print(result["llc_mean"])         # scalar LLC
-   print(result["loss_trace"])       # (num_chains, num_draws) loss trace
+   print(result["llc_per_chain"])    # (num_chains,) per-chain LLC
+   print(result["loss_trace"])       # (num_chains, num_steps) per-step loss,
+                                     # num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
 
 
 Sample with Observables
@@ -132,9 +136,11 @@ Each analysis has two entry points:
 
 - **High-level** (``llc()``, ``bif()``, ``susceptibilities()``): runs sampling and
   post-processing in one call
-- **Low-level** (``compute_llc()``, ``compute_bif()``, ``compute_susceptibilities()``):
-  takes a pre-computed ``xr.DataTree`` from ``sample()``, useful when you want to run
-  sampling once and compute multiple analyses
+- **Low-level** (``compute_llc()``, ``compute_bif()``): takes a pre-computed
+  ``xr.DataTree`` from ``sample()``, useful when you want to run sampling once and
+  compute multiple analyses. ``compute_susceptibilities()`` takes a
+  ``dict[str, xr.DataTree]`` (one tree per weight restriction), since susceptibilities
+  require a separate sampling run for each restriction.
 
 The sampling pipeline stores full per-token losses to Zarr via ``sample()``, and
 post-processing functions operate on the resulting ``xr.DataTree``.
@@ -156,38 +162,41 @@ For non-standard models, ``sample_single_chain()`` in ``devinterp.slt.sampler`` 
 custom ``evaluate`` callable.
 
 
-Known Issues
-============
+Hyperparameter selection
+========================
 
-- LLC estimation is sensitive to hyperparameters. Always vary ``lr``, ``n_beta``, and
-  ``num_draws`` to check robustness.
-- Hyperparameters do change what we observe. Observables should theoretically be independent
-  of hyperparameters, but in practice estimates are sensitive.
+All sampling is sensitive to hyperparameters. See our `Sampling Hyperparameter Guide
+<https://timaeus.co/research/2026-04-21-sampling-guide>`_. 
 
 Further Reading
 ===============
 
-- `You're Measuring Model Complexity Wrong <https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong>`_ - Introduction to LLC and phase transitions
-- `Structural Inference with Susceptibilities <https://arxiv.org/abs/2504.18274>`_ - Susceptibility framework for interpretability (Baker et al., 2025)
-- Lau et al. (2023) - Local learning coefficient estimator
-- Watanabe (2009) - Algebraic Geometry and Statistical Learning Theory
+- `You're Measuring Model Complexity Wrong <https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong>`_ - Introduction to LLC and phase transitions (2024)
+- `Structural Inference with Susceptibilities <https://arxiv.org/abs/2504.18274>`_ (2025)
+- `Towards Spectroscopy: Susceptibility Clusters in Language Models <https://arxiv.org/abs/2601.12703>`_ (2026)
+- `The Local Learning Coefficient: A Singularity-Aware Complexity Measure <https://arxiv.org/pdf/2308.12108>`_ (2023)
+- `Algebraic Geometry and Statistical Learning Theory <https://www.cambridge.org/core/books/algebraic-geometry-and-statistical-learning-theory/9C8FD1BDC817E2FC79117C7F41544A3A#fndtn-information>`_ Watanabe (2009)
 
 
 Credits & Citations
 ===================
 
-.. TODO: Update credits and citation for v2 release. The current citation
-   reflects the original devinterp authors. The v2 sampling/susceptibilities/BIF
-   pipeline was ported from aether and needs proper attribution.
+This package was created by `Timaeus <https://timaeus.co>`_. Most of the sampling, LLC,
+susceptibility, and BIF implementations were developed internally; this package is a port
+of that joint work.
 
-This package was created by `Timaeus <https://timaeus.co>`_.
+If this package was useful in your work, please cite it as:
 
 .. code-block:: bibtex
 
-   @misc{devinterpcode,
-     title = {DevInterp},
-     author = {van Wingerden, Stan and Hoogland, Jesse and Wang, George and Zhou, William},
-     year = {2024},
+   @misc{devinterp2026,
+     title   = {DevInterp},
+     author  = {Snell, William and Wind, Johan Sokrates and Snikkers, Billy
+                and Fraser, Sandy and Newgas, Adam and Hoogland, Jesse
+                and Wang, George and Gordon, Andrew and Zhou, William
+                and van Wingerden, Stan},
+     year    = {2026},
+     version = {2.0},
      howpublished = {\url{https://github.com/timaeus-research/devinterp}},
    }
 
@@ -208,6 +217,6 @@ API Reference
 .. toctree::
    :maxdepth: 2
 
-   SLT Analysis <source/devinterp.slt>
+   Configs, Observables, Postprocessing <source/devinterp.slt>
    Sampling Methods <source/devinterp.optim>
    Utilities <source/devinterp.utils>

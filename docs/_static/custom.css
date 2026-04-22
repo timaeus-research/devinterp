@@ -1,26 +1,10 @@
-article figure {
+.rst-content figure {
   margin-block: 2em;
 }
 
-article figure figcaption {
+.rst-content figure figcaption,
+.rst-content figure .caption-text {
   font-size: 0.9rem;
   margin-inline: 12px;
   text-align: left;
-}
-
-/* Invert black-on-white figures in dark mode */
-body[data-theme="dark"] figure img.dark-invert {
-  filter: invert(1) hue-rotate(180deg);
-  &.dark-screen {
-    mix-blend-mode: screen;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  body:not([data-theme="light"]) figure img.dark-invert {
-    filter: invert(1) hue-rotate(180deg);
-    &.dark-screen {
-      mix-blend-mode: screen;
-    }
-  }
 }
