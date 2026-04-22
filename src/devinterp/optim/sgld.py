@@ -1,8 +1,25 @@
 import warnings
-from collections import defaultdict
-from typing import Callable, List, Optional, Union
+from typing import Callable, Iterable, Iterator, NamedTuple, Optional, Union
 
 import torch
+
+from .metrics import Metrics
+from .sketch import CountSketch, SketchBuffer
+
+
+class _ComponentVectors(NamedTuple):
+    """Post-masked component vectors from a single SGLD parameter update."""
+
+    # Duplicated from SGMCMC deliberately: SGLD is deprecated and will be
+    # removed, so coupling it to the replacement via a shared type would make
+    # that cleanup harder. Also the semantics differ slightly in the way masks
+    # are applied.
+
+    scaled_grad: torch.Tensor
+    unscaled_grad: torch.Tensor
+    localization: torch.Tensor
+    weight_decay: torch.Tensor
+    noise: torch.Tensor
 
 
 class SGLD(torch.optim.Optimizer):
@@ -18,13 +35,15 @@ class SGLD(torch.optim.Optimizer):
 
     The equation for the update is as follows:
 
-    $$\Delta w_t = \frac{\epsilon}{2}\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right)+\gamma\left(w_0-w_t\right) - \lambda w_t\right) + N(0, \epsilon\sigma^2)$$
+    .. math::
 
-    where $w_t$ is the weight at time $t$, $\epsilon$ is the learning rate,
-    $(\beta n)$ is the inverse temperature (we're in the tempered Bayes paradigm),
-    $n$ is the number of training samples, $m$ is the batch size, $\gamma$ is
-    the localization strength, $\lambda$ is the weight decay strength,
-    and $\sigma$ is the noise term.
+        \Delta w_t = \frac{\epsilon}{2}\left(\frac{\beta n}{m} \sum_{i=1}^m \nabla \log p\left(y_{l_i} \mid x_{l_i}, w_t\right)+\gamma\left(w_0-w_t\right) - \lambda w_t\right) + N(0, \epsilon\sigma^2)
+
+    where :math:`w_t` is the weight at time :math:`t`, :math:`\epsilon` is the learning rate,
+    :math:`(\beta n)` is the inverse temperature (we're in the tempered Bayes paradigm),
+    :math:`n` is the number of training samples, :math:`m` is the batch size, :math:`\gamma` is
+    the localization strength, :math:`\lambda` is the weight decay strength,
+    and :math:`\sigma` is the noise term.
 
     Example:
         >>> optimizer = SGLD(model.parameters(), lr=0.1, nbeta=utils.default_nbeta(dataloader))
@@ -37,99 +56,52 @@ class SGLD(torch.optim.Optimizer):
         :target: https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb
 
     Note:
-        - :python:`localization` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
-        - :python:`noise_level` is not intended to be changed, except when testing! Doing so will raise a warning.
-        - Although this class is a subclass of :python:`torch.optim.Optimizer`, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.
+        - ``localization`` is unique to this class and serves to guide the weights towards their original values. This is useful for estimating quantities over the local posterior.
+        - ``noise_level`` is not intended to be changed, except when testing! Doing so will raise a warning.
+        - Although this class is a subclass of ``torch.optim.Optimizer``, this is a bit of a misnomer in this case. It's not used for optimizing in LLC estimation, but rather for sampling from the posterior distribution around a point.
         - Hyperparameter optimization is more of an art than a science. Check out `the calibration notebook <https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb>`_ |colab6| for how to go about it in a simple case.
-    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either :python:`model.parameters()` or something more fancy, just like other :python:`torch.optim.Optimizer` classes.
+    :param params: Iterable of parameters to optimize or dicts defining parameter groups. Either ``model.parameters()`` or something more fancy, just like other ``torch.optim.Optimizer`` classes.
     :type params: Iterable
-    :param lr: Learning rate $\epsilon$. Default is 0.01
+    :param lr: Learning rate :math:`\epsilon`. Default is 0.01
     :type lr: float, optional
-    :param noise_level: Amount of Gaussian noise $\sigma$ introduced into gradient updates. Don't change this unless you know very well what you're doing! Default is 1
+    :param noise_level: Amount of Gaussian noise :math:`\sigma` introduced into gradient updates. Don't change this unless you know very well what you're doing! Default is 1
     :type noise_level: float, optional
-    :param weight_decay: L2 regularization term $\lambda$, applied as weight decay. Default is 0
+    :param weight_decay: L2 regularization term :math:`\lambda`, applied as weight decay. Default is 0
     :type weight_decay: float, optional
-    :param localization: Strength of the force $\gamma$ pulling weights back to their initial values. Default is 0
+    :param localization: Strength of the force :math:`\gamma` pulling weights back to their initial values. Default is 0
     :type localization: float, optional
     :param nbeta: Inverse reparameterized temperature (otherwise known as n*beta or ~beta), float (default: 1., set to utils.default_nbeta(dataloader)=len(batch_size)/np.log(len(batch_size)))
-    :type nbeta: int, optional
+    :type nbeta: float or Callable, optional
     :param bounding_box_size: the size of the bounding box enclosing our trajectory in parameter space. Default is None, in which case no bounding box is used.
     :type bounding_box_size: float, optional
-    :param save_noise: Whether to store the per-parameter noise during optimization. Default is False
-    :type save_noise: bool, optional
-    :param save_mala_vars: Whether to store variables for calculating Metropolis-Adjusted Langevin Algorithm (MALA) metrics.
-    :type save_mala_vars: bool, optional
-    :param optimize_over: A boolean tensor of the same shape as the parameters. Used to implement weight restrictions.
-    Think of it as a boolean mask that restricts the set of parameters that can be updated. Default is None (no restrictions).
-    :type optimize_over: torch.Tensor, optional
-    :param noise_norm: Boolean flag to track the norm of the noise. Default is False
-    :type noise_norm: bool, optional
-    :param grad_norm: Boolean flag to track the norm of the gradient. Default is False
-    :type grad_norm: bool, optional
-    :param weight_norm: Boolean flag to track the norm of the weights. Default is False
-    :type weight_norm: bool, optional
-    :param distance: Boolean flag to track the distance between the current weights and the initial weights. Default is False
-    :type distance: bool, optional
+    :param save_metrics: Whether to track metrics (scaled_grad, localization, weight_decay, noise norms) during optimization. Use :meth:`get_metrics` to retrieve. Default is False
+    :type save_metrics: bool, optional
 
-
-    :raises Warning: if :python:`noise_level` is set to anything other than 1
-    :raises Warning: if :python:`nbeta` is set to 1
+    :raises Warning: if ``noise_level`` is set to anything other than 1
+    :raises Warning: if ``nbeta`` is set to 1
     """
 
     def __init__(
         self,
-        params,
-        lr=0.01,
-        noise_level=1.0,
-        weight_decay=0.0,
-        localization=0.0,
-        nbeta: Union[Callable, float] = 1.0,
-        bounding_box_size=None,
-        save_noise=False,
-        save_mala_vars=False,
-        optimize_over=None,
-        noise_norm=False,
-        grad_norm=False,
-        weight_norm=False,
-        distance=False,
-        temperature: Optional[float] = None,
-        metrics: Optional[List[str]] = None,
+        params: Iterable[torch.nn.Parameter],
+        *,
+        lr: float = 0.01,
+        noise_level: float = 1.0,
+        weight_decay: float = 0.0,
+        localization: float = 0.0,
+        nbeta: Union[Callable[[], float], float] = 1.0,
+        bounding_box_size: Optional[float] = None,
+        save_metrics: bool = False,
+        sketch_dim: Optional[int] = None,
+        sketch_seed: int = 0,
     ):
         warnings.warn(
             "SGLD has been deprecated. Please use SGMCMC.sgld instead.",
             DeprecationWarning,
         )
 
-        if metrics:
-            valid_metrics = {
-                "noise",
-                "dws",
-                "localization_loss",
-                "noise_norm",
-                "grad_norm",
-                "weight_norm",
-                "distance",
-            }
-            invalid_metrics = set(metrics) - valid_metrics
-            if invalid_metrics:
-                raise ValueError(
-                    f"Invalid metrics: {invalid_metrics}. Valid metrics are: {valid_metrics}"
-                )
-
-            save_noise = save_noise or "noise" in metrics
-            save_mala_vars = (
-                save_mala_vars or "dws" in metrics or "localization_loss" in metrics
-            )
-            noise_norm = noise_norm or "noise_norm" in metrics
-            grad_norm = grad_norm or "grad_norm" in metrics
-            weight_norm = weight_norm or "weight_norm" in metrics
-            distance = distance or "distance" in metrics
-
-        if temperature is not None:
-            nbeta = temperature
-            warnings.warn(
-                "Temperature is deprecated. Please use nbeta in your yaml file instead."
-            )
+        self.save_metrics = save_metrics
+        self.save_sketches = sketch_dim is not None
 
         if noise_level != 1.0:
             warnings.warn(
@@ -146,51 +118,72 @@ class SGLD(torch.optim.Optimizer):
             localization=localization,
             nbeta=nbeta,
             bounding_box_size=bounding_box_size,
-            optimize_over=optimize_over,
-            noise_norm=noise_norm,
-            grad_norm=grad_norm,
-            weight_norm=weight_norm,
-            distance=distance,
         )
 
         # In torch.optim.Optimizer, the parameters are stored in a list of dictionaries.
         # defaults holds the default values for the optimizer parameters.
         super(SGLD, self).__init__(params, defaults)
-        self.save_noise = save_noise
-        self.save_mala_vars = save_mala_vars
-        self.noise = None
 
         # Save the initial parameters if the localization term is set
         for group in self.param_groups:
             group["num_el"] = 0
 
-            if group["localization"] != 0 or group["bounding_box_size"] != 0:
+            # Validate mask shape if present
+            if group.get("mask") is not None:
+                for p in group["params"]:
+                    mask = group["mask"]
+                    if isinstance(mask, torch.Tensor) and mask.shape != p.shape:
+                        raise ValueError(
+                            f"Mask shape {mask.shape} does not match parameter shape {p.shape}. "
+                            "Scalar masks are not supported."
+                        )
+
+            store_initial = (
+                group["localization"] != 0
+                or group["bounding_box_size"] != 0
+                or self.save_metrics
+                or self.save_sketches
+            )
+            if store_initial:
                 for p in group["params"]:
                     param_state = self.state[p]
                     param_state["initial_param"] = p.data.clone().detach()
                     group["num_el"] += p.numel()
 
-            for hp in ["noise_norm", "grad_norm", "distance", "weight_norm"]:
-                if group[hp] is not False:
-                    group[hp] = torch.tensor(0.0).to(p.device)
+            if self.save_metrics:
+                device = next(iter(group["params"])).device
+                group["metrics"] = Metrics().to(device)
 
-    def step(self, noise_generator: Optional[torch.Generator] = None):
+        if self.save_sketches:
+            assert sketch_dim is not None
+            total_numel = sum(
+                p.numel() for group in self.param_groups for p in group["params"]
+            )
+            device = next(iter(self.param_groups[0]["params"])).device
+            self._sketch = CountSketch.create(total_numel, sketch_dim, sketch_seed).to(
+                device
+            )
+            self._sketch_buf = SketchBuffer.create(sketch_dim, device)
+        else:
+            self._sketch = None
+            self._sketch_buf = None
+
+    def step(self, noise_generator: Optional[torch.Generator] = None) -> None:
         """
         Perform a single SGLD optimization step.
         """
-        if self.save_noise:
-            self.noise = defaultdict(list)
-
-        if self.save_mala_vars:
-            self.dws = []
-            self.localization_loss = 0.0
-
         with torch.no_grad():
+            _need_decomposition = self.save_metrics or self.save_sketches
+            param_offset = 0
+
+            if self.save_sketches:
+                assert self._sketch_buf is not None
+                self._sketch_buf.zero_()
+
             for group_idx, group in enumerate(self.param_groups):
-                for hp in ["noise_norm", "grad_norm", "distance", "weight_norm"]:
-                    # Zero iteration-level metrics that haven't been disabled.
-                    if group[hp] is not False:
-                        group[hp] *= 0.0
+                # Metrics lifecycle: zero → accumulate per-param → sqrt (see Metrics docstring)
+                if self.save_metrics:
+                    group["metrics"].zero_()
 
                 for p in group["params"]:
                     param_state = self.state[p]
@@ -214,20 +207,6 @@ class SGLD(torch.optim.Optimizer):
                     if group["localization"] != 0:
                         dw.add_(initial_param_distance, alpha=group["localization"])
 
-                    if self.save_mala_vars:
-                        if group["optimize_over"] is not None:
-                            initial_param_distance = (
-                                initial_param_distance * group["optimize_over"]
-                            )
-                        # localization_loss = (p.data - initial_param)^2 * group["optimize_over"]^2 * group["localization"] / 2
-                        #                                                           ^ boolean
-                        distance = (initial_param_distance.detach() ** 2).sum()
-                        self.localization_loss += distance * group["localization"] / 2
-                        self.dws.append(dw.clone())
-
-                        if group["distance"] is not False:
-                            group["distance"] += distance
-
                     # Add Gaussian noise
                     noise = torch.normal(
                         mean=0.0,
@@ -236,14 +215,22 @@ class SGLD(torch.optim.Optimizer):
                         device=dw.device,
                         generator=noise_generator,
                     )
-                    if self.save_noise:
-                        # Noise saved here is the unscaled noise.
-                        self.noise[group_idx].append(noise)
 
-                    if group["optimize_over"] is not None:
+                    if group.get("mask") is not None:
                         # Restrict the noise and gradient to the subset of parameters we're optimizing over.
-                        dw = dw * group["optimize_over"]
-                        noise = noise * group["optimize_over"]
+                        dw = dw * group["mask"]
+                        noise = noise * group["mask"]
+
+                    if _need_decomposition:
+                        components = self._decompose_update(
+                            group, p, dw, initial_param_distance, noise
+                        )
+                        if self.save_metrics:
+                            self._accumulate_metrics(
+                                group, p, components, initial_param_distance
+                            )
+                        if self.save_sketches:
+                            self._scatter_sketches(components, param_offset)
 
                     # Update parameters
                     p.data.add_(dw, alpha=-0.5 * group["lr"])
@@ -251,23 +238,8 @@ class SGLD(torch.optim.Optimizer):
                         noise, alpha=group["lr"] ** 0.5
                     )  # Scale noise by sqrt(lr)
 
-                    # Track the size of the changes & relative contributions
-                    if group["grad_norm"] is not False and p.grad is not None:
-                        group["grad_norm"] += (
-                            ((p.grad.data * group["nbeta"] * 0.5 * group["lr"]) ** 2)
-                            .sum()
-                            .detach()
-                        )
-
-                    if group["noise_norm"] is not False:
-                        group["noise_norm"] += (noise**2).sum().detach()
-
-                    if group["distance"] is not False and not self.save_mala_vars:
-                        group["distance"] += (
-                            ((initial_param_distance * group["localization"]) ** 2)
-                            .sum()
-                            .detach()
-                        )
+                    if self.save_sketches:
+                        param_offset += p.numel()
 
                     # Rebound if exceeded bounding box size
                     if group["bounding_box_size"]:
@@ -279,21 +251,132 @@ class SGLD(torch.optim.Optimizer):
                             + group["bounding_box_size"],
                         )
 
-                    if group["weight_norm"] is not False:
-                        group["weight_norm"] += (p.data**2).sum().detach()
+                if self.save_metrics:
+                    # All params accumulated; convert sum-of-squares to L2 norms
+                    group["metrics"].sqrt_norms_()
 
-                for hp in ["noise_norm", "grad_norm", "distance", "weight_norm"]:
-                    if group[hp] is not False:
-                        group[hp] = (group[hp] ** 0.5).detach()
+    def _decompose_update(
+        self,
+        group: dict,
+        p: torch.Tensor,
+        dw: torch.Tensor,
+        initial_param_distance: torch.Tensor,
+        noise: torch.Tensor,
+    ) -> _ComponentVectors:
+        """Decompose an SGLD parameter update into post-masked component vectors.
 
-    def __getattr__(self, name):
+        Shared by both metrics accumulation and sketch scattering. SGLD has no
+        preconditioner, so unscaled_grad == scaled_grad. Debug assertions verify
+        the decomposition matches the actual update.
         """
-        Return iteration-level metrics if requested.
-        """
+        _lr = group["lr"]
+        _mask = group.get("mask")
+        _half_lr = 0.5 * _lr
+
+        # Multiplication order must match step() to avoid bfloat16 associativity errors:
+        #   step() builds dw as: (p.grad * nbeta) + (p.data * wd) + (dist * loc)
+        raw_grad = p.grad.data if p.grad is not None else torch.zeros_like(p.data)
+        _scaled_grad = _half_lr * raw_grad.mul(group["nbeta"])
+        _noise_vec = noise * (_lr**0.5)
+        _loc = _half_lr * initial_param_distance.mul(group["localization"])
+        _wd = _half_lr * p.data.mul(group["weight_decay"])
+
+        if _mask is not None:
+            _scaled_grad = _scaled_grad * _mask
+            _loc = _loc * _mask
+            _wd = _wd * _mask
+            _noise_vec = _noise_vec * _mask
+
+        # Sanity-check: reconstructed components must sum to the actual update.
+        # step() builds dw via in-place add_ (which may use FMA on GPU),
+        # then we multiply by half_lr once. Here we multiply half_lr into
+        # each component separately and sum — distributing the scalar
+        # breaks IEEE 754 associativity. The rounding gap scales with the
+        # component magnitudes and the dtype's epsilon (significant for
+        # bfloat16 models where eps ≈ 0.004). Using the sum of absolute
+        # values as the scale handles catastrophic cancellation, where
+        # large components nearly cancel leaving a small residual whose
+        # relative error would otherwise look enormous.
+        if __debug__:
+            _step_eps = torch.finfo(dw.dtype).eps
+            _decomp_scale = float((_scaled_grad.abs() + _loc.abs() + _wd.abs()).max())
+            _decomp_atol = max(_decomp_scale * _step_eps * 16, 1e-12)
+            torch.testing.assert_close(
+                (_scaled_grad + _loc + _wd).float(),
+                (_half_lr * dw).float(),
+                atol=_decomp_atol,
+                rtol=0,
+                msg=lambda s: f"Decomposition components don't match gradient update:\n{s}",
+            )
+
+        return _ComponentVectors(
+            scaled_grad=_scaled_grad,
+            unscaled_grad=_scaled_grad,
+            localization=_loc,
+            weight_decay=_wd,
+            noise=_noise_vec,
+        )
+
+    def _accumulate_metrics(
+        self,
+        group: dict,
+        p: torch.Tensor,
+        components: _ComponentVectors,
+        initial_param_distance: torch.Tensor,
+    ) -> None:
+        """Accumulate decomposed component vectors into per-group metrics."""
+        _mask = group.get("mask")
+        if _mask is not None:
+            initial_param_distance = initial_param_distance * _mask
+            numel = p[_mask.bool()].numel()
+        else:
+            numel = p.numel()
+
+        group["metrics"].add_sum_squared_(
+            scaled_grad=components.scaled_grad,
+            unscaled_grad=components.unscaled_grad,
+            localization=components.localization,
+            weight_decay=components.weight_decay,
+            noise=components.noise,
+            distance=initial_param_distance,
+        )
+        group["metrics"].add_dot_products_(
+            scaled_grad=components.scaled_grad,
+            prior=components.localization + components.weight_decay,
+            noise=components.noise,
+        )
+        group["metrics"].numel += numel
+
+    def _scatter_sketches(self, components: _ComponentVectors, offset: int) -> None:
+        """Scatter decomposed component vectors into the sketch buffer."""
+        buf = self._sketch_buf
+        sketch = self._sketch
+        assert buf is not None and sketch is not None
+        sketch.scatter_into_(buf.scaled_grad, components.scaled_grad, offset)
+        sketch.scatter_into_(buf.unscaled_grad, components.unscaled_grad, offset)
+        sketch.scatter_into_(buf.localization, components.localization, offset)
+        sketch.scatter_into_(buf.weight_decay, components.weight_decay, offset)
+        sketch.scatter_into_(buf.noise, components.noise, offset)
+
+    def get_sketches(self) -> SketchBuffer:
+        """Return a CPU snapshot of the current sketch buffer."""
+        if not self.save_sketches:
+            raise RuntimeError("Sketches not enabled.")
+        assert self._sketch_buf is not None
+        return SketchBuffer(
+            **{
+                q: getattr(self._sketch_buf, q).detach().cpu().clone()
+                for q in SketchBuffer.QUANTITIES
+            }
+        )
+
+    def iter_group_metrics(self) -> Iterator[Metrics]:
+        """Yield metrics for each param group."""
+        if not self.save_metrics:
+            raise RuntimeError("Metrics not enabled. Set save_metrics=True.")
         for group in self.param_groups:
-            # If the metric key is missing or set to False, raise AttributeError
-            if name not in group or group[name] is False:
-                raise AttributeError(f"'SGLD' object has no tracked metric '{name}'")
-            return group[name]
+            yield group["metrics"]
 
-        raise AttributeError(f"'SGLD' object has no attribute '{name}'")
+    def get_metrics(self) -> Metrics:
+        """Aggregate metrics across all param groups into a single CPU Metrics."""
+        return Metrics.aggregate(self.iter_group_metrics())

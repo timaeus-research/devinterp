@@ -1,0 +1,10 @@
+.rst-content figure {
+  margin-block: 2em;
+}
+
+.rst-content figure figcaption,
+.rst-content figure .caption-text {
+  font-size: 0.9rem;
+  margin-inline: 12px;
+  text-align: left;
+}

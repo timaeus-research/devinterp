@@ -1,6 +1,6 @@
 # DevInterp
 
-[![PyPI version](https://badge.fury.io/py/devinterp.svg)](https://badge.fury.io/py/devinterp) ![Python version](https://img.shields.io/pypi/pyversions/devinterp) ![Contributors](https://img.shields.io/github/contributors/timaeus-research/devinterp) [![Docs](https://img.shields.io/badge/Read_the_Docs!-white?style=flat&logo=Read-the-Docs&logoColor=black&link=https%3A%2F%2Ftimaeus-research.github.io%2Fdevinterp%2F)](https://devinterp.timaeus.co/)
+[![PyPI version](https://badge.fury.io/py/devinterp.svg)](https://badge.fury.io/py/devinterp) ![Python version](https://img.shields.io/pypi/pyversions/devinterp) ![Contributors](https://img.shields.io/github/contributors/timaeus-research/devinterp) [![Docs](https://img.shields.io/badge/Read_the_Docs!-white?style=flat&logo=Read-the-Docs&logoColor=black)](https://devinterp.timaeus.co/)
 
 
 ## A Python Library for Developmental Interpretability Research
@@ -9,72 +9,195 @@ DevInterp is a python library for conducting research on developmental interpret
 
 [Read more about developmental interpretability](https://www.lesswrong.com/posts/TjaeCWvLZtEDAS5Ex/towards-developmental-interpretability).
 
+## Features
 
-> :warning: This library is still in early development. Don't expect things to work on a first attempt. We are actively working on improving the library and adding new features. 
+- **SGLD Sampling** with per-token loss storage to xarray/Zarr
+- **Local Learning Coefficient (LLC)** estimation from sampling results
+- **Susceptibilities** measuring first-order posterior response to data perturbations, localized on model components
+- **Bayesian Influence Functions (BIF)** as posterior correlations (or covariances) between per-sample losses
+- **Weight restrictions** for sampling over parameter subsets (e.g., individual attention heads)
 
 ## Installation
 
- To install `devinterp`, simply run `pip install devinterp`. (Note: This has PyTorch as a dependency.)
+`devinterp` is distributed through PyPI. Install with [uv](https://docs.astral.sh/uv/):
 
-### Minimal Example
-
-```python
-
-from devinterp.slt.sampler import  sample, LLCEstimator
-from devinterp.optim import SGLD
-from devinterp.utils import default_nbeta
-
-# Assuming you have a PyTorch Model assigned to model, and DataLoader assigned to trainloader
-llc_estimator = LLCEstimator(..., nbeta=default_nbeta(trainloader))
-sample(model, trainloader, ..., callbacks = [llc_estimator])
-
-llc_mean = llc_estimator.get_results()["llc/mean"]
-
+```bash
+uv add devinterp
 ```
 
-## Advanced Usage
+## Example
 
-To see DevInterp in action, check out our example notebooks:
+See [`examples/quickstart.py`](examples/quickstart.py) for a runnable script that computes LLC and susceptibilities on Qwen2.5-0.5B.
 
-- [Introduction](https://www.github.com/timaeus-research/devinterp/blob/main/examples/introduction.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/introduction.ipynb)
-- [Normal Crossing Demo](https://www.github.com/timaeus-research/devinterp/blob/main/examples/normal_crossing.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/normal_crossing.ipynb)
-- [Grokking Demo](https://www.github.com/timaeus-research/devinterp/blob/main/examples/grokking.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/grokking.ipynb)
+## Quick Start
 
-For more advanced usage, see [the Diagnostics notebook](https://www.github.com/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/diagnostics.ipynb) and for a quick guide on picking hyperparameters, see the above [Grokking Demo](https://www.github.com/timaeus-research/devinterp/blob/main/examples/grokking.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/grokking.ipynb) or the [the Calibration notebook.](https://www.github.com/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/sgld_calibration.ipynb). Documentation can be [found here](https://devinterp.timaeus.co/). [![Docs](https://img.shields.io/badge/Read_the_Docs!-white?style=flat&logo=Read-the-Docs&logoColor=black&link=https%3A%2F%2Ftimaeus-research.github.io%2Fdevinterp%2F)](https://devinterp.timaeus.co/)
+### Compute the Local Learning Coefficient
 
-For papers that either inspired or used the DevInterp package, [click here](https://devinterp.com/publications).
+```python
+from devinterp.slt.llc import llc
 
-## Known Issues
+result = llc(
+    model=model,
+    dataset=dataset,              # HuggingFace Dataset with "input_ids"
+    observables={"train": dataset},
+    lr=0.001,
+    n_beta=30,
+    num_chains=4,
+    num_draws=200,
+)
 
-- LLC Estimation is currently more of an art than a science. It will take some time and pain to get it work reliably.
+print(result["llc_mean"])         # scalar LLC
+print(result["llc_per_chain"])    # (num_chains,) per-chain LLC
+print(result["loss_trace"])       # (num_chains, num_steps) per-step loss, num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
+```
 
-If you run into issues not mentioned here, please first check the github issues, then ask in [the DevInterp Discord](https://discord.gg/UwjWKCZZYR), and only then make a new github issue.
+### Sample with Observables
 
-## Contributing
+```python
+from devinterp.slt.sampling import sample
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on how to contribute. 
+tree = sample(
+    model=model,
+    dataset=train_data,
+    observables={
+        "train": train_data,
+        "code": (code_data, 5),   # (dataset, batches_per_draw)
+    },
+    lr=0.001,
+    n_beta=30,
+    num_chains=4,
+    num_draws=200,
+)
+# tree is an xr.DataTree backed by Zarr with full per-token loss traces
+```
+
+### Compute Susceptibilities
+
+```python
+from devinterp.slt.susceptibilities import susceptibilities
+from devinterp.slt.weight_restrictions import create_param_masks
+
+result = susceptibilities(
+    model=model,
+    dataset=train_data,
+    observables={"train": train_data, "code": code_data},
+    weight_restrictions={
+        "full": None,
+        "l0h0": create_param_masks(model, "l0h0"),
+        "l0h1": create_param_masks(model, "l0h1"),
+    },
+    sampling_task="train",
+    lr=0.001,
+    n_beta=30,
+)
+# result is a DataTree with /susceptibilities and /context subtrees
+```
+
+`create_param_masks` supports 85+ HuggingFace model types and TransformerLens.
+Restriction patterns: `"full"`, `"l0"`, `"l0h1"`, `"l0g0"` (GQA group), `"l0 attn"`, `"l0 mlp"`, `"embed"`, `"unembed"`.
+
+### Compute BIF
+
+```python
+from devinterp.slt.bif import bif
+
+result = bif(
+    model=model,
+    dataset=train_data,
+    observables={"train": train_data, "code": code_data},
+    lr=0.001,
+    n_beta=30,
+    num_chains=4,
+    num_draws=200,
+    correlation_method="token",  # or "sequence"
+)
+# result["influences"] contains pairwise correlation matrix
+```
+
+## Architecture
+
+Each analysis has two entry points:
+
+- **High-level** (`llc()`, `bif()`, `susceptibilities()`): runs sampling and post-processing in one call
+- **Low-level** (`compute_llc()`, `compute_bif()`): takes a pre-computed `xr.DataTree` from `sample()`, useful when you want to run sampling once and compute multiple analyses. `compute_susceptibilities()` takes a `dict[str, xr.DataTree]` (one tree per weight restriction), since susceptibilities require a separate sampling run for each restriction.
+
+The sampling pipeline stores full per-token losses to Zarr via `sample()`, and post-processing functions operate on the resulting `xr.DataTree`.
+
+## Model Requirements
+
+The current API assumes **autoregressive language models** with fixed-length tokenized sequences:
+
+- Model must accept `input_ids` and return logits (HuggingFace models, TransformerLens HookedTransformer, or any model returning a tensor or object with `.logits`)
+- Dataset must be a HuggingFace `Dataset` with an `"input_ids"` column of uniform-length sequences
+- Loss defaults to next-token cross-entropy
+
+For non-standard losses, pass `loss_fn=...` to `sample()`, `bif()`, `llc()`, or `susceptibilities()`. The function takes `(model, input_ids)` and must return per-token loss of shape `(batch, seq_len-1)`. For more exotic control, `sample_single_chain()` in `devinterp.slt.sampler` accepts a custom `evaluate` callable.
+
+## Migrating from v1
+
+The v2 API replaces the callback-based sampling with a data-centric pipeline. Key changes:
+
+```python
+# v1 (old)
+from devinterp.slt.sampler import estimate_learning_coeff_with_summary
+from devinterp.optim import SGLD
+
+result = estimate_learning_coeff_with_summary(
+    model, loader,
+    sampling_method=SGLD,
+    sampling_method_kwargs={"lr": 0.001, "nbeta": 30},
+    num_chains=4, num_draws=200,
+)
+llc = result["llc/mean"]
+
+# v2 (new)
+from devinterp.slt.llc import llc
+
+result = llc(
+    model=model,
+    dataset=dataset,                # HF Dataset, not DataLoader
+    observables={"train": dataset},
+    lr=0.001, n_beta=30,
+    num_chains=4, num_draws=200,
+)
+llc_value = float(result["llc_mean"])
+```
+
+**What changed:**
+- `estimate_learning_coeff` / `LLCEstimator` / `SamplerCallback` → `llc()` and `compute_llc()`
+- `DataLoader` → HuggingFace `Dataset` with `"input_ids"` column
+- `sampling_method_kwargs={"nbeta": ...}` → `n_beta=...` as a direct parameter
+- Results are `xr.Dataset` / `xr.DataTree`, not dicts with string keys
+- New capabilities: `susceptibilities()`, `bif()`, observables, weight restrictions, per-token loss storage
+
+## Hyperparameter selection
+
+All sampling is sensitive to hyperparameters. See our [Sampling Hyperparameter Guide](https://timaeus.co/research/2026-04-21-sampling-guide).
+
+
+## Further Reading
+
+- [You're Measuring Model Complexity Wrong](https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong) - Introduction to LLC and phase transitions (2024)
+- [Structural Inference with Susceptibilities](https://arxiv.org/abs/2504.18274) (2025)
+- [Towards Spectroscopy: Susceptibility Clusters in Language Models](https://arxiv.org/abs/2601.12703) (2026)
+- [The Local Learning Coefficient: A Singularity-Aware Complexity Measure](https://arxiv.org/pdf/2308.12108) (2023)
+- [Algebraic Geometry and Statistical Learning Theory](https://www.cambridge.org/core/books/algebraic-geometry-and-statistical-learning-theory/9C8FD1BDC817E2FC79117C7F41544A3A#fndtn-information) Watanabe (2009)
 
 ## Credits & Citations
 
-This package was created by [Timaeus](https://timaeus.co). The main contributors to this package are Stan van Wingerden, Jesse Hoogland, George Wang, and William Zhou. Zach Furman, Matthew Farrugia-Roberts, Rohan Hitchcock, and Edmund Lau also made valuable contributions or provided useful advice.
+This package was created by [Timaeus](https://timaeus.co). Most of the sampling, LLC, susceptibility, and BIF implementations were developed internally; this package is a port of that joint work.
 
 If this package was useful in your work, please cite it as:
 
 ```BibTeX
-@misc{devinterpcode,
-  title = {DevInterp},
-  author = {van Wingerden, Stan and Hoogland, Jesse and Wang, George and Zhou, William},
-  year = {2024},
+@misc{devinterp2026,
+  title   = {DevInterp},
+  author  = {Snell, William and Wind, Johan Sokrates and Snikkers, Billy
+             and Fraser, Sandy and Newgas, Adam and Hoogland, Jesse
+             and Wang, George and Gordon, Andrew and Zhou, William
+             and van Wingerden, Stan},
+  year    = {2026},
+  version = {2.0},
   howpublished = {\url{https://github.com/timaeus-research/devinterp}},
 }
 ```
-
-## Optional Dependencies
-
-DevInterp offers additional visualization functionalities that are not included in the base installation. To enable these features, install the package with the `vis` extra:
-
-```sh
-pip install devinterp[vis]
-```
-
-This will install `plotly`, which is required for the visualization utilities provided in `vis_utils.py`.

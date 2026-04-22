@@ -4,6 +4,14 @@ devinterp.optim package
 Submodules
 ----------
 
+devinterp.optim.metrics module
+------------------------------
+
+.. automodule:: devinterp.optim.metrics
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 devinterp.optim.preconditioner module
 -------------------------------------
 
@@ -40,6 +48,14 @@ devinterp.optim.sgnht module
 ----------------------------
 
 .. automodule:: devinterp.optim.sgnht
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+devinterp.optim.sketch module
+-----------------------------
+
+.. automodule:: devinterp.optim.sketch
    :members:
    :undoc-members:
    :show-inheritance:

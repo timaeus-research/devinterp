@@ -4,26 +4,26 @@ devinterp.slt package
 Submodules
 ----------
 
-devinterp.slt.callback module
------------------------------
-
-.. automodule:: devinterp.slt.callback
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-devinterp.slt.cov module
+devinterp.slt.bif module
 ------------------------
 
-.. automodule:: devinterp.slt.cov
+.. automodule:: devinterp.slt.bif
    :members:
    :undoc-members:
    :show-inheritance:
 
-devinterp.slt.gradient module
------------------------------
+devinterp.slt.config module
+---------------------------
 
-.. automodule:: devinterp.slt.gradient
+.. automodule:: devinterp.slt.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+devinterp.slt.covariance module
+-------------------------------
+
+.. automodule:: devinterp.slt.covariance
    :members:
    :undoc-members:
    :show-inheritance:
@@ -36,26 +36,18 @@ devinterp.slt.llc module
    :undoc-members:
    :show-inheritance:
 
-devinterp.slt.loss module
--------------------------
+devinterp.slt.lm\_loss module
+-----------------------------
 
-.. automodule:: devinterp.slt.loss
+.. automodule:: devinterp.slt.lm_loss
    :members:
    :undoc-members:
    :show-inheritance:
 
-devinterp.slt.mala module
--------------------------
+devinterp.slt.observables module
+--------------------------------
 
-.. automodule:: devinterp.slt.mala
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-devinterp.slt.norms module
---------------------------
-
-.. automodule:: devinterp.slt.norms
+.. automodule:: devinterp.slt.observables
    :members:
    :undoc-members:
    :show-inheritance:
@@ -68,18 +60,42 @@ devinterp.slt.sampler module
    :undoc-members:
    :show-inheritance:
 
-devinterp.slt.trace module
---------------------------
+devinterp.slt.sampling module
+-----------------------------
 
-.. automodule:: devinterp.slt.trace
+.. automodule:: devinterp.slt.sampling
    :members:
    :undoc-members:
    :show-inheritance:
 
-devinterp.slt.wbic module
--------------------------
+devinterp.slt.susceptibilities module
+-------------------------------------
 
-.. automodule:: devinterp.slt.wbic
+.. automodule:: devinterp.slt.susceptibilities
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+devinterp.slt.weight\_restrictions module
+-----------------------------------------
+
+.. automodule:: devinterp.slt.weight_restrictions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+devinterp.slt.writing module
+----------------------------
+
+.. automodule:: devinterp.slt.writing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+devinterp.slt.zarr\_schema module
+---------------------------------
+
+.. automodule:: devinterp.slt.zarr_schema
    :members:
    :undoc-members:
    :show-inheritance:
