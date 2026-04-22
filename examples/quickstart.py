@@ -1,6 +1,6 @@
 """Quickstart: LLC, susceptibilities, and BIF on Qwen2.5-0.5B.
 
-Requires: uv add devinterp
+Requires: devinterp transformers datasets
 GPU recommended.
 """
 

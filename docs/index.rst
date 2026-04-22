@@ -15,7 +15,7 @@ For questions, `join the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_!
 Installation
 ============
 
-``devinterp`` is distributed through PyPI. Instal with `uv <https://docs.astral.sh/uv/>`_:
+``devinterp`` is distributed through PyPI. Install with `uv <https://docs.astral.sh/uv/>`_:
 
 .. code-block:: bash
 
@@ -162,21 +162,20 @@ For non-standard models, ``sample_single_chain()`` in ``devinterp.slt.sampler`` 
 custom ``evaluate`` callable.
 
 
-Known Issues
-============
+Hyperparameter selection
+========================
 
-- LLC estimation is sensitive to hyperparameters. Always vary ``lr``, ``n_beta``, and
-  ``num_draws`` to check robustness.
-- Hyperparameters do change what we observe. Observables should theoretically be independent
-  of hyperparameters, but in practice estimates are sensitive.
+All sampling is sensitive to hyperparameters. See our `Sampling Hyperparameter Guide
+<https://timaeus.co/research/2026-04-21-sampling-guide>`_. 
 
 Further Reading
 ===============
 
-- `You're Measuring Model Complexity Wrong <https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong>`_ - Introduction to LLC and phase transitions
-- `Structural Inference with Susceptibilities <https://arxiv.org/abs/2504.18274>`_ - Susceptibility framework for interpretability (Baker et al., 2025)
-- Lau et al. (2023) - Local learning coefficient estimator
-- Watanabe (2009) - Algebraic Geometry and Statistical Learning Theory
+- `You're Measuring Model Complexity Wrong <https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong>`_ - Introduction to LLC and phase transitions (2024)
+- `Structural Inference with Susceptibilities <https://arxiv.org/abs/2504.18274>`_ (2025)
+- `Towards Spectroscopy: Susceptibility Clusters in Language Models <https://arxiv.org/abs/2601.12703>`_ (2026)
+- `The Local Learning Coefficient: A Singularity-Aware Complexity Measure <https://arxiv.org/pdf/2308.12108>`_ (2023)
+- `Algebraic Geometry and Statistical Learning Theory <https://www.cambridge.org/core/books/algebraic-geometry-and-statistical-learning-theory/9C8FD1BDC817E2FC79117C7F41544A3A#fndtn-information>`_ Watanabe (2009)
 
 
 Credits & Citations
@@ -218,6 +217,6 @@ API Reference
 .. toctree::
    :maxdepth: 2
 
-   SLT Analysis <source/devinterp.slt>
+   Configs, Observables, Postprocessing <source/devinterp.slt>
    Sampling Methods <source/devinterp.optim>
    Utilities <source/devinterp.utils>
