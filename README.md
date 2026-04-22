@@ -14,7 +14,7 @@ DevInterp is a python library for conducting research on developmental interpret
 - **SGLD Sampling** with per-token loss storage to xarray/Zarr
 - **Local Learning Coefficient (LLC)** estimation from sampling results
 - **Susceptibilities** measuring first-order posterior response to data perturbations, localized on model components
-- **Bayesian Influence Functions (BIF)** as posterior covariances between per-sample losses
+- **Bayesian Influence Functions (BIF)** as posterior correlations (or covariances) between per-sample losses
 - **Weight restrictions** for sampling over parameter subsets (e.g., individual attention heads)
 
 ## Installation
@@ -190,13 +190,14 @@ This package was created by [Timaeus](https://timaeus.co). Most of the sampling,
 If this package was useful in your work, please cite it as:
 
 ```BibTeX
-@misc{devinterpcodeV2,
-  title  = {DevInterp},
-  author = {Snell, William and Wind, Johan Sokrates and Snikkers, Billy
-            and Fraser, Sandy and Newgas, Adam and Hoogland, Jesse
-            and Wang, George and Gordon, Andrew and Zhou, William
-            and van Wingerden, Stan},
-  year   = {2026},
+@misc{devinterp2026,
+  title   = {DevInterp},
+  author  = {Snell, William and Wind, Johan Sokrates and Snikkers, Billy
+             and Fraser, Sandy and Newgas, Adam and Hoogland, Jesse
+             and Wang, George and Gordon, Andrew and Zhou, William
+             and van Wingerden, Stan},
+  year    = {2026},
+  version = {2.0},
   howpublished = {\url{https://github.com/timaeus-research/devinterp}},
 }
 ```

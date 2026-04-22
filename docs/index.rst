@@ -21,7 +21,7 @@ Installation
 
    uv add devinterp
 
-**Requirements**: Python 3.10 or higher. 
+**Requirements**: Python 3.10 or higher.
 
 
 Quick Start
