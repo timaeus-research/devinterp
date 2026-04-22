@@ -15,7 +15,7 @@ For questions, `join the DevInterp discord <https://discord.gg/UwjWKCZZYR>`_!
 Installation
 ============
 
-``devinterp`` is distributed through PyPI. From within a `uv <https://docs.astral.sh/uv/>`_ project:
+``devinterp`` is distributed through PyPI. Instal with `uv <https://docs.astral.sh/uv/>`_:
 
 .. code-block:: bash
 
@@ -44,7 +44,9 @@ Compute the Local Learning Coefficient
        num_draws=200,
    )
    print(result["llc_mean"])         # scalar LLC
-   print(result["loss_trace"])       # (num_chains, num_draws) loss trace
+   print(result["llc_per_chain"])    # (num_chains,) per-chain LLC
+   print(result["loss_trace"])       # (num_chains, num_steps) per-step loss,
+                                     # num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
 
 
 Sample with Observables
@@ -134,9 +136,11 @@ Each analysis has two entry points:
 
 - **High-level** (``llc()``, ``bif()``, ``susceptibilities()``): runs sampling and
   post-processing in one call
-- **Low-level** (``compute_llc()``, ``compute_bif()``, ``compute_susceptibilities()``):
-  takes a pre-computed ``xr.DataTree`` from ``sample()``, useful when you want to run
-  sampling once and compute multiple analyses
+- **Low-level** (``compute_llc()``, ``compute_bif()``): takes a pre-computed
+  ``xr.DataTree`` from ``sample()``, useful when you want to run sampling once and
+  compute multiple analyses. ``compute_susceptibilities()`` takes a
+  ``dict[str, xr.DataTree]`` (one tree per weight restriction), since susceptibilities
+  require a separate sampling run for each restriction.
 
 The sampling pipeline stores full per-token losses to Zarr via ``sample()``, and
 post-processing functions operate on the resulting ``xr.DataTree``.
@@ -178,18 +182,22 @@ Further Reading
 Credits & Citations
 ===================
 
-.. TODO: Update credits and citation for v2 release. The current citation
-   reflects the original devinterp authors. The v2 sampling/susceptibilities/BIF
-   pipeline was ported from aether and needs proper attribution.
+This package was created by `Timaeus <https://timaeus.co>`_. Most of the sampling, LLC,
+susceptibility, and BIF implementations were developed internally; this package is a port
+of that joint work.
 
-This package was created by `Timaeus <https://timaeus.co>`_.
+If this package was useful in your work, please cite it as:
 
 .. code-block:: bibtex
 
-   @misc{devinterpcode,
-     title = {DevInterp},
-     author = {van Wingerden, Stan and Hoogland, Jesse and Wang, George and Zhou, William},
-     year = {2024},
+   @misc{devinterp2026,
+     title   = {DevInterp},
+     author  = {Snell, William and Wind, Johan Sokrates and Snikkers, Billy
+                and Fraser, Sandy and Newgas, Adam and Hoogland, Jesse
+                and Wang, George and Gordon, Andrew and Zhou, William
+                and van Wingerden, Stan},
+     year    = {2026},
+     version = {2.0},
      howpublished = {\url{https://github.com/timaeus-research/devinterp}},
    }
 
