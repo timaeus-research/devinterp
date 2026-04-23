@@ -21,7 +21,7 @@ from devinterp.slt.config import EpochMode
 from devinterp.slt.lm_loss import NonFiniteLogitsError
 from torch import nn
 from torch.utils.data import DataLoader
-from tqdm import trange
+from tqdm.auto import trange
 
 # param name -> mask tensor (or None for unrestricted).
 # Only params in the dict are optimized; all others are frozen.

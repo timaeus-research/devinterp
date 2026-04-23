@@ -1,19 +1,14 @@
 # DevInterp
 
-[![PyPI version](https://badge.fury.io/py/devinterp.svg)](https://badge.fury.io/py/devinterp) ![Python version](https://img.shields.io/pypi/pyversions/devinterp) ![Contributors](https://img.shields.io/github/contributors/timaeus-research/devinterp) [![Docs](https://img.shields.io/badge/Read_the_Docs!-white?style=flat&logo=Read-the-Docs&logoColor=black)](https://devinterp.timaeus.co/)
+[![PyPI version](https://badge.fury.io/py/devinterp.svg)](https://badge.fury.io/py/devinterp) ![Python version](https://img.shields.io/pypi/pyversions/devinterp) ![Contributors](https://img.shields.io/github/contributors/timaeus-research/devinterp) [![Docs](https://img.shields.io/badge/docs-devinterp.timaeus.co-blue?style=flat)](https://devinterp.timaeus.co/)
 
-
-## A Python Library for Developmental Interpretability Research
-
-DevInterp is a python library for conducting research on developmental interpretability, a novel AI safety research agenda rooted in Singular Learning Theory (SLT). DevInterp proposes tools for detecting, locating, and ultimately _controlling_ the development of structure over training.
-
-[Read more about developmental interpretability](https://www.lesswrong.com/posts/TjaeCWvLZtEDAS5Ex/towards-developmental-interpretability).
+DevInterp is [Timaeus](https://timaeus.co)' open source research package, built to allow external researchers to do SLT/DevInterp-style research on Large Language Models.
 
 ## Features
 
 - **SGLD Sampling** with per-token loss storage to xarray/Zarr
 - **Local Learning Coefficient (LLC)** estimation from sampling results
-- **Susceptibilities** measuring first-order posterior response to data perturbations, localized on model components
+- **Susceptibilities** measuring first-order posterior response to data perturbations, optionally restricted to specific model components
 - **Bayesian Influence Functions (BIF)** as posterior correlations (or covariances) between per-sample losses
 - **Weight restrictions** for sampling over parameter subsets (e.g., individual attention heads)
 
@@ -27,31 +22,11 @@ uv add devinterp
 
 ## Example
 
-See [`examples/quickstart.py`](examples/quickstart.py) for a runnable script that computes LLC and susceptibilities on Qwen2.5-0.5B.
+See the [Quickstart Notebook](examples/quickstart.ipynb) ([open in Colab](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/quickstart.ipynb)) or the [Quickstart Script](examples/quickstart.py) for examples of how to compute LLCs and susceptibilities on Qwen2.5-0.5B (GPU required).
 
 ## Quick Start
 
-### Compute the Local Learning Coefficient
-
-```python
-from devinterp.slt.llc import llc
-
-result = llc(
-    model=model,
-    dataset=dataset,              # HuggingFace Dataset with "input_ids"
-    observables={"train": dataset},
-    lr=0.001,
-    n_beta=30,
-    num_chains=4,
-    num_draws=200,
-)
-
-print(result["llc_mean"])         # scalar LLC
-print(result["llc_per_chain"])    # (num_chains,) per-chain LLC
-print(result["loss_trace"])       # (num_chains, num_steps) per-step loss, num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
-```
-
-### Sample with Observables
+### Sampling with Observables
 
 ```python
 from devinterp.slt.sampling import sample
@@ -71,7 +46,27 @@ tree = sample(
 # tree is an xr.DataTree backed by Zarr with full per-token loss traces
 ```
 
-### Compute Susceptibilities
+### Computing the Local Learning Coefficient
+
+```python
+from devinterp.slt.llc import llc
+
+result = llc(
+    model=model,
+    dataset=dataset,              # HuggingFace Dataset with "input_ids"
+    observables={"train": dataset},
+    lr=0.001,
+    n_beta=30,
+    num_chains=4,
+    num_draws=200,
+)
+
+print(result["llc_mean"])         # scalar LLC
+print(result["llc_per_chain"])    # (num_chains,) per-chain LLC
+print(result["loss_trace"])       # (num_chains, num_steps) per-step loss, num_steps = num_draws * num_steps_bw_draws + num_burnin_steps
+```
+
+### Computing Susceptibilities
 
 ```python
 from devinterp.slt.susceptibilities import susceptibilities
@@ -96,7 +91,7 @@ result = susceptibilities(
 `create_param_masks` supports 85+ HuggingFace model types and TransformerLens.
 Restriction patterns: `"full"`, `"l0"`, `"l0h1"`, `"l0g0"` (GQA group), `"l0 attn"`, `"l0 mlp"`, `"embed"`, `"unembed"`.
 
-### Compute BIF
+### Computing Bayesian Influence Functions
 
 ```python
 from devinterp.slt.bif import bif
@@ -172,16 +167,24 @@ llc_value = float(result["llc_mean"])
 
 ## Hyperparameter selection
 
-All sampling is sensitive to hyperparameters. See our [Sampling Hyperparameter Guide](https://timaeus.co/research/2026-04-21-sampling-guide).
+All sampling is sensitive to hyperparameters. Our [Sampling Hyperparameter Guide](https://timaeus.co/research/2026-04-21-sampling-guide) covers the three primary knobs — step size (`lr`), inverse temperature (`n_beta`), and localization strength (`localization`) — along with burn-in, steps between draws, and chain count, and walks through diagnosing common failure modes (non-convergence, spikes, NaNs, low signal-to-noise) from the loss traces.
 
 
 ## Further Reading
 
-- [You're Measuring Model Complexity Wrong](https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong) - Introduction to LLC and phase transitions (2024)
+Blog Posts:
+- [Spectroscopy at Scale: Finding Interpretable Structure in Pythia-1.4B](https://timaeus.co/research/2026-04-21-spectroscopy-main) (2026)
+- [Guide for Sampling Hyperparameter Selection](https://timaeus.co/research/2026-04-21-sampling-guide) (2026)
+
+Papers:
 - [Structural Inference with Susceptibilities](https://arxiv.org/abs/2504.18274) (2025)
 - [Towards Spectroscopy: Susceptibility Clusters in Language Models](https://arxiv.org/abs/2601.12703) (2026)
 - [The Local Learning Coefficient: A Singularity-Aware Complexity Measure](https://arxiv.org/pdf/2308.12108) (2023)
-- [Algebraic Geometry and Statistical Learning Theory](https://www.cambridge.org/core/books/algebraic-geometry-and-statistical-learning-theory/9C8FD1BDC817E2FC79117C7F41544A3A#fndtn-information) Watanabe (2009)
+
+Background:
+- [Algebraic Geometry and Statistical Learning Theory](https://www.cambridge.org/core/books/algebraic-geometry-and-statistical-learning-theory/9C8FD1BDC817E2FC79117C7F41544A3A#fndtn-information), Watanabe (2009)
+- [Interpreting the Ising Model](https://timaeus.co/research/2026-04-21-spectroscopy-ising) (2026)
+- [You're Measuring Model Complexity Wrong](https://www.lesswrong.com/posts/6g8cAftfQufLmFDYT/you-re-measuring-model-complexity-wrong) (2024)
 
 ## Credits & Citations
 
@@ -201,3 +204,9 @@ If this package was useful in your work, please cite it as:
   howpublished = {\url{https://github.com/timaeus-research/devinterp}},
 }
 ```
+
+The authors would like to thank Zach Furman, Matthew Farrugia-Roberts, Rohan Hitchcock, and Edmund Lau for useful advice.
+
+## About Timaeus
+
+Timaeus is a non-profit advancing AI safety through research in Singular Learning Theory (SLT). We use SLT to understand how training data shapes AI behavior, combining deep mathematical insights from algebraic geometry and statistical physics with empirical research to develop interpretability tools for how capabilities and values emerge during neural network training. This foundational work enables us to build interventions that ensure models are aligned with human values.
