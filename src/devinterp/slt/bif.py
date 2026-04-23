@@ -17,7 +17,7 @@ import numpy as np
 import torch
 import xarray as xr
 from datasets import Dataset
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from devinterp.slt.covariance import (
     batch_corrcoef,
