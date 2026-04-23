@@ -2,7 +2,7 @@ Welcome to DevInterp's documentation!
 =====================================
 
 DevInterp is `Timaeus <https://timaeus.co>`_' open source research package, built to allow
-external researchers to do SLT/DevInterp research on Large Language Models.
+external researchers to do SLT/DevInterp-style research on Large Language Models.
 
 Source: `github.com/timaeus-research/devinterp <https://github.com/timaeus-research/devinterp>`_.
 For questions, `Join the SLT and AI Safety Discord <https://discord.gg/UwjWKCZZYR>`_!

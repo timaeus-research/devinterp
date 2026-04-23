@@ -4,8 +4,8 @@ Sampling
 ========
 
 DevInterp uses Stochastic Gradient Langevin Dynamics (SGLD) to sample from the posterior
-distribution around model parameters. This is the foundation for computing LLC,
-susceptibilities, and BIF.
+distribution around model parameters. This is the foundation for computing Local Learning Coefficients (LLCs),
+Susceptibilities, and Bayesian Influence Functions (BIFs).
 
 .. figure:: figures/sample-macro.svg
    :class: dark-invert dark-screen
@@ -19,10 +19,9 @@ How Sampling Works
 
 The ``sample()`` function:
 
-1. Initializes the model at a checkpoint
-2. Runs multiple independent SGLD chains
-3. At each draw, evaluates per-token loss on the sampling dataset and all observables
-4. Writes everything to a Zarr store, returned as an ``xr.DataTree``
+1. Runs multiple independent SGLD chains
+2. At each draw, evaluates per-token loss on the sampling dataset and all observables
+3. Writes everything to a Zarr store, returned as an ``xr.DataTree``
 
 .. code-block:: python
 
