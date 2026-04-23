@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/devinterp.svg)](https://badge.fury.io/py/devinterp) ![Python version](https://img.shields.io/pypi/pyversions/devinterp) ![Contributors](https://img.shields.io/github/contributors/timaeus-research/devinterp) [![Docs](https://img.shields.io/badge/docs-devinterp.timaeus.co-blue?style=flat)](https://devinterp.timaeus.co/)
 
-DevInterp is [Timaeus](https://timaeus.co)' open source research package, built to allow external researchers to do SLT/DevInterp research on Large Language Models.
+DevInterp is [Timaeus](https://timaeus.co)' open source research package, built to allow external researchers to do SLT/DevInterp-style research on Large Language Models.
 
 ## Features
 
