@@ -18,7 +18,7 @@ dependencies = [
     "tqdm>=4.65.0",
     "transformers",
     "xarray>=2024.1.0",
-    "zarr>=3.0.0",
+    "zarr>=3.1.0,<3.2",
 ]
 classifiers = [
     "Programming Language :: Python :: 3.10",
