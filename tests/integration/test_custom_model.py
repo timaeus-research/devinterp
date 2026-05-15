@@ -139,6 +139,8 @@ def test_susceptibilities(model_and_data):
         **_SAMPLER_KW,
     )
     assert "susceptibilities" in result.children
+    sus = result["susceptibilities"].dataset
+    assert list(sus.coords["wr"].values) == ["full", "head0"]
 
 
 @pytest.mark.parametrize("field", ["rmsprop_eps", "rmsprop_alpha"])

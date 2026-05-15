@@ -108,7 +108,7 @@ def test_standalone_susceptibilities():
     sus = result["susceptibilities"].dataset
     assert "sus" in sus.data_vars
     assert "wr" in sus.coords
-    assert list(sus.coords["wr"].values) == ["l0h1"]
+    assert list(sus.coords["wr"].values) == ["full", "l0h1"]
 
 
 @pytest.mark.gpu

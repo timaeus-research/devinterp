@@ -173,8 +173,6 @@ def compute_susceptibilities(
     results: list[tuple[str, str, xr.DataArray, xr.DataArray]] = []
 
     for wr_name, wr in wr_map.items():
-        if wr_name == "full":
-            continue
         ds = wr.dataset
 
         # Verify expected layout since we slice positionally below.
