@@ -24,6 +24,8 @@ uv add devinterp
 
 See the [Quickstart Notebook](examples/quickstart.ipynb) ([open in Colab](https://colab.research.google.com/github/timaeus-research/devinterp/blob/main/examples/quickstart.ipynb)) or the [Quickstart Script](examples/quickstart.py) for examples of how to compute LLCs and susceptibilities on Qwen2.5-0.5B (GPU required).
 
+For a CPU-only check that needs no model download, [`examples/llc_calibration.py`](examples/llc_calibration.py) recovers the analytic learning coefficients of monomial (quasi-homogeneous) toy losses (`lambda = sum_i 1/p_i`) with `llc()`, a ground-truth calibration of the estimator.
+
 ## Quick Start
 
 ### Sampling with Observables
